@@ -2,7 +2,7 @@ import random
 
 ATGC = ["A","T","G","C"]
 
-num_mutation = 5000
+num_mutation = 100
 
 input1 = []
 input2 = []

@@ -31,6 +31,10 @@
 
 // スケッチサイズ
 constexpr size_t SKETCH_SIZE = 8192;
+static_assert(SKETCH_SIZE % 64 == 0);    // 64 の倍数であること
+
+// スケッチをワード単位で保持する型
+constexpr size_t NUM_WORDS = SKETCH_SIZE / 64;
 
 // k-mer 長さ（ハッシュ）
 constexpr size_t KMER = 64;
@@ -236,8 +240,99 @@ std::bitset<SKETCH_SIZE> make_odd_sketch_from_fasta(const std::string &fname) {
     return sketch;
 }
 
+// bitset を raw uint64_t 配列にしてバイナリ書き出す
+void write_sketch_binary(const std::bitset<SKETCH_SIZE>& sketch,
+                         const std::string& outfname) {
+    // SKETCH_SIZE ビットを 64 ビットずつ区切ったワード数
+    constexpr size_t NUM_WORDS = SKETCH_SIZE / 64;
 
+    // ビットセットを uint64_t 配列に展開
+    std::vector<uint64_t> words(NUM_WORDS, 0);
+    for (size_t w = 0; w < NUM_WORDS; ++w) {
+        uint64_t word = 0;
+        for (size_t b = 0; b < 64; ++b) {
+            if (sketch.test(w * 64 + b)) {
+                word |= (uint64_t(1) << b);
+            }
+        }
+        words[w] = word;
+    }
 
+    // バイナリモードでファイルを開いて write
+    std::ofstream ofs(outfname, std::ios::binary);
+    if (!ofs) {
+        throw std::runtime_error("Cannot open output file: " + outfname);
+    }
+    ofs.write(reinterpret_cast<const char*>(words.data()),
+              words.size() * sizeof(uint64_t));
+    if (!ofs) {
+        throw std::runtime_error("Error writing to file: " + outfname);
+    }
+}
+
+// スケッチをワード単位で保持する型
+struct Sketch {
+    std::vector<uint64_t> words;  // size() == NUM_WORDS
+};
+
+// バイナリファイル (*.sketch) を読み込んで Sketch オブジェクトを返す
+Sketch load_sketch(const std::string &fname) {
+    Sketch s;
+    s.words.resize(NUM_WORDS);
+    std::ifstream ifs(fname, std::ios::binary);
+    if (!ifs) throw std::runtime_error("Cannot open sketch file: " + fname);
+
+    // NUM_WORDS * 8 バイト分を一気読み
+    ifs.read(reinterpret_cast<char*>(s.words.data()),
+             NUM_WORDS * sizeof(uint64_t));
+    if (!ifs) throw std::runtime_error("Error reading sketch file: " + fname);
+    return s;
+}
+
+// ファイル名リストからすべてのスケッチを読み込む
+std::vector<Sketch> load_all_sketches(const std::vector<std::string> &paths) {
+    std::vector<Sketch> sketches;
+    sketches.reserve(paths.size());
+    for (const auto &p : paths) {
+        sketches.push_back(load_sketch(p));
+    }
+    return sketches;
+}
+
+/**
+ *  odd-sketch 同士の Jaccard 類似度推定値を返す
+ *  popcnt の定義上、2*popcnt > SKETCH_SIZE のとき
+ *  log の引数が負になるケースは Jaccard = 0 として扱う
+ */
+double jaccard_distance(const Sketch &a,
+                        const Sketch &b) {
+    if (a.words.size() != NUM_WORDS ||
+        b.words.size() != NUM_WORDS) {
+        throw std::runtime_error("Sketch size mismatch");
+    }
+
+    // 1) XOR -> POPCNT
+    uint64_t popcnt = 0;
+    for (size_t w = 0; w < NUM_WORDS; ++w) {
+        popcnt += __builtin_popcountll(a.words[w] ^ b.words[w]);
+    }
+
+    // 2*popcnt > sketch_size のときは 0 にクリップ
+    if (2 * popcnt > SKETCH_SIZE) {
+        return 0.0;
+    }
+
+    // 2) 式に代入
+    double d_pop    = static_cast<double>(popcnt);
+    double d_size   = static_cast<double>(SKETCH_SIZE);
+    double d_hashes = static_cast<double>(HASH_NUM);
+
+    double ratio = (2.0 * d_pop) / d_size;            // = 2*popcnt/sketch_size
+    double term  = std::log(1.0 - ratio);             // ≤ 0
+    double jacc  = 1.0 + (d_size / (2.0 * d_hashes)) * term;
+
+    return jacc;
+}
 
 int main(int argc, char** argv) {
     if (argc != 2) {
@@ -256,14 +351,14 @@ int main(int argc, char** argv) {
 
     
     if (mode == "sketch") {
+
         for (auto &f : paths) {
             auto S = make_odd_sketch_from_fasta(f);
-            std::cout << f << "\t" << S.to_string() << "\n";
             // 出力ファイル名は f+".sketch" 固定
             write_sketch_binary(S, f + ".sketch");
+            std::cout << f + ".sketch" << "\n";
         }
     }
-    /*
     else if (mode == "dist") {
         // すべての .sketch を読み込んでメモリに展開
         auto sketches = load_all_sketches(paths);
@@ -279,7 +374,7 @@ int main(int argc, char** argv) {
         std::cerr << "Unknown mode: " << mode << "\n";
         return 1;
     }
-    */
+    
     return 0;
 }
 
