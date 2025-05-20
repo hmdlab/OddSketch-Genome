@@ -1,24 +1,19 @@
-# ソースファイルのリスト
-SOURCES = oddsketch.cpp xxhash.cpp
+CXX := g++
+CXXFLAGS := -std=c++17 -O3 -march=native -fopenmp -Wall -Wextra
 
-# オブジェクトファイルのリスト（.cpp を .o に変換）
-OBJECTS = $(SOURCES:.cpp=.o)
+TARGET := oddsketch
+SRCS := oddsketch.cpp
+OBJS := $(SRCS:.cpp=.o)
 
-# コンパイラとオプション
-CXX = g++
-CXXFLAGS = -Wall -std=c++11
+.PHONY: all clean
 
-# 実行ファイル名
-TARGET = oddsketch
+all: $(TARGET)
 
-# コンパイルルール
-$(TARGET): $(OBJECTS)
-	$(CXX) $(OBJECTS) -o $(TARGET)
+$(TARGET): $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ -fopenmp
 
-# .cpp から .o への変換ルール
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# クリーンアップルール
 clean:
-	rm -f $(OBJECTS) $(TARGET)
+	rm -f $(OBJS) $(TARGET)

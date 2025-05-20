@@ -1,0 +1,2 @@
+/Users/kikutakyouhei/local/vscode/genome-oddsketch/genome-Odd-Sketch/src/test/testgenome1.fna
+/Users/kikutakyouhei/local/vscode/genome-oddsketch/genome-Odd-Sketch/src/test/testgenome2.fna

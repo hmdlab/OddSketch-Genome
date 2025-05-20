@@ -86,7 +86,7 @@ int main(){
                 //std::cout << kmer << std::endl;
 
                 uint64_t hash_value = XXH64(kmer.c_str(), kmerlen, 0);
-                //std::cout <<"1 "<< kmer <<hash_value<< std::endl;
+                //重複するkmerは除外しない（kmerの重複度が同じほど良いため）
                 if (sortedkmer.size() < sketch_size){
                     sortedkmer.push(hash_value);        
                 }
@@ -107,11 +107,6 @@ int main(){
             oddsketch1[idx_odd1] ^= 1;
             //std::cout<<idx_odd1<<oddsketch1[idx_odd1]<< std::endl;
         }
-
-        //!!!!!!
-        //std::cout<<"sketch1 finish"<<std::endl;
-
-
 
 //ここから計算
         std::priority_queue<uint64_t> sortedkmer2;
@@ -176,7 +171,7 @@ int main(){
     }
 
 
-    /*    double_t Jaccard = 1 + sketch_size/(4*numHashFunc)*log(1 - (2 * popcnt(&oddsketch, sketch_size))/sketch_size);
+       double_t Jaccard = 1 + sketch_size/(4*numHashFunc)*log(1 - (2 * popcnt(&oddsketch, sketch_size))/sketch_size);
     std::cout<<"popcnt"<<" "<<popcnt(&oddsketch, sketch_size)<<std::endl;
     std::cout<<"log"<<" "<<log(1 - (2 * popcnt(&oddsketch, sketch_size))/sketch_size)<<std::endl;
     std::cout<<"popcnt"<<" "<< sketch_size/(4*numHashFunc)*log(1 - (2 * popcnt(&oddsketch, sketch_size))/sketch_size)<<std::endl;
@@ -193,7 +188,7 @@ int main(){
 
 */
 // kmerをハッシュ化(xxhash)
-u_int64_t hash_kmer(const std::string &kmer){
+u_int64_t hash_kmer(const std::string_view &kmer){
     return XXH64(kmer.data(), kmer.length(), 0);
 }
 
@@ -211,18 +206,37 @@ std::bitset<SKETCH_SIZE> make_odd_sketch_from_fasta(const std::string &fname) {
         seq += line;
     }
 
+    // bottom-k sketch のための優先度付きキュー
+    std::priority_queue<uint64_t> sortedkmer;
+
+    // スライディングウィンドウで k-mer を取り出しハッシュ化、優先度付きキューに格納
+    for (size_t i = 0; i + KMER <= seq.size(); i++) {
+        std::string_view kmer(&seq[i], KMER);
+        uint64_t hash_value = hash_kmer(kmer);// ハッシュ値
+        // 重複するkmerは除外しない（kmerの重複度が同じほど良いため）
+        if (sortedkmer.size() < HASH_NUM) {
+            sortedkmer.push(hash_value);
+        } else if (sortedkmer.top() > hash_value) {
+            sortedkmer.pop();
+            sortedkmer.push(hash_value);
+        }
+    }
+
     // oddsketch本体, デフォルトで 0 に初期化
     std::bitset<SKETCH_SIZE> sketch;  
+    
 
-    // スライディングウィンドウで k-mer を取り出し
-    for (size_t i = 0; i + KMER <= seq.size(); ++i) {
-        std::string_view kmer(&seq[i], KMER);
-        uint64_t h = hash_kmer(std::string(kmer));    // ハッシュ値
-        size_t pos = h % SKETCH_SIZE;                // ビット位置
+    // HASH_NUM 個の最小値を取り出して、スケッチに入れる
+    for (size_t i = 0; i < HASH_NUM; i++) {
+        uint64_t min_i = sortedkmer.top();
+        sortedkmer.pop();
+        size_t pos = min_i % SKETCH_SIZE;                // ビット位置
         sketch.flip(pos);                            // 反転 (odd‐sketch の核心)
     }
     return sketch;
 }
+
+
 
 
 int main(int argc, char** argv) {
@@ -240,13 +254,16 @@ int main(int argc, char** argv) {
         paths.push_back(line);
     }
 
+    
     if (mode == "sketch") {
         for (auto &f : paths) {
             auto S = make_odd_sketch_from_fasta(f);
+            std::cout << f << "\t" << S.to_string() << "\n";
             // 出力ファイル名は f+".sketch" 固定
             write_sketch_binary(S, f + ".sketch");
         }
     }
+    /*
     else if (mode == "dist") {
         // すべての .sketch を読み込んでメモリに展開
         auto sketches = load_all_sketches(paths);
@@ -262,6 +279,7 @@ int main(int argc, char** argv) {
         std::cerr << "Unknown mode: " << mode << "\n";
         return 1;
     }
+    */
     return 0;
 }
 
