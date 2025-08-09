@@ -1,0 +1,40 @@
+# BinDash Parameters Used for Jaccard Coefficient Estimation
+# Generated on: 2025-07-27 20:09
+
+## Sketch Generation Parameters
+Command: bindash sketch
+- listfname: data/test_genomes/genome_paths_bindash.txt
+- outfname: data/test_genomes/bindash_sketch_testgenomes
+- nthreads: 8
+- kmerlen: 64  (Changed from 16 to match true Jaccard calculation)
+- sketchsize64: 32  (Default BinDash setting)
+
+## Distance Calculation Parameters  
+Command: bindash dist
+- outfname: data/test_genomes/jaccard_bindash_results.txt
+- nthreads: 8
+- input_sketch: data/test_genomes/bindash_sketch_testgenomes
+
+## Data Processing
+- Input genomes: 1000 files (genome1_001.fna ~ genome2_500.fna)
+- Extracted pairs: 500 pairs (genome1_XXX vs genome2_XXX matching IDs)
+- Genome length: 500,000 bp each
+- Mutation range: 13-2993 mutations per pair
+
+## Comparison with True Jaccard
+- True Jaccard k-mer length: 64
+- True Jaccard calculation: Exact set operations |A ∩ B| / |A ∪ B|
+- BinDash estimation: One-Permutation Hashing with densification
+
+## Results with k=64 (UPDATED)
+- Previous k=16 results: Systematic overestimation (+0.193578 mean error, RMSE: 0.212724)
+- Current k=64 results: Excellent alignment with true Jaccard values
+  * Correlation: 0.997494 (improved from 0.988636)
+  * RMSE: 0.009638 (improved from 0.212724)
+  * MAE: 0.007398 (improved from 0.193578)
+  * Mean Error: +0.000261 (almost zero bias, improved from +0.193578)
+- Reason: Matching k-mer length (k=64) eliminates k-mer sampling discrepancy
+
+## Conclusion
+Using k=64 (same as true Jaccard calculation) dramatically improves BinDash accuracy.
+The One-Permutation Hashing now shows near-perfect agreement with true Jaccard values.

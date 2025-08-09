@@ -1,0 +1,2 @@
+testgenome1.fna
+testgenome2.fna

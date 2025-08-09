@@ -1,0 +1,2 @@
+/Users/kikutakyouhei/local/claude/genome-oddsketch/genome-Odd-Sketch/src/test/data/test_genomes/genomes/genome1_001.fna
+/Users/kikutakyouhei/local/claude/genome-oddsketch/genome-Odd-Sketch/src/test/data/test_genomes/genomes/genome1_002.fna

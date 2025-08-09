@@ -28,6 +28,8 @@
 #include <time.h>
 #include <cstdlib>
 #include <bitset>
+#include <sys/resource.h>
+#include <unistd.h>
 
 // スケッチサイズ
 constexpr size_t SKETCH_SIZE = 8192;
@@ -42,158 +44,60 @@ constexpr size_t KMER = 64;
 // odd sketchの閾値
 constexpr double J0 = 0.75;
 
-// odd sketchのハッシュ関数の数（bottom-k sketchと組み合わせるため実際は１だが、計算上）
+// odd sketchのハッシュ関数の数（One Permutation Hashingと組み合わせるため）
 constexpr uint32_t HASH_NUM = SKETCH_SIZE; // n/{4(1-J0)}=n,since J0=0.75
 
-/*
-int main(){
-    std::chrono::system_clock::time_point  start, end;
-    start = std::chrono::system_clock::now();
 
-    const uint32_t kmerlen = 64;
-    const uint64_t sketch_size = 8192;
-    const double J0 = 0.75;
-    const uint32_t numHashFunc = sketch_size; // n/{4(1-J0)}=n,since J0=0.75
-    
-
-    size_t k,input_num;
-    std::cin>>k>>input_num;
-    std::vector<int> input_len;
-    for(int i=0; i<input_num; i++){
-        int t;
-        std::cin>>t;
-        input_len.push_back(t);
-
-    }
-    std::cout<<input_len[0]<<std::endl;
-
-    std::vector<double> Jaccards;
-
-
-    for (int i=0; i<input_num; i++){
-        std::string input1, input2;
-        std::cin>>input1>>input2;
-
-        if (input1.length()<kmerlen){
-            std::cout << "The length of the input string is smaller than kmerlen." << std::endl;
-            return 1;
-        }
-
-        //std::cout<<input1.length()<<" "<< input2.length()<<std::endl;
-        std::array<int, sketch_size> oddsketch1{};
-        std::array<int, sketch_size> oddsketch2{};
-
-//ここから計算
-        std::priority_queue<uint64_t> sortedkmer;
-        for (size_t i = 0; i <= input1.length() - kmerlen; i++) {
-                std::string kmer = input1.substr(i, kmerlen);
-                //std::cout << kmer << std::endl;
-
-                uint64_t hash_value = XXH64(kmer.c_str(), kmerlen, 0);
-                //重複するkmerは除外しない（kmerの重複度が同じほど良いため）
-                if (sortedkmer.size() < sketch_size){
-                    sortedkmer.push(hash_value);        
-                }
-                else if (sortedkmer.top() > hash_value){
-                    sortedkmer.pop();
-                    sortedkmer.push(hash_value);
-                }
-                
-        }
-        // bottom-numHashFunc個のminを取り出して、スケッチに入れる
-        for (uint32_t i = 0; i <= numHashFunc; i++){
-            uint64_t min_i = sortedkmer.top();
-            sortedkmer.pop();
-            
-            //std::cout << mkmer << min_i << std::endl;
-            int idx_odd1 = (min_i & (sketch_size-1));
-            
-            oddsketch1[idx_odd1] ^= 1;
-            //std::cout<<idx_odd1<<oddsketch1[idx_odd1]<< std::endl;
-        }
-
-//ここから計算
-        std::priority_queue<uint64_t> sortedkmer2;
-
-        for (size_t i = 0; i <= input2.length() - kmerlen; i++) {
-                std::string kmer = input2.substr(i, kmerlen);
-                //std::cout << kmer << std::endl;
-
-                uint64_t hash_value = XXH64(kmer.c_str(), kmerlen, 0);
-                //std::cout <<"1 "<< kmer <<hash_value<< std::endl;
-                if (sortedkmer2.size() < sketch_size){
-                    sortedkmer2.push(hash_value);        
-                }
-                else if (sortedkmer2.top() > hash_value){
-                    sortedkmer2.pop();
-                    sortedkmer2.push(hash_value);
-                }
-                
-        }
-        // bottom-numHashFunc個のminを取り出して、スケッチに入れる
-        for (uint32_t i = 0; i <= numHashFunc; i++){
-            uint64_t min_i = sortedkmer2.top();
-            sortedkmer2.pop();
-            
-            //std::cout << mkmer << min_i << std::endl;
-            int idx_odd2 = (min_i & (sketch_size-1));
-            
-            oddsketch2[idx_odd2] ^= 1;
-            //std::cout<<idx_odd1<<oddsketch1[idx_odd1]<< std::endl;
-        }
-        //std::cout<<"sketch2 finish"<<std::endl;
-
-        // oddsketch同士でXOR
-        std::array<int, sketch_size> oddsketch{};
-        uint64_t popcnt = 0;
-        for (uint64_t i=0; i<sketch_size; i++){
-            oddsketch[i] = oddsketch1[i] ^ oddsketch2[i];
-            popcnt += oddsketch[i];
-            //std::cout<<oddsketch[i]<<std::endl;
-        }
-
-        double_t d_popcnt = (double)popcnt;
-        double_t d_sketch_size = (double)sketch_size;
-        double_t d_numHashFunc = (double)numHashFunc;
-
-        double_t Jaccard = 1 + d_sketch_size/(2*d_numHashFunc)*std::log(1 - (2 * d_popcnt / d_sketch_size));
-        //std::cout<<"popcnt"<<" "<<popcnt<<std::endl;
-        //std::cout<<"login"<<" "<<(1 - (2 * d_popcnt / d_sketch_size))<<std::endl;
-        //std::cout<<"log"<<" "<<std::log(1 - (2 * d_popcnt / d_sketch_size))<<std::endl;
-        if (2 * popcnt > sketch_size){
-            Jaccard = 0;
-        } 
-
-        //std::cout<<Jaccard<<std::endl;
-        Jaccards.push_back(Jaccard);
-
-
-        end = std::chrono::system_clock::now();
-        double elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
-        std::cout<<elapsed<<std::endl;
-    
-    }
-
-
-       double_t Jaccard = 1 + sketch_size/(4*numHashFunc)*log(1 - (2 * popcnt(&oddsketch, sketch_size))/sketch_size);
-    std::cout<<"popcnt"<<" "<<popcnt(&oddsketch, sketch_size)<<std::endl;
-    std::cout<<"log"<<" "<<log(1 - (2 * popcnt(&oddsketch, sketch_size))/sketch_size)<<std::endl;
-    std::cout<<"popcnt"<<" "<< sketch_size/(4*numHashFunc)*log(1 - (2 * popcnt(&oddsketch, sketch_size))/sketch_size)<<std::endl;
-    std::cout<<Jaccard<<std::endl;
-
-
-    for(int i=0; i<Jaccards.size(); i++){
-        std::cout<<Jaccards[i]<<std::endl;
-    }
-    end = std::chrono::system_clock::now();
-    double elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
-    std::cout<<elapsed<<std::endl;
-}
-
-*/
 // kmerをハッシュ化(xxhash)
 u_int64_t hash_kmer(const std::string_view &kmer){
     return XXH64(kmer.data(), kmer.length(), 0);
+}
+
+// One-Permutation Hashing による MinHash 実装
+std::vector<uint64_t> get_minhash_one_permutation(const std::string &seq) {
+    // 適切なバケット数を設定（k-merの数より小さく）
+    const size_t NUM_BUCKETS = std::min(static_cast<size_t>(HASH_NUM), seq.size() > KMER ? seq.size() - KMER + 1 : 1);
+    
+    // 各bucketに対して最小ハッシュ値を保持
+    std::vector<uint64_t> bucket_min_hash(NUM_BUCKETS, UINT64_MAX);
+    
+    // スライディングウィンドウで k-mer を取り出しハッシュ化
+    for (size_t i = 0; i + KMER <= seq.size(); i++) {
+        std::string_view kmer(&seq[i], KMER);
+        uint64_t hash_value = hash_kmer(kmer);
+        
+        // ハッシュ値をbucket番号に変換（上位ビットを使用）
+        size_t bucket_id = (hash_value >> (64 - static_cast<int>(log2(NUM_BUCKETS)) - 1)) % NUM_BUCKETS;
+        
+        // 各bucketで最小値を更新
+        if (hash_value < bucket_min_hash[bucket_id]) {
+            bucket_min_hash[bucket_id] = hash_value;
+        }
+    }
+    
+    // 結果ベクターを準備（空bucketは除外してbottom-k相当に）
+    std::vector<uint64_t> non_empty_values;
+    for (size_t i = 0; i < NUM_BUCKETS; i++) {
+        if (bucket_min_hash[i] != UINT64_MAX) {
+            non_empty_values.push_back(bucket_min_hash[i]);
+        }
+    }
+    
+    // bottom-k相当に変換: ソートしてHASH_NUM個まで取る
+    std::sort(non_empty_values.begin(), non_empty_values.end());
+    std::vector<uint64_t> result(HASH_NUM);
+    
+    size_t copy_size = std::min(static_cast<size_t>(HASH_NUM), non_empty_values.size());
+    for (size_t i = 0; i < copy_size; i++) {
+        result[i] = non_empty_values[i];
+    }
+    
+    // 不足分は最大のハッシュ値で埋める（OddSketchでは問題にならない）
+    for (size_t i = copy_size; i < HASH_NUM; i++) {
+        result[i] = copy_size > 0 ? non_empty_values[copy_size - 1] : 0;
+    }
+    
+    return result;
 }
 
 // FASTA ファイルからシーケンスを読みつつ Odd Sketch ビットセットを構築
@@ -210,32 +114,17 @@ std::bitset<SKETCH_SIZE> make_odd_sketch_from_fasta(const std::string &fname) {
         seq += line;
     }
 
-    // bottom-k sketch のための優先度付きキュー
-    std::priority_queue<uint64_t> sortedkmer;
-
-    // スライディングウィンドウで k-mer を取り出しハッシュ化、優先度付きキューに格納
-    for (size_t i = 0; i + KMER <= seq.size(); i++) {
-        std::string_view kmer(&seq[i], KMER);
-        uint64_t hash_value = hash_kmer(kmer);// ハッシュ値
-        // 重複するkmerは除外しない（kmerの重複度が同じほど良いため）
-        if (sortedkmer.size() < HASH_NUM) {
-            sortedkmer.push(hash_value);
-        } else if (sortedkmer.top() > hash_value) {
-            sortedkmer.pop();
-            sortedkmer.push(hash_value);
-        }
-    }
+    // One Permutation Hashingを使用してMinHashを取得
+    std::vector<uint64_t> minhash_values = get_minhash_one_permutation(seq);
 
     // oddsketch本体, デフォルトで 0 に初期化
     std::bitset<SKETCH_SIZE> sketch;  
     
-
-    // HASH_NUM 個の最小値を取り出して、スケッチに入れる
-    for (size_t i = 0; i < HASH_NUM; i++) {
-        uint64_t min_i = sortedkmer.top();
-        sortedkmer.pop();
-        size_t pos = min_i % SKETCH_SIZE;                // ビット位置
-        sketch.flip(pos);                            // 反転 (odd‐sketch の核心)
+    // One Permutation Hashingで得られた値をスケッチに入れる
+    for (size_t i = 0; i < minhash_values.size(); i++) {
+        uint64_t hash_val = minhash_values[i];
+        size_t pos = hash_val % SKETCH_SIZE;  // ビット位置
+        sketch.flip(pos);                     // 反転 (odd‐sketch の核心)
     }
     return sketch;
 }
@@ -329,7 +218,8 @@ double jaccard_distance(const Sketch &a,
 
     double ratio = (2.0 * d_pop) / d_size;            // = 2*popcnt/sketch_size
     double term  = std::log(1.0 - ratio);             // ≤ 0
-    double jacc  = 1.0 + (d_size / (2.0 * d_hashes)) * term;
+    double jacc  = 1.0 + (d_size / (4.0 * d_hashes)) * term;
+    // double jacc  = 1.0 + (d_size / (4.0 * d_hashes)) * term;
 
     return jacc;
 }

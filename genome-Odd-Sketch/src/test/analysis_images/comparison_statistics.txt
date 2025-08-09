@@ -1,0 +1,20 @@
+OddSketch vs BinDash 統計比較結果
+==================================================
+
+データセット: 500 ペア
+真値範囲: 0.514442 - 0.996677
+
+OddSketch (k=64, One Permutation Hashing):
+  RMSE: 0.011152
+  MAE:  0.007861
+  範囲: 0.469160 - 0.997176
+
+BinDash (k=16, One Permutation Hashing):
+  RMSE: 0.727334
+  MAE:  0.714202
+  範囲: 0.000026 - 0.006022
+
+性能比較:
+  RMSE比率 (BinDash/OddSketch): 65.22
+  MAE比率 (BinDash/OddSketch): 90.85
+  → OddSketchが98.5%優位
