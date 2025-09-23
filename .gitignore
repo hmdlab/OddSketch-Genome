@@ -1,0 +1,11 @@
+# Test data and generated artifacts
+src/test/data/test_genomes/genomes/
+src/test/data/test_genomes/*.sketch
+src/test/data/test_genomes/*.tsv
+src/test/data/test_genomes/*.csv
+src/test/data/test_genomes/*.png
+src/test/data/test_genomes/*_results.txt
+
+# Common OS/editor files
+.DS_Store
+.vscode/
