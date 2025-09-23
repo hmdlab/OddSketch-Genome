@@ -5,6 +5,7 @@ src/test/data/test_genomes/*.tsv
 src/test/data/test_genomes/*.csv
 src/test/data/test_genomes/*.png
 src/test/data/test_genomes/*_results.txt
+src/cal/input_SNP.txt
 
 # Common OS/editor files
 .DS_Store
