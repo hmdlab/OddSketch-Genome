@@ -4,7 +4,7 @@
 - `src`: コア実装。
   - `oddsketch.cpp` + `Makefile`: C++17/OpenMP のバイナリ `oddsketch` を生成。
   - `oddpipe.py`: パイプライン CLI（download → sketch → dist）。
-  - `extract_jaccard_values.py`、`cal/`、`images/`、`test/`: 解析・可視化・サンプルデータ/スクリプト。
+  - `extract_jaccard_values.py`、`cal/`、`test/`: 解析・可視化・サンプルデータ/スクリプト。
 
 ## ビルド・実行・開発コマンド
 - コアのビルド: `cd src && make`

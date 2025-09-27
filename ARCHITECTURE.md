@@ -28,7 +28,7 @@ assembly_summary.txt ──> refgenomes.list ──> .sketch 群 ──> dist.ts
 ## ディレクトリ規約
 - コア: `src`（`oddsketch.cpp`, `Makefile`, `oddpipe.py`）
 - ゴールデン/検証データ: `src/test/data/test_genomes/`
-- 図表/スクリプト: `src/images/`, `src/test/`
+- 図表/スクリプト: `src/test/`
 - 大容量データはコミットしない。パスは `.list`/`.sketch` で参照。
 
 ## 並列化と性能
