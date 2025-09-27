@@ -1,10 +1,29 @@
 import os
 import subprocess
 import tempfile
+import json
+
+def load_pipeline_config():
+    candidates = [
+        os.path.join(os.path.dirname(__file__), '..', 'pipeline_config.json')
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            try:
+                with open(c) as f:
+                    return json.load(f)
+            except Exception:
+                pass
+    return {}
+
 
 def run_oddsketch_sketch(genome_files):
     """OddSketchでスケッチファイルを生成"""
     sketch_files = []
+    cfg = load_pipeline_config()
+    oddcfg = cfg.get('oddsketch', {}) if isinstance(cfg, dict) else {}
+    kmer = oddcfg.get('kmerlen', 64)
+    ssize = oddcfg.get('sketch_size', 8192)
     
     # 一時ファイルでファイルパスリストを作成
     with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
@@ -14,8 +33,9 @@ def run_oddsketch_sketch(genome_files):
     
     try:
         # oddsketch sketch コマンドを実行
+        cmd = ['../oddsketch', 'sketch', f'--kmer={kmer}', f'--sketch-size={ssize}']
         result = subprocess.run(
-            ['../oddsketch', 'sketch'],
+            cmd,
             stdin=open(temp_path_file, 'r'),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -38,6 +58,10 @@ def run_oddsketch_sketch(genome_files):
 
 def run_oddsketch_dist(sketch_files):
     """OddSketchでJaccard距離を計算"""
+    cfg = load_pipeline_config()
+    oddcfg = cfg.get('oddsketch', {}) if isinstance(cfg, dict) else {}
+    kmer = oddcfg.get('kmerlen', 64)
+    ssize = oddcfg.get('sketch_size', 8192)
     # 一時ファイルでスケッチファイルパスリストを作成
     with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
         for sketch_file in sketch_files:
@@ -46,8 +70,9 @@ def run_oddsketch_dist(sketch_files):
     
     try:
         # oddsketch dist コマンドを実行
+        cmd = ['../oddsketch', 'dist', f'--kmer={kmer}', f'--sketch-size={ssize}']
         result = subprocess.run(
-            ['../oddsketch', 'dist'],
+            cmd,
             stdin=open(temp_sketch_file, 'r'),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -145,7 +170,34 @@ def main():
         for result in results:
             f.write(f"{result['pair_id']}\t{result['mutation_count']}\t{result['genome_length']}\t"
                    f"{result['jaccard_estimate']:.10f}\t{result['sketch_file1']}\t{result['sketch_file2']}\n")
-    
+    # 比較用CSVも（真値が存在すれば）同時に生成
+    true_path = "data/test_genomes/jaccard_true_results.txt"
+    if os.path.exists(true_path):
+        true = {}
+        import csv
+        with open(true_path) as tf:
+            rd = csv.reader(tf, delimiter='\t')
+            next(rd, None)
+            for row in rd:
+                if not row:
+                    continue
+                pid = int(row[0])
+                true[pid] = {
+                    'mutation_count': int(row[1]),
+                    'jaccard_true': float(row[4])
+                }
+        out_csv = "data/test_genomes/comparison_results_oddsketch.csv"
+        with open(out_csv, 'w') as cf:
+            w = csv.writer(cf)
+            w.writerow(['pair_id','mutation_count','jaccard_true','jaccard_oddsketch'])
+            for r in sorted(results, key=lambda x: x['pair_id']):
+                pid = r['pair_id']
+                if pid in true:
+                    w.writerow([pid, true[pid]['mutation_count'], true[pid]['jaccard_true'], r['jaccard_estimate']])
+        print(f"比較CSVを書き出しました: {out_csv}")
+    else:
+        print("注意: 真値ファイルが見つからないため comparison_results.csv の生成をスキップしました。")
+
     # 統計情報の表示
     print(f"\n計算完了!")
     print(f"処理ペア数: {len(results)}")

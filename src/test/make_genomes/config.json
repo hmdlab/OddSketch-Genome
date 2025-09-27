@@ -1,0 +1,9 @@
+{
+  "genome_length": 500000,
+  "num_pairs": 100,
+  "mutation_min": 50,
+  "mutation_max": 3000,
+  "outdir": "data/test_genomes/genomes",
+  "seed_base": 2000
+}
+

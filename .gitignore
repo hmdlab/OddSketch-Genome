@@ -5,7 +5,24 @@ src/test/data/test_genomes/*.tsv
 src/test/data/test_genomes/*.csv
 src/test/data/test_genomes/*.png
 src/test/data/test_genomes/*_results.txt
-src/cal/input_SNP.txt
+src/test/data/test_genomes/bindash_sketch*
+src/test/data/test_genomes/*.list
+src/test/data/test_genomes/*.txt
+src/test/data/test_genomes/results/
+
+# Build artifacts (local)
+src/*.o
+src/cal/cal_Jaccard
+
+# Virtualenvs and caches
+.venv/
+.env
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# External tools (cloned locally)
+external/
 
 # Common OS/editor files
 .DS_Store

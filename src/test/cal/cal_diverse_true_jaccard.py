@@ -1,4 +1,5 @@
 import os
+import json
 from collections import defaultdict
 
 def read_fasta(filename):
@@ -30,8 +31,27 @@ def calculate_jaccard(kmers1, kmers2):
     return intersection / union
 
 def main():
-    # パラメータ設定
-    k = 64  # k-mer長（oddsketchと同じ）
+    # 設定読み込み（統合config対応）。デフォルトは pipeline_config.json。
+    # ファイルが無い場合やキーが無い場合は既定値にフォールバック。
+    cfg_path_candidates = [
+        os.path.join(os.path.dirname(__file__), '..', 'pipeline_config.json'),
+        os.path.join(os.path.dirname(__file__), '..', 'bindash_config.json'),  # 互換
+    ]
+    k = 64
+    for c in cfg_path_candidates:
+        try:
+            if os.path.exists(c):
+                with open(c) as f:
+                    data = json.load(f)
+                # true_jaccard.kmerlen またはトップレベル kmerlen を参照
+                if isinstance(data, dict):
+                    if 'true_jaccard' in data and isinstance(data['true_jaccard'], dict):
+                        k = int(data['true_jaccard'].get('kmerlen', k))
+                    elif 'kmerlen' in data:
+                        k = int(data.get('kmerlen', k))
+                break
+        except Exception:
+            pass
     
     # ペア情報の読み込み
     pair_info_file = "data/test_genomes/pair_info.txt"

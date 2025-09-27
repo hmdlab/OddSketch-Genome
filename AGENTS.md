@@ -15,7 +15,8 @@
   - 距離計算: `cd src && ./oddpipe.py dist --list refgenomes.sketch --threads 8 > refgenomes.dist.tsv`
 - テスト補助:
   - 精度比較: `src/test/` のスクリプト（例 `text_bindash_oddsketch_compare.py`）を `src/test/data/` の結果ファイルに対して実行。
-  - 比較・図示（推奨）: `cd src/test/analysis_images && python compare_results.py`
+  - 比較・図示（推奨）: `cd src/test/analysis_images && python true_vs_oddsketch_compare.py`
+  - 単純図示: `python plot_true_vs_oddsketch.py`（OddSketch, 入力: `comparison_results_oddsketch.csv`）, `python plot_true_vs_bindash.py`（BinDash, 入力: `comparison_results_bindash.csv`）
   - 依存関係: `pip install -r requirements.txt`
 
 ## コーディング規約・命名
