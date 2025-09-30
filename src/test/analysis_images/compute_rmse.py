@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
 compute_rmse.py
-comparison_results_*.csv から RMSE を計算します。
+comparison_results_*.csv から RMSE / MAE を計算します。
 
 計算内容:
-- RMSE(all): 全データでの RMSE
-- RMSE(high): 真値 jaccard_true > 閾値（既定 0.75）のみでの RMSE
+- 全体の RMSE / MAE
+- 類似度ビンごとの RMSE / MAE と 95%CI（ブートストラップ）
 
 入力CSV 必須列:
 - pair_id, jaccard_true, <推定列>
@@ -16,12 +16,14 @@ comparison_results_*.csv から RMSE を計算します。
 - OddSketch:  python compute_rmse.py --csv ../data/test_genomes/comparison_results_oddsketch.csv
 - BinDash:    python compute_rmse.py --csv ../data/test_genomes/comparison_results_bindash.csv --est-col jaccard_bindash
 - 複数CSV:    python compute_rmse.py --csv file1.csv --csv file2.csv
+- ビン指定:   python compute_rmse.py --bins 0.5,0.6,0.7,0.8,0.9,1.0 --bootstrap 1000
 """
 
 import argparse
 import csv
 import math
 from pathlib import Path
+import random
 
 
 def load_pairs(path: Path, est_col: str | None):
@@ -57,7 +59,20 @@ def main():
     ap.add_argument("--csv", action="append", required=True, help="入力CSV（複数可）")
     ap.add_argument("--est-col", default=None, help="推定列名（例: jaccard_oddsketch, jaccard_bindash）")
     ap.add_argument("--threshold", type=float, default=0.75, help="高類似度RMSEのしきい値（真値>threshold）")
+    ap.add_argument("--bins", default="0.5,0.6,0.7,0.8,0.9,1.0", help="類似度ビンの端点CSV（例: 0.5,0.6,0.7,0.8,0.9,1.0）")
+    ap.add_argument("--bootstrap", type=int, default=1000, help="95%CI推定のブートストラップ反復回数")
+    ap.add_argument("--min-n", type=int, default=20, help="各ビンの最低サンプル数（未満はスキップ）")
     args = ap.parse_args()
+
+    # 乱数シード（再現性確保したい場合は固定）
+    random.seed(42)
+
+    # ビン端点
+    try:
+        edges = [float(x.strip()) for x in args.bins.split(',') if x.strip()]
+        assert len(edges) >= 2
+    except Exception:
+        raise SystemExit("--bins の形式が不正です。例: 0.5,0.6,0.7,0.8,0.9,1.0")
 
     for csv_path in args.csv:
         p = Path(csv_path)
@@ -80,7 +95,50 @@ def main():
         print(f"  N(true>{args.threshold:.2f}): {n_hi}")
         print(f"  RMSE(true>{args.threshold:.2f}): {r_hi:.6f}")
 
+        # 類似度ビンごとの RMSE/MAE (+ 95%CI)
+        print("  Binned metrics (mean ± 95%CI):")
+        for i in range(len(edges) - 1):
+            lo, hi = edges[i], edges[i+1]
+            # 最後のビンは上端含む
+            if i == len(edges) - 2:
+                sel = [j for j, x in enumerate(xs) if (x >= lo and x <= hi)]
+            else:
+                sel = [j for j, x in enumerate(xs) if (x >= lo and x < hi)]
+            n = len(sel)
+            if n < args.min_n:
+                print(f"    [{lo:.2f},{hi:.2f}{']' if i==len(edges)-2 else ')'}: N={n} (skip)")
+                continue
+            xe = [xs[j] for j in sel]
+            ye = [ys[j] for j in sel]
+            # 誤差系列
+            abs_err = [abs(ye[k]-xe[k]) for k in range(n)]
+            sq_err  = [(ye[k]-xe[k])**2 for k in range(n)]
+            mae = sum(abs_err)/n
+            rmse_bin = math.sqrt(sum(sq_err)/n)
+            # 95%CI（ブートストラップ）
+            def boot_ci(vals, is_rmse=False):
+                B = args.bootstrap
+                if B <= 0:
+                    return (float('nan'), float('nan'))
+                res = []
+                idx = list(range(n))
+                for _ in range(B):
+                    samp = [vals[random.choice(idx)] for __ in range(n)]
+                    if is_rmse:
+                        res.append(math.sqrt(sum(samp)/n))
+                    else:
+                        res.append(sum(samp)/n)
+                res.sort()
+                lo_p = res[int(0.025*B)]
+                hi_p = res[int(0.975*B)]
+                return (lo_p, hi_p)
+            mae_lo, mae_hi = boot_ci(abs_err, is_rmse=False)
+            rm_lo, rm_hi   = boot_ci(sq_err, is_rmse=True)
+            # 表示
+            bracket = ']' if i == len(edges)-2 else ')'
+            print(f"    [{lo:.2f},{hi:.2f}{bracket}: N={n}  RMSE={rmse_bin:.6f} (95% CI: {rm_lo:.6f}-{rm_hi:.6f}),  "
+                  f"MAE={mae:.6f} (95% CI: {mae_lo:.6f}-{mae_hi:.6f})")
+
 
 if __name__ == "__main__":
     main()
-

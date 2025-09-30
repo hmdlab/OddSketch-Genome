@@ -49,51 +49,95 @@ u_int64_t hash_kmer(const std::string_view &kmer){
 }
 
 // One-Permutation Hashing による MinHash 実装
+// 2の冪への丸め（以下の densify ではパワーオブツーが望ましい）
+static inline size_t floor_pow2(size_t x) {
+    if (x == 0) return 1;
+    size_t p = 1;
+    while ((p << 1) <= x) p <<= 1;
+    return p;
+}
+
+// ---- 2-universal hash (multiply-shift; k は 2 の冪を推奨) ----
+struct UnivHash {
+    uint64_t a, b;  // a は奇数
+    size_t k;       // バケット数（2^m）
+    unsigned shift; // 64 - m
+
+    explicit UnivHash(size_t k_, uint64_t seed = 0x9e3779b97f4a7c15ULL) : k(k_) {
+        a = 0x2545F4914F6CDD1DULL ^ seed;
+        if ((a & 1ULL) == 0) a ^= 1ULL; // 奇数化
+        b = 0x9E3779B185EBCA87ULL + (seed << 1);
+        unsigned m = 0; while ((1ULL << m) < k) ++m; shift = 64 - m;
+    }
+    inline size_t operator()(uint64_t x) const {
+        uint64_t y = a * x + b;      // mod 2^64
+        return (size_t)(y >> shift); // 上位ビットを抽出 → [0, k)
+    }
+};
+
+// （i, attempt）を 64bit にパック
+static inline uint64_t pack_pair(uint32_t i, uint32_t attempt) {
+    return (uint64_t(i) << 32) ^ uint64_t(attempt);
+}
+
+// ---- Optimal densification (Shrivastava 2017, Algorithm 1) ----
+// buckets: OPH の各バケット最小値（空は UINT64_MAX）
+// 戻り値: 稠密化後の配列（すべて非空）
+static std::vector<uint64_t> densify_optimal(const std::vector<uint64_t>& buckets) {
+    const size_t k = buckets.size();
+    std::vector<uint64_t> out(k);
+    if (k == 0) return out;
+
+    bool any = false;
+    for (auto v : buckets) { if (v != UINT64_MAX) { any = true; break; } }
+    if (!any) { std::fill(out.begin(), out.end(), 0ULL); return out; }
+
+    UnivHash huniv(k);
+    for (uint32_t i = 0; i < (uint32_t)k; ++i) {
+        if (buckets[i] != UINT64_MAX) {
+            out[i] = buckets[i];
+        } else {
+            uint32_t attempt = 1;
+            while (true) {
+                size_t next = huniv(pack_pair(i, attempt));
+                if (buckets[next] != UINT64_MAX) { out[i] = buckets[next]; break; }
+                ++attempt;
+            }
+        }
+    }
+    return out;
+}
+
 std::vector<uint64_t> get_minhash_one_permutation(const std::string &seq) {
-    // 適切なバケット数を設定（k-merの数より小さく）
-    const size_t HASH_NUM = G_SKETCH_SIZE;
-    const size_t NUM_BUCKETS = std::min(static_cast<size_t>(HASH_NUM), seq.size() > KMER ? seq.size() - KMER + 1 : 1);
-    
-    // 各bucketに対して最小ハッシュ値を保持
+    // バケット数は G_SKETCH_SIZE 以下の 2 の冪（推奨）
+    size_t desired = G_SKETCH_SIZE;
+    size_t NUM_BUCKETS = floor_pow2(desired);
+    if (NUM_BUCKETS == 0) NUM_BUCKETS = 1;
+
+    // 各バケットに最小ハッシュを保持（空は UINT64_MAX）
     std::vector<uint64_t> bucket_min_hash(NUM_BUCKETS, UINT64_MAX);
-    
-    // スライディングウィンドウで k-mer を取り出しハッシュ化
-    for (size_t i = 0; i + KMER <= seq.size(); i++) {
+
+    // k-mer を走査して各バケットの min を更新
+    size_t num_kmers = (seq.size() >= KMER) ? (seq.size() - KMER + 1) : 0;
+    // バケットIDは上位ビットから決める（下位ビットは後段の pos=hv%M と相関させないため）
+    unsigned m = 0; while ((1ULL << m) < NUM_BUCKETS) ++m; unsigned shift = 64 - m;
+    for (size_t i = 0; i < num_kmers; ++i) {
         std::string_view kmer(&seq[i], KMER);
-        uint64_t hash_value = hash_kmer(kmer);
-        
-        // ハッシュ値をbucket番号に変換（上位ビットを使用）
-        size_t bucket_id = (hash_value >> (64 - static_cast<int>(log2(NUM_BUCKETS)) - 1)) % NUM_BUCKETS;
-        
-        // 各bucketで最小値を更新
-        if (hash_value < bucket_min_hash[bucket_id]) {
-            bucket_min_hash[bucket_id] = hash_value;
-        }
+        uint64_t hv = hash_kmer(kmer);
+        size_t bucket_id = static_cast<size_t>(hv >> shift); // 上位ビット → [0, NUM_BUCKETS)
+        if (hv < bucket_min_hash[bucket_id]) bucket_min_hash[bucket_id] = hv;
     }
-    
-    // 結果ベクターを準備（空bucketは除外してbottom-k相当に）
-    std::vector<uint64_t> non_empty_values;
-    for (size_t i = 0; i < NUM_BUCKETS; i++) {
-        if (bucket_min_hash[i] != UINT64_MAX) {
-            non_empty_values.push_back(bucket_min_hash[i]);
-        }
-    }
-    
-    // bottom-k相当に変換: ソートしてHASH_NUM個まで取る
-    std::sort(non_empty_values.begin(), non_empty_values.end());
-    std::vector<uint64_t> result(HASH_NUM);
-    
-    size_t copy_size = std::min(static_cast<size_t>(HASH_NUM), non_empty_values.size());
-    for (size_t i = 0; i < copy_size; i++) {
-        result[i] = non_empty_values[i];
-    }
-    
-    // 不足分は最大のハッシュ値で埋める（OddSketchでは問題にならない）
-    for (size_t i = copy_size; i < HASH_NUM; i++) {
-        result[i] = copy_size > 0 ? non_empty_values[copy_size - 1] : 0;
-    }
-    
-    return result;
+
+    // 最適稠密化（optimal densification）
+    auto dense = densify_optimal(bucket_min_hash);
+
+    // 参考: 空率の期待値 s*exp(-n/s)
+    // size_t s = NUM_BUCKETS; size_t n = num_kmers;
+    // double expected_empty = s * std::exp(-(double)n / (double)s);
+    // std::cerr << "[OPH] buckets=" << s << ", kmers=" << n << ", expected_empty≈" << expected_empty << "\n";
+
+    // 各バケット値をそのまま返す（後段で mod G_SKETCH_SIZE してビット反転）
+    return dense;
 }
 
 // ビット操作（64ビットワード配列）
@@ -123,11 +167,11 @@ std::vector<uint64_t> make_odd_sketch_from_fasta(const std::string &fname) {
     }
     std::vector<uint64_t> words(G_SKETCH_SIZE / 64, 0);
 
-    // One Permutation Hashingで得られた値をスケッチに入れる
+    // One Permutation Hashingで得られた値（バケットごとの最小値）をスケッチに入れる（直写像のベースライン）
     for (size_t i = 0; i < minhash_values.size(); i++) {
-        uint64_t hash_val = minhash_values[i];
-        size_t pos = static_cast<size_t>(hash_val % G_SKETCH_SIZE);  // ビット位置
-        flip_bit(words, pos);                                        // 反転 (odd‐sketch の核心)
+        uint64_t hv = minhash_values[i];
+        size_t pos = static_cast<size_t>(hv % G_SKETCH_SIZE);  // 直写像: hv の下位ビットで位置決定
+        flip_bit(words, pos);                                   // 反転 (odd‐sketch の核心)
     }
     return words;
 }

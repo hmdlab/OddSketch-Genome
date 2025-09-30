@@ -3,7 +3,7 @@
     "genome_length": 1000000,
     "num_pairs": 500,
     "mutation_min": 10,
-    "mutation_max": 4000,
+    "mutation_max": 500,
     "outdir": "data/test_genomes/genomes",
     "seed_base": 2000
   },
@@ -12,7 +12,7 @@
   },
   "oddsketch": {
     "kmerlen": 64,
-    "sketch_size": 131072,
+    "sketch_size": 16384,
     "note": "oddsketch は現状コンパイル時定数。C++側の KMER/SKETCH_SIZE を更新してください。"
   },
   "bindash": {
@@ -20,7 +20,7 @@
     "threads": 8,
     "mode": "sketch_dist",
     "kmerlen": 64,
-    "sketchsize64": 128,
+    "sketchsize64": 256,
     "bbits": 16,
     "pair_cmd": "{bin} exact --nthreads={threads} {f1} {f2}",
     "parse": "tsv3_or_fraction"
