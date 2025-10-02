@@ -12,7 +12,7 @@
   },
   "oddsketch": {
     "kmerlen": 64,
-    "sketch_size": 8192,
+    "sketch_size": 1024,
     "j0": 0.90,
     "note": "oddsketch は現状コンパイル時定数。C++側の KMER/SKETCH_SIZE を更新してください。"
   },
@@ -21,7 +21,7 @@
     "threads": 8,
     "mode": "sketch_dist",
     "kmerlen": 64,
-    "sketchsize64": 128,
+    "sketchsize64": 16,
     "bbits": 16,
     "pair_cmd": "{bin} exact --nthreads={threads} {f1} {f2}",
     "parse": "tsv3_or_fraction"

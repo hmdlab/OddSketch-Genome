@@ -24,6 +24,7 @@ def run_oddsketch_sketch(genome_files):
     oddcfg = cfg.get('oddsketch', {}) if isinstance(cfg, dict) else {}
     kmer = oddcfg.get('kmerlen', 64)
     ssize = oddcfg.get('sketch_size', 8192)
+    j0 = oddcfg.get('j0', 0.75)
     
     # 一時ファイルでファイルパスリストを作成
     with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
@@ -33,12 +34,12 @@ def run_oddsketch_sketch(genome_files):
     
     try:
         # oddsketch sketch コマンドを実行
-        cmd = ['../oddsketch', 'sketch', f'--kmer={kmer}', f'--sketch-size={ssize}']
+        cmd = ['../oddsketch', 'sketch', f'--kmer={kmer}', f'--sketch-size={ssize}', f'--j0={j0}']
         result = subprocess.run(
             cmd,
             stdin=open(temp_path_file, 'r'),
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=None,  # デバッグ出力（sketchsize など）をそのままコンソールへ
             text=True,
             check=True
         )
@@ -62,6 +63,7 @@ def run_oddsketch_dist(sketch_files):
     oddcfg = cfg.get('oddsketch', {}) if isinstance(cfg, dict) else {}
     kmer = oddcfg.get('kmerlen', 64)
     ssize = oddcfg.get('sketch_size', 8192)
+    j0 = oddcfg.get('j0', 0.75)
     # 一時ファイルでスケッチファイルパスリストを作成
     with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
         for sketch_file in sketch_files:
@@ -70,12 +72,12 @@ def run_oddsketch_dist(sketch_files):
     
     try:
         # oddsketch dist コマンドを実行
-        cmd = ['../oddsketch', 'dist', f'--kmer={kmer}', f'--sketch-size={ssize}']
+        cmd = ['../oddsketch', 'dist', f'--kmer={kmer}', f'--sketch-size={ssize}', f'--j0={j0}']
         result = subprocess.run(
             cmd,
             stdin=open(temp_sketch_file, 'r'),
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=None,  # デバッグ出力（nbits/kbuckets）をそのままコンソールへ
             text=True,
             check=True
         )

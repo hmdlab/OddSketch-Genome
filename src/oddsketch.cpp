@@ -36,10 +36,10 @@ static size_t G_SKETCH_SIZE = 8192;
 // k-mer 長さ（実行時に上書き可能）
 static size_t KMER = 64;
 
-// odd sketchの閾値
-constexpr double J0 = 0.75;
+// odd sketchの閾値（実行時に上書き可能）
+static double J0 = 0.75;
 
-// odd sketchのハッシュ関数の数（One Permutation Hashingと組み合わせるため）
+// odd sketchのハッシュ値の個数（One Permutation Hashingと組み合わせるため）
 // 実装上、ハッシュ数はスケッチビット数と同スケールで扱う
 
 
@@ -108,11 +108,21 @@ static std::vector<uint64_t> densify_optimal(const std::vector<uint64_t>& bucket
     return out;
 }
 
+// 直近の OPH バケット数を保持（書き出し用）
+static size_t G_LAST_NUM_BUCKETS = 0;
+
 std::vector<uint64_t> get_minhash_one_permutation(const std::string &seq) {
-    // バケット数は G_SKETCH_SIZE 以下の 2 の冪（推奨）
-    size_t desired = G_SKETCH_SIZE;
+    // バケット数は Odd Sketch 論文の推奨式に基づき設定:
+    //   L = n / (4 * (1 - J0))
+    // ここで n はスケッチのビット数（G_SKETCH_SIZE）とし、J0 はしきい値（デフォルト 0.75）。
+    double denom = 4.0 * (1.0 - J0);
+    size_t desired = (denom > 0.0)
+        ? static_cast<size_t>(std::max(1.0, std::round(static_cast<double>(G_SKETCH_SIZE) / denom)))
+        : G_SKETCH_SIZE;
+    // 実装簡素化と均等性のため、2 の冪に丸める
     size_t NUM_BUCKETS = floor_pow2(desired);
     if (NUM_BUCKETS == 0) NUM_BUCKETS = 1;
+    G_LAST_NUM_BUCKETS = NUM_BUCKETS;
 
     // 各バケットに最小ハッシュを保持（空は UINT64_MAX）
     std::vector<uint64_t> bucket_min_hash(NUM_BUCKETS, UINT64_MAX);
@@ -176,24 +186,41 @@ std::vector<uint64_t> make_odd_sketch_from_fasta(const std::string &fname) {
     return words;
 }
 
-// 生の uint64_t 配列をバイナリ書き出し
+// スケッチヘッダ（可搬性簡易のためバイナリ直書き）
+struct SketchHeader {
+    char magic[4];      // 'O','D','S','K'
+    uint32_t version;   // 1
+    uint64_t nbits;     // スケッチビット数
+    uint64_t kbuckets;  // OPHバケット数（稠密化後）
+    double j0;          // しきい値
+};
+
+// ヘッダ付きで書き出し
 void write_sketch_binary(const std::vector<uint64_t>& words,
-                         const std::string& outfname) {
-    // バイナリモードでファイルを開いて write
+                         const std::string& outfname,
+                         uint64_t nbits,
+                         uint64_t kbuckets,
+                         double j0val) {
     std::ofstream ofs(outfname, std::ios::binary);
-    if (!ofs) {
-        throw std::runtime_error("Cannot open output file: " + outfname);
-    }
-    ofs.write(reinterpret_cast<const char*>(words.data()),
-              words.size() * sizeof(uint64_t));
-    if (!ofs) {
-        throw std::runtime_error("Error writing to file: " + outfname);
-    }
+    if (!ofs) throw std::runtime_error("Cannot open output file: " + outfname);
+    SketchHeader h{};
+    h.magic[0]='O'; h.magic[1]='D'; h.magic[2]='S'; h.magic[3]='K';
+    h.version = 1;
+    h.nbits = nbits;
+    h.kbuckets = kbuckets;
+    h.j0 = j0val;
+    ofs.write(reinterpret_cast<const char*>(&h), sizeof(h));
+    if (!ofs) throw std::runtime_error("Error writing header: " + outfname);
+    ofs.write(reinterpret_cast<const char*>(words.data()), words.size()*sizeof(uint64_t));
+    if (!ofs) throw std::runtime_error("Error writing body: " + outfname);
 }
 
 // スケッチをワード単位で保持する型
 struct Sketch {
     std::vector<uint64_t> words;  // 動的長
+    uint64_t bit_size = 0;         // 総ビット数（ヘッダ）
+    uint64_t k_buckets = 0;        // OPHバケット数（ヘッダ。0 の場合は未知）
+    double j0 = 0.75;              // 参照用（ヘッダ）
 };
 
 // バイナリファイル (*.sketch) を読み込んで Sketch オブジェクトを返す
@@ -201,16 +228,49 @@ Sketch load_sketch(const std::string &fname) {
     Sketch s;
     std::ifstream ifs(fname, std::ios::binary);
     if (!ifs) throw std::runtime_error("Cannot open sketch file: " + fname);
-    ifs.seekg(0, std::ios::end);
-    std::streampos end = ifs.tellg();
-    ifs.seekg(0, std::ios::beg);
-    if (end <= 0 || (end % static_cast<std::streampos>(sizeof(uint64_t))) != 0) {
-        throw std::runtime_error("Invalid sketch file size: " + fname);
+    // ヘッダ判定
+    SketchHeader h{};
+    ifs.read(reinterpret_cast<char*>(&h), sizeof(h));
+    bool has_header = false;
+    if (ifs && h.magic[0]=='O' && h.magic[1]=='D' && h.magic[2]=='S' && h.magic[3]=='K' && h.version>=1) {
+        has_header = true;
+    } else {
+        // ヘッダなしレガシー: 先頭に戻して全体を本文として読む
+        ifs.clear();
+        ifs.seekg(0, std::ios::beg);
     }
-    size_t num_words = static_cast<size_t>(end / static_cast<std::streampos>(sizeof(uint64_t)));
-    s.words.resize(num_words);
-    ifs.read(reinterpret_cast<char*>(s.words.data()), num_words * sizeof(uint64_t));
-    if (!ifs) throw std::runtime_error("Error reading sketch file: " + fname);
+    if (has_header) {
+        // 残りは本文
+        ifs.seekg(0, std::ios::end);
+        std::streampos end = ifs.tellg();
+        std::streampos body = end - static_cast<std::streampos>(sizeof(SketchHeader));
+        if (body < 0 || (body % static_cast<std::streampos>(sizeof(uint64_t))) != 0) {
+            throw std::runtime_error("Invalid sketch body size: " + fname);
+        }
+        size_t num_words = static_cast<size_t>(body / static_cast<std::streampos>(sizeof(uint64_t)));
+        s.words.resize(num_words);
+        ifs.seekg(sizeof(SketchHeader), std::ios::beg);
+        ifs.read(reinterpret_cast<char*>(s.words.data()), num_words*sizeof(uint64_t));
+        if (!ifs) throw std::runtime_error("Error reading sketch body: " + fname);
+        s.bit_size = h.nbits ? h.nbits : static_cast<uint64_t>(s.words.size()*64);
+        s.k_buckets = h.kbuckets;
+        s.j0 = (h.j0>0 && h.j0<1) ? h.j0 : 0.75;
+    } else {
+        // レガシー: 全体を本文として読む
+        ifs.seekg(0, std::ios::end);
+        std::streampos end = ifs.tellg();
+        ifs.seekg(0, std::ios::beg);
+        if (end <= 0 || (end % static_cast<std::streampos>(sizeof(uint64_t))) != 0) {
+            throw std::runtime_error("Invalid sketch file size: " + fname);
+        }
+        size_t num_words = static_cast<size_t>(end / static_cast<std::streampos>(sizeof(uint64_t)));
+        s.words.resize(num_words);
+        ifs.read(reinterpret_cast<char*>(s.words.data()), num_words*sizeof(uint64_t));
+        if (!ifs) throw std::runtime_error("Error reading sketch file: " + fname);
+        s.bit_size = static_cast<uint64_t>(num_words*64);
+        s.k_buckets = 0; // 不明
+        s.j0 = 0.75;
+    }
     return s;
 }
 
@@ -243,19 +303,33 @@ double jaccard_distance(const Sketch &a,
         popcnt += __builtin_popcountll(a.words[w] ^ b.words[w]);
     }
 
-    // 2*popcnt > sketch_size のときは 0 にクリップ
-    if (2 * popcnt > SKETCH_BITS) {
-        return 0.0;
+    // 2) 推定式に代入
+    // OddSketch 論文の式に基づき係数を n/(4*k) とする（k は OPH のハッシュ数）
+    // ここでは k を L = n / (4*(1-J0)) から再推定し、2 の冪に丸める。
+    const double n = static_cast<double>(SKETCH_BITS);
+    // 実際にスケッチ生成時に使われた k を優先（ヘッダ）。両方に無ければ式から推定。
+    uint64_t k_header = (a.k_buckets>0 && b.k_buckets>0) ? std::min(a.k_buckets, b.k_buckets)
+                        : (a.k_buckets>0 ? a.k_buckets : (b.k_buckets>0 ? b.k_buckets : 0));
+    double k;
+    if (k_header > 0) {
+        k = static_cast<double>(k_header);
+    } else {
+        const double denom = 4.0 * (1.0 - J0);
+        size_t k_est = (denom > 0.0)
+            ? floor_pow2(static_cast<size_t>(std::max(1.0, std::round(n / denom))))
+            : SKETCH_BITS;
+        k = static_cast<double>(k_est);
     }
 
-    // 2) 式に代入
-    double d_pop    = static_cast<double>(popcnt);
-    double d_size   = static_cast<double>(SKETCH_BITS);
-    double d_hashes = static_cast<double>(SKETCH_BITS); // 近似: ハッシュ数 ≒ ビット数
+    // 数値安定化: x = 1 - 2*popcnt/n の対数をとる前にクリップ
+    const double x = 1.0 - (2.0 * static_cast<double>(popcnt)) / n; // 1 - 2p
+    const double eps = 1e-12; // 小さすぎる負値/ゼロを避ける
+    double term = std::log(std::max(eps, x));
+    double jacc = 1.0 + (n / (4.0 * k)) * term;
 
-    double ratio = (2.0 * d_pop) / d_size;            // = 2*popcnt/sketch_size
-    double term  = std::log(1.0 - ratio);             // ≤ 0
-    double jacc  = 1.0 + (d_size / (4.0 * d_hashes)) * term;
+    // 範囲クリップ（理論上 [0,1]）
+    if (jacc < 0.0) jacc = 0.0;
+    if (jacc > 1.0) jacc = 1.0;
     return jacc;
 }
 
@@ -283,6 +357,17 @@ static void parse_options(int argc, char** argv, std::string &mode) {
                 } else {
                     std::cerr << "[oddsketch] warning: sketch-size must be a positive multiple of 64; got " << req << " (ignored)\n";
                 }
+            }
+        } else if (key == "j0" || key == "j-threshold") {
+            if (!val.empty()) {
+                try {
+                    double v = std::stod(val);
+                    if (v > 0.0 && v < 1.0) {
+                        J0 = v;
+                    } else {
+                        std::cerr << "[oddsketch] warning: j0 must be in (0,1); got " << v << " (ignored)\n";
+                    }
+                } catch (...) {}
             }
         }
     }
@@ -339,17 +424,28 @@ int main(int argc, char** argv) {
     }
 
     if (mode == "sketch") {
+        // デバッグ: スケッチサイズとバケット数、J0 を表示
+        std::cerr << "[oddsketch] sketch: nbits=" << G_SKETCH_SIZE
+                  << ", kbuckets=" << G_LAST_NUM_BUCKETS
+                  << ", j0=" << std::fixed << std::setprecision(6) << J0 << "\n";
 
         for (auto &f : paths) {
             auto S = make_odd_sketch_from_fasta(f);
             // 出力ファイル名は f+".sketch" 固定
-            write_sketch_binary(S, f + ".sketch");
+            write_sketch_binary(S, f + ".sketch", static_cast<uint64_t>(G_SKETCH_SIZE), static_cast<uint64_t>(G_LAST_NUM_BUCKETS), J0);
             std::cout << f + ".sketch" << "\n";
         }
     }
     else if (mode == "dist") {
         // すべての .sketch を読み込んでメモリに展開
         auto sketches = load_all_sketches(paths);
+        if (!sketches.empty()) {
+            const auto &s0 = sketches.front();
+            uint64_t nbits = s0.bit_size ? s0.bit_size : static_cast<uint64_t>(s0.words.size()*64);
+            std::cerr << "[oddsketch] dist: nbits=" << nbits
+                      << ", kbuckets(header)=" << s0.k_buckets
+                      << ", j0(current)=" << std::fixed << std::setprecision(6) << J0 << "\n";
+        }
         // 二重ループで距離計算して stdout に TSV 出力
         for (size_t i = 0; i < sketches.size(); ++i) {
             for (size_t j = i + 1; j < sketches.size(); ++j) {
