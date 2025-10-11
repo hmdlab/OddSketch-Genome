@@ -2,25 +2,20 @@
 
 # コンパイラの設定
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall
+CXXFLAGS = -std=c++17 -O3 -march=native -Wall -Wextra -fopenmp
 
-# ソースファイル名と出力ファイル名
-SRC = cal_Jaccard.cpp
-OUT = cal_Jaccard
+BIN_CAL_JACCARD = cal_Jaccard
+BIN_TRUE_JACCARD = true_jaccard
 
-# ターゲット: 実行ファイルのビルド
-all: $(OUT)
+all: $(BIN_CAL_JACCARD) $(BIN_TRUE_JACCARD)
 
-# 実行ファイルをビルドするルール
-$(OUT): $(SRC)
-	$(CXX) $(CXXFLAGS) $(SRC) -o $(OUT)
+$(BIN_CAL_JACCARD): cal_Jaccard.cpp
+	$(CXX) $(CXXFLAGS) $< -o $@
 
-# 実行ファイルの削除（クリーン）
+$(BIN_TRUE_JACCARD): true_jaccard.cpp
+	$(CXX) $(CXXFLAGS) $< -o $@
+
 clean:
-	rm -f $(OUT)
+	rm -f $(BIN_CAL_JACCARD) $(BIN_TRUE_JACCARD)
 
-# 実行ファイルの実行
-run: $(OUT)
-	./$(OUT)
-
-.PHONY: all clean run
+.PHONY: all clean

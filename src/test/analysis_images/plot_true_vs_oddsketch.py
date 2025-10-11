@@ -22,6 +22,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--csv', default=str(Path(__file__).resolve().parent.parent / 'data' / 'test_genomes' / 'comparison_results_oddsketch.csv'))
     ap.add_argument('--out', default='oddsketch_true_vs_estimate.png')
+    ap.add_argument('--rmse-ylim-max', type=float, default=None,
+                    help='Set RMSE subplot y-axis upper limit (use same value across tools to align).')
     args = ap.parse_args()
 
     csv_path = Path(args.csv)
@@ -39,16 +41,18 @@ def main():
 
     fig = plt.figure(figsize=(16, 12))
 
-    # 1) 全体
+    # 1) 変異数で色分け（カラープロット）
     ax1 = plt.subplot(2, 2, 1)
-    ax1.scatter(x, y, alpha=0.7, s=30, color='steelblue')
+    sc = ax1.scatter(x, y, c=m, cmap='viridis', alpha=0.75, s=30)
     ax1.plot([0, 1], [0, 1], 'r--', linewidth=2)
     ax1.set_xlabel('True Jaccard')
     ax1.set_ylabel('OddSketch (estimate)')
-    ax1.set_title('True vs OddSketch (Full Range)')
+    ax1.set_title('Colored by Mutation Count')
     ax1.grid(True, alpha=0.3)
     ax1.set_xlim(0, 1)
     ax1.set_ylim(0, 1)
+    cbar = plt.colorbar(sc, ax=ax1)
+    cbar.set_label('Mutation Count')
 
     # 2) 高類似度ズーム
     ax2 = plt.subplot(2, 2, 2)
@@ -63,23 +67,29 @@ def main():
     ax2.set_xlim(0.5, 1)
     ax2.set_ylim(0.5, 1)
 
-    # 3) 変異数で色分け
+    # 3) True Jaccard の分布に対する RMSE（ビン別）
     ax3 = plt.subplot(2, 2, 3)
-    sc = ax3.scatter(x, y, c=m, cmap='viridis', alpha=0.75, s=30)
-    ax3.plot([0, 1], [0, 1], 'r--', linewidth=2)
-    ax3.set_xlabel('True Jaccard')
-    ax3.set_ylabel('OddSketch (estimate)')
-    ax3.set_title('Colored by Mutation Count')
-    ax3.grid(True, alpha=0.3)
-    ax3.set_xlim(0, 1)
-    ax3.set_ylim(0, 1)
-    cbar = plt.colorbar(sc, ax=ax3)
-    cbar.set_label('Mutation Count')
+    err = (df['jaccard_oddsketch'] - df['jaccard_true'])
+    bins = [i / 10.0 for i in range(11)]
+    df['true_bin'] = pd.cut(df['jaccard_true'], bins=bins, include_lowest=True, right=True)
+    rmse_by_bin = df.groupby('true_bin', observed=True).apply(
+        lambda g: ((g['jaccard_oddsketch'] - g['jaccard_true'])**2).mean() ** 0.5,
+        include_groups=False
+    )
+    rmse_by_bin = rmse_by_bin.dropna()
+    ax3.bar([str(b) for b in rmse_by_bin.index], rmse_by_bin.values, color='skyblue', edgecolor='black', alpha=0.9)
+    ax3.set_xlabel('True Jaccard bins')
+    ax3.set_ylabel('RMSE')
+    ax3.set_title('RMSE by True Jaccard bin')
+    ax3.grid(True, axis='y', alpha=0.3)
+    for label in ax3.get_xticklabels():
+        label.set_rotation(45)
+    if args.rmse_ylim_max is not None:
+        ax3.set_ylim(0, args.rmse_ylim_max)
 
-    # 4) 誤差分布
+    # 4) 誤差分布（符号付き）
     ax4 = plt.subplot(2, 2, 4)
-    err = (df['jaccard_oddsketch'] - df['jaccard_true']).values
-    ax4.hist(err, bins=30, alpha=0.7, color='lightgreen', edgecolor='black')
+    ax4.hist(err.values, bins=30, alpha=0.7, color='lightgreen', edgecolor='black')
     ax4.axvline(0, color='red', linestyle='--', linewidth=2)
     ax4.set_xlabel('Error (OddSketch - True)')
     ax4.set_ylabel('Frequency')

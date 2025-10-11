@@ -31,6 +31,48 @@ def calculate_jaccard(kmers1, kmers2):
     return intersection / union
 
 def main():
+    # まず C++ 実装があればそれを呼び出して高速に計算
+    try:
+        import os, subprocess, shutil
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        cpp_bin = os.path.abspath(os.path.join(script_dir, '..', '..', 'cal', 'true_jaccard'))
+        if os.path.exists(cpp_bin) and os.access(cpp_bin, os.X_OK):
+            pair_info = os.path.join('data', 'test_genomes', 'pair_info.txt')
+            out_path = os.path.join('data', 'test_genomes', 'jaccard_true_results.txt')
+            cfg_path = os.path.join('..', 'pipeline_config.json')
+            # スレッド数: config(true_jaccard.threads) > 環境変数 > CPU数
+            threads_val = None
+            try:
+                import json
+                with open(cfg_path) as f:
+                    cfg = json.load(f)
+                if isinstance(cfg, dict) and 'true_jaccard' in cfg and isinstance(cfg['true_jaccard'], dict):
+                    tv = cfg['true_jaccard'].get('threads')
+                    if isinstance(tv, int) and tv > 0:
+                        threads_val = tv
+            except Exception:
+                pass
+            if threads_val is None:
+                envv = os.environ.get('ODDSKETCH_THREADS')
+                if envv and envv.isdigit():
+                    threads_val = int(envv)
+            if threads_val is None:
+                threads_val = os.cpu_count() or 1
+            threads = str(max(1, int(threads_val)))
+            cmd = [
+                cpp_bin,
+                f"--config={cfg_path}",
+                f"--pair-info={pair_info}",
+                f"--out={out_path}",
+                f"--threads={threads}",
+            ]
+            print(f"C++ true_jaccard を起動します: {' '.join(cmd)}")
+            subprocess.run(cmd, check=True)
+            print("C++ 実装での計算が完了しました。")
+            return
+    except Exception as e:
+        print(f"C++ 実装の起動に失敗したため、Python実装で継続します: {e}")
+
     # 設定読み込み（統合config対応）。デフォルトは pipeline_config.json。
     # ファイルが無い場合やキーが無い場合は既定値にフォールバック。
     cfg_path_candidates = [

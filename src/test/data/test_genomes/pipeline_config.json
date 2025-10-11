@@ -8,8 +8,7 @@
     "seed_base": 2000
   },
   "true_jaccard": {
-    "kmerlen": 64,
-    "threads": 8
+    "kmerlen": 64
   },
   "oddsketch": {
     "kmerlen": 64,

@@ -1,68 +1,66 @@
-# genome-oddsketch リポジトリの使い方
+# genome-oddsketch (Synthetic Data Only)
 
-本リポジトリでは、ゲノムの自動生成 → 厳密Jaccard計算 → OddSketch推定 → BinDash推定 → 比較CSVと画像生成 → RMSE算出 までを再現できます。
+This repository evaluates OddSketch using synthetic genomes generated under `src/test/make_genomes`. No external/real genomes are used in this workflow.
 
-## 前提
-- C++ビルド環境（g++ / OpenMP）
+## Requirements
+- `g++` with OpenMP (C++17)
 - Python 3.8+
-- 依存パッケージ: `pip install -r requirements.txt`
-- BinDash（PATHに`bindash`があるか、もしくは `src/test/pipeline_config.json` の `bindash.bindash_bin` を書き換え）
+- Python deps: `pip install -r requirements.txt`
+- BinDash (optional, for comparison). Provide the binary and configure its path in a config file if you want to run the BinDash baseline.
 
-## コンフィグ
-共通設定は `src/test/pipeline_config.json` に集約（k-mer長、スケッチサイズ、生成数など）。
-- make_genomes: `genome_length`, `num_pairs`, `mutation_min/max`, `outdir`, `seed_base`
-- true_jaccard: `kmerlen`
-- oddsketch: `kmerlen`, `sketch_size`（OddSketchは実行時引数 `--kmer/--sketch-size` で反映）
-- bindash: `kmerlen`, `sketchsize64`, `bbits`, `threads`（`sketch → dist`）
-
-## 手順（標準フロー）
-1) ビルド（OddSketch）
+## Build (OddSketch)
 - `cd src && make`
+  - This produces the `oddsketch` binary in `src` (clean with `make clean`).
 
-2) 入力生成（ゲノムの自作）
-- `cd src/test && python make_genomes/make_diverse_genomes.py --config pipeline_config.json`
-- 出力: `data/test_genomes/genomes/*.fna`, `pair_info.txt`, `genome_paths.txt`
+## Repro Steps (Synthetic Data)
+1. Generate input genomes
+   - Run: `cd src/test && python make_genomes/make_diverse_genomes.py --config pipeline_config.json`
+   - Configure: set genome length, number of pairs, etc. in `src/test/pipeline_config.json`
+   - Output: FASTA under `src/test/data/test_genomes/genomes/` plus `pair_info.txt` and `genome_paths.txt`
 
-3) 厳密Jaccardの計算（真値）
-- `cd src/test && python cal/cal_diverse_true_jaccard.py`
-- 出力: `data/test_genomes/jaccard_true_results.txt`
+2. Exact Jaccard (ground truth)
+   - Run: `cd src/test && python cal/cal_diverse_true_jaccard.py`
+   - Output: `src/test/data/test_genomes/jaccard_true_results.txt`
+   - Notes: Uses the C++ OpenMP binary if built (`src/cal/true_jaccard`) and reads thread count from `true_jaccard.threads` in the config (environment `ODDSKETCH_THREADS` can override).
 
-4) OddSketch推定
-- `cd src/test && python cal/cal_diverse_oddsketch.py`
-- 出力: `data/test_genomes/jaccard_oddsketch_results.txt`
-- 同時に比較CSVを自動生成: `data/test_genomes/comparison_results_oddsketch.csv`
+3. OddSketch estimation
+   - Build: `cd src && make`
+   - Run: `cd src/test && python cal/cal_diverse_oddsketch.py`
+   - Outputs: `src/test/data/test_genomes/jaccard_oddsketch_results.txt`
+   - Comparison CSV: `src/test/data/test_genomes/comparison_results_oddsketch.csv`
 
-5) BinDash推定
-- `cd src/test && python cal/cal_diverse_bindash.py --config pipeline_config.json`
-- 出力: `data/test_genomes/jaccard_bindash_results.txt`, `data/test_gen_genomes/comparison_results_bindash.csv`
+4. BinDash estimation (optional)
+   - Run: `cd src/test && python cal/cal_diverse_bindash.py --config pipeline_config.json`
+     - Alternatively: `--config bindash_config.json` (set `bindash_bin` and parameters explicitly)
+   - Output: `src/test/data/test_genomes/comparison_results_bindash.csv`
+   - Generic plotting from CSV:
+     - `cd src/test/analysis_images && python plot_true_vs_estimate_csv.py --est-col jaccard_bindash --csv ../data/test_genomes/comparison_results_bindash.csv`
 
-6) 推定結果の比較と図示
-- OddSketch（4パネルの簡潔図）:
-  - `cd src/test/analysis_images && python plot_true_vs_oddsketch.py`
-  - 入力: `../data/test_genomes/comparison_results_oddsketch.csv`
-  - 出力: `../data/test_genomes/oddsketch_true_vs_estimate.png`
-- BinDash（4パネルの簡潔図）:
-  - `cd src/test/analysis_images && python plot_true_vs_bindash.py`
-  - 入力: `../data/test_genomes/comparison_results_bindash.csv`
-  - 出出: `../data/test_genomes/bindash_true_vs_estimate.png`
-- OddSketch（包括6パネル＋CSV生成）:
-  - `python true_vs_oddsketch_compare.py`
-  - 出力: 画像 `../data/test_genomes/oddsketch_jaccard_comparison_full.png`
-          CSV `../data/test_genomes/comparison_results_oddsketch.csv`
+5. Comparison and plots
+   - True vs OddSketch
+     - Input: `../data/test_genomes/comparison_results_oddsketch.csv` (columns: pair_id, mutation_count, jaccard_true, jaccard_oddsketch)
+     - Output: `oddsketch_true_vs_estimate.png` (mutation-colored scatter, high-similarity zoom, RMSE by true-Jaccard bin, error histogram)
+     - Command: `cd src/test/analysis_images && python plot_true_vs_oddsketch.py`
+   - True vs BinDash
+     - Input: `../data/test_genomes/comparison_results_bindash.csv` (columns: pair_id, mutation_count, jaccard_true, jaccard_bindash)
+     - Output: `bindash_true_vs_estimate.png` (same four panels: colored, zoom, RMSE-by-bin, error)
+     - Command: `cd src/test/analysis_images && python plot_true_vs_bindash.py`
+   - Align RMSE y-axis across tools
+     - Pass the same limit to both scripts, e.g.: `--rmse-ylim-max 0.2`
+       - OddSketch: `python plot_true_vs_oddsketch.py --rmse-ylim-max 0.2`
+       - BinDash: `python plot_true_vs_bindash.py --rmse-ylim-max 0.2`
+   - RMSE comparison
+     - `cd src/test/analysis_images && python compute_rmse.py --csv ../data/test_genomes/comparison_results_oddsketch.csv --csv ../data/test_genomes/comparison_results_bindash.csv`
 
-7) RMSEの計算
-- `cd src/test/analysis_images`
-- `python compute_rmse.py --csv ../data/test_genomes/comparison_results_oddsketch.csv --csv ../data/test_genomes/comparison_results_bindash.csv`
-- 出力例:
-  - OddSketch: `RMSE(all)=...`, `RMSE(true>0.75)=...`
-  - BinDash:   `RMSE(all)=...`, `RMSE(true>0.75)=...`
+## Config files
+- `src/test/pipeline_config.json`
+  - `make_genomes`: `genome_length`, `num_pairs`, `mutation_min/max`, `outdir`, `seed_base`
+  - `true_jaccard`: `kmerlen`, `threads`
+  - `oddsketch`: `kmerlen`, `sketch_size`, `j0`
+  - `bindash`: `bindash_bin`, `kmerlen`, `sketchsize64`, `bbits`, `threads`
+- `bindash_config.json` (optional)
+  - Either a flat dict or `{ "bindash": { ... } }` works; `cal_diverse_bindash.py` supports both.
 
-## メモリの比較（任意）
-- `python src/test/analysis_images/report_sketch_memory.py`
-  - OddSketch/BinDash の理論メモリと、出力ファイルからの実測メモリをレポート
-  - メモリを合わせる目安: `OddSketch.sketch_size ≈ 64 * sketchsize64 * bbits`
-
-## 補足
-- .gitignore で生成物（FASTA/スケッチ/CSV/画像等）や `external/` を除外。
-- OddSketchの `--kmer`/`--sketch-size` は `pipeline_config.json`から `cal_diverse_oddsketch.py` が自動付与します。
-- BinDashは `sketch → dist` の2段階。`bindash.bindash_bin` をPATH上の`bindash`にするか、絶対パスを指定してください。
+## Notes
+- Generated artifacts (FASTA/sketches/CSV/figures) are ignored by `.gitignore`. Do not commit large data.
+- `oddsketch` supports `--kmer`, `--sketch-size` (multiple of 64), and `--j0`. `cal_diverse_oddsketch.py` reads values from `src/test/pipeline_config.json` and passes them to the binary.
