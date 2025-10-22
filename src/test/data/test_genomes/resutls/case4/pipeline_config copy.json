@@ -1,14 +1,15 @@
 {
   "make_genomes": {
     "genome_length": 1000000,
-    "num_pairs": 50,
+    "num_pairs": 1000,
     "mutation_min": 10,
     "mutation_max": 5000,
     "outdir": "data/test_genomes/genomes",
     "seed_base": 2000
   },
   "true_jaccard": {
-    "kmerlen": 64
+    "kmerlen": 64,
+    "threads": 8
   },
   "oddsketch": {
     "kmerlen": 64,

@@ -2,11 +2,18 @@ import os
 import subprocess
 import tempfile
 import json
+import argparse
 
-def load_pipeline_config():
-    candidates = [
-        os.path.join(os.path.dirname(__file__), '..', 'pipeline_config.json')
-    ]
+def load_pipeline_config(config_path: str = None):
+    candidates = []
+    # 1) 明示指定があれば最優先（作業ディレクトリ基準）
+    if config_path:
+        candidates.append(config_path)
+        # 2) スクリプト位置からの相対も試す
+        if not os.path.isabs(config_path):
+            candidates.append(os.path.join(os.path.dirname(__file__), config_path))
+    # 3) 既定の pipeline_config.json を最後に試す
+    candidates.append(os.path.join(os.path.dirname(__file__), '..', 'pipeline_config.json'))
     for c in candidates:
         if os.path.exists(c):
             try:
@@ -17,14 +24,14 @@ def load_pipeline_config():
     return {}
 
 
-def run_oddsketch_sketch(genome_files):
+def run_oddsketch_sketch(genome_files, cfg):
     """OddSketchでスケッチファイルを生成"""
     sketch_files = []
-    cfg = load_pipeline_config()
     oddcfg = cfg.get('oddsketch', {}) if isinstance(cfg, dict) else {}
     kmer = oddcfg.get('kmerlen', 64)
     ssize = oddcfg.get('sketch_size', 8192)
     j0 = oddcfg.get('j0', 0.75)
+    pos_mode = oddcfg.get('pos_mode', 'value')  # value|mix|stripe
     
     # 一時ファイルでファイルパスリストを作成
     with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
@@ -34,12 +41,12 @@ def run_oddsketch_sketch(genome_files):
     
     try:
         # oddsketch sketch コマンドを実行
-        cmd = ['../oddsketch', 'sketch', f'--kmer={kmer}', f'--sketch-size={ssize}', f'--j0={j0}']
+        cmd = ['../oddsketch', 'sketch', f'--kmer={kmer}', f'--sketch-size={ssize}', f'--j0={j0}', f'--pos-mode={pos_mode}']
         result = subprocess.run(
             cmd,
             stdin=open(temp_path_file, 'r'),
             stdout=subprocess.PIPE,
-            stderr=None,  # デバッグ出力（sketchsize など）をそのままコンソールへ
+            stderr=subprocess.DEVNULL,
             text=True,
             check=True
         )
@@ -48,8 +55,7 @@ def run_oddsketch_sketch(genome_files):
         sketch_files = result.stdout.strip().split('\n')
         sketch_files = [f.strip() for f in sketch_files if f.strip()]
         
-    except subprocess.CalledProcessError as e:
-        print(f"スケッチ生成エラー: {e.stderr}")
+    except subprocess.CalledProcessError:
         return []
     finally:
         # 一時ファイルを削除
@@ -57,13 +63,13 @@ def run_oddsketch_sketch(genome_files):
     
     return sketch_files
 
-def run_oddsketch_dist(sketch_files):
+def run_oddsketch_dist(sketch_files, cfg):
     """OddSketchでJaccard距離を計算"""
-    cfg = load_pipeline_config()
     oddcfg = cfg.get('oddsketch', {}) if isinstance(cfg, dict) else {}
     kmer = oddcfg.get('kmerlen', 64)
     ssize = oddcfg.get('sketch_size', 8192)
     j0 = oddcfg.get('j0', 0.75)
+    pos_mode = oddcfg.get('pos_mode', 'value')
     # 一時ファイルでスケッチファイルパスリストを作成
     with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
         for sketch_file in sketch_files:
@@ -72,12 +78,12 @@ def run_oddsketch_dist(sketch_files):
     
     try:
         # oddsketch dist コマンドを実行
-        cmd = ['../oddsketch', 'dist', f'--kmer={kmer}', f'--sketch-size={ssize}', f'--j0={j0}']
+        cmd = ['../oddsketch', 'dist', f'--kmer={kmer}', f'--sketch-size={ssize}', f'--j0={j0}', f'--pos-mode={pos_mode}']
         result = subprocess.run(
             cmd,
             stdin=open(temp_sketch_file, 'r'),
             stdout=subprocess.PIPE,
-            stderr=None,  # デバッグ出力（nbits/kbuckets）をそのままコンソールへ
+            stderr=subprocess.DEVNULL,
             text=True,
             check=True
         )
@@ -97,14 +103,18 @@ def run_oddsketch_dist(sketch_files):
         
         return distances
         
-    except subprocess.CalledProcessError as e:
-        print(f"距離計算エラー: {e.stderr}")
+    except subprocess.CalledProcessError:
         return []
     finally:
         # 一時ファイルを削除
         os.unlink(temp_sketch_file)
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--config', default='pipeline_config.json', help='Path to pipeline config JSON')
+    args = ap.parse_args()
+
+    cfg = load_pipeline_config(args.config)
     # ペア情報の読み込み
     pair_info_file = "data/test_genomes/pair_info.txt"
     
@@ -113,11 +123,18 @@ def main():
         return
     
     results = []
-    
-    print("多様性データセットでのOddSketch推定値計算開始...")
-    print("Traditional MinHash (優先度付きキュー)実装を使用")
-    print()
-    
+
+    # 総ペア数（正しい形式の行）を事前カウントし、進捗表示に利用
+    total_pairs = 0
+    try:
+        with open(pair_info_file, 'r') as fcnt:
+            _ = fcnt.readline()
+            for ln in fcnt:
+                if len(ln.strip().split('\t')) == 5:
+                    total_pairs += 1
+    except Exception:
+        total_pairs = 0
+
     with open(pair_info_file, 'r') as f:
         header = f.readline().strip()  # ヘッダー行をスキップ
         
@@ -131,21 +148,17 @@ def main():
             mutation_count = int(mutation_count)
             genome_length = int(genome_length)
             
-            print(f"ペア {pair_id:3d}: 変異数 {mutation_count:5,} ", end="")
-            
             try:
                 # スケッチファイル生成
-                sketch_files = run_oddsketch_sketch([file1, file2])
+                sketch_files = run_oddsketch_sketch([file1, file2], cfg)
                 
                 if len(sketch_files) != 2:
-                    print(f"-> エラー: スケッチファイル生成失敗")
                     continue
                 
                 # Jaccard距離計算
-                distances = run_oddsketch_dist(sketch_files)
+                distances = run_oddsketch_dist(sketch_files, cfg)
                 
                 if len(distances) != 1:
-                    print(f"-> エラー: 距離計算失敗")
                     continue
                 
                 jaccard_estimate = distances[0]['jaccard_estimate']
@@ -158,11 +171,14 @@ def main():
                     'sketch_file1': sketch_files[0],
                     'sketch_file2': sketch_files[1]
                 })
-                
-                print(f"-> Jaccard推定: {jaccard_estimate:.6f}")
+                # 20ケースごとに進捗のみ出力
+                if len(results) % 20 == 0:
+                    if total_pairs > 0:
+                        print(f"[oddsketch_jaccard] progress {len(results)}/{total_pairs}")
+                    else:
+                        print(f"[oddsketch_jaccard] progress {len(results)}")
                 
             except Exception as e:
-                print(f"-> エラー: {e}")
                 continue
     
     # 結果の保存

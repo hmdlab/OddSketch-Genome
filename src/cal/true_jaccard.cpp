@@ -1,5 +1,4 @@
 #include <bits/stdc++.h>
-#include <omp.h>
 
 using namespace std;
 
@@ -27,6 +26,29 @@ static inline string read_fasta_concat(const string &path) {
 
 static inline size_t kmer_count_possible(size_t L, size_t k) {
   if (L < k) return 0; return L - k + 1;
+}
+
+static inline char comp_base(char c) {
+  switch (c) {
+    case 'A': case 'a': return 'T';
+    case 'C': case 'c': return 'G';
+    case 'G': case 'g': return 'C';
+    case 'T': case 't': return 'A';
+    default: return 'N';
+  }
+}
+
+static inline string revcomp(const string &s) {
+  string rc; rc.resize(s.size());
+  for (size_t i = 0, n = s.size(); i < n; ++i) {
+    rc[n - 1 - i] = comp_base(s[i]);
+  }
+  return rc;
+}
+
+static inline string canonical_kmer(const string &s) {
+  string rc = revcomp(s);
+  return (rc < s) ? rc : s;
 }
 
 struct JaccardOut {
@@ -83,7 +105,7 @@ int main(int argc, char** argv) {
 
   // Defaults
   int kmer = 64;
-  int threads = max(1, omp_get_max_threads());
+  // sequential execution only
   string pair_info = "data/test_genomes/pair_info.txt"; // relative to working dir
   string out_path = "data/test_genomes/jaccard_true_results.txt";
   string cfg_path = ""; // optional
@@ -100,18 +122,6 @@ int main(int argc, char** argv) {
     string json((istreambuf_iterator<char>(ifs)), istreambuf_iterator<char>());
     if (auto v = find_kmer_from_config(json, "\"true_jaccard\"")) kmer = *v;
     else if (auto v2 = find_kmer_from_config(json, "")) kmer = *v2;
-    // threads in config
-    auto find_threads = [&](const string &ns)->optional<int>{
-      size_t pos = 0; if (!ns.empty()) { pos = json.find(ns); if (pos==string::npos) pos = 0; }
-      const string key = "\"threads\"";
-      size_t kpos = json.find(key, pos); if (kpos==string::npos) return nullopt;
-      size_t colon = json.find(':', kpos); if (colon==string::npos) return nullopt;
-      size_t beg = json.find_first_of("0123456789", colon); if (beg==string::npos) return nullopt;
-      size_t end = json.find_first_not_of("0123456789", beg);
-      try { return stoi(json.substr(beg, end - beg)); } catch (...) { return nullopt; }
-    };
-    if (auto tv = find_threads("\"true_jaccard\"")) threads = max(1, *tv);
-    else if (auto tv2 = find_threads("")) threads = max(1, *tv2);
   };
 
   if (!cfg_path.empty()) {
@@ -124,7 +134,6 @@ int main(int argc, char** argv) {
 
   // now parse remaining CLI overrides
   kmer = parse_int_arg(args, "kmer", kmer);
-  threads = parse_int_arg(args, "threads", threads);
   pair_info = parse_str_arg(args, "pair-info", pair_info);
   out_path = parse_str_arg(args, "out", out_path);
 
@@ -155,11 +164,11 @@ int main(int argc, char** argv) {
     pairs.push_back(move(pi));
   }
 
-  omp_set_num_threads(threads);
   vector<JaccardOut> outs(pairs.size());
+  const long long total = (long long)pairs.size();
+  long long completed = 0;
 
-  #pragma omp parallel for schedule(dynamic)
-  for (long long i = 0; i < (long long)pairs.size(); ++i) {
+  for (long long i = 0; i < total; ++i) {
     const auto &p = pairs[i];
     try {
       string s1 = read_fasta_concat(p.file1);
@@ -174,8 +183,8 @@ int main(int argc, char** argv) {
       unordered_set<string> set1; set1.reserve(n1*1.3);
       unordered_set<string> set2; set2.reserve(n2*1.3);
 
-      for (size_t j = 0; j < n1; ++j) set1.emplace(s1.substr(j, K));
-      for (size_t j = 0; j < n2; ++j) set2.emplace(s2.substr(j, K));
+      for (size_t j = 0; j < n1; ++j) set1.emplace(canonical_kmer(s1.substr(j, K)));
+      for (size_t j = 0; j < n2; ++j) set2.emplace(canonical_kmer(s2.substr(j, K)));
 
       size_t c1 = set1.size();
       size_t c2 = set2.size();
@@ -199,9 +208,12 @@ int main(int argc, char** argv) {
       o.inter = inter;
       o.uni = uni;
       outs[i] = move(o);
+      ++completed;
+      if (completed % 20 == 0) {
+        cerr << "[true_jaccard] progress " << completed << "/" << total << "\n";
+      }
     } catch (const exception &e) {
       // leave default zeros; but report
-      #pragma omp critical
       cerr << "[true_jaccard] error on pair " << p.pair_id << ": " << e.what() << "\n";
     }
   }
@@ -215,6 +227,6 @@ int main(int argc, char** argv) {
         << setprecision(10) << o.jaccard_true << '\t'
         << o.kmers1_count << '\t' << o.kmers2_count << '\t' << o.inter << '\t' << o.uni << "\n";
   }
-  cerr << "[true_jaccard] done. pairs=" << outs.size() << ", kmer=" << kmer << ", threads=" << threads << "\n";
+  cerr << "[true_jaccard] done. pairs=" << outs.size() << ", kmer=" << kmer << "\n";
   return 0;
 }

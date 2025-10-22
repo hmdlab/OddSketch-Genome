@@ -2,7 +2,7 @@
 
 # コンパイラの設定
 CXX = g++
-CXXFLAGS = -std=c++17 -O3 -march=native -Wall -Wextra -fopenmp
+CXXFLAGS = -std=c++17 -O3 -march=native -Wall -Wextra
 
 BIN_CAL_JACCARD = cal_Jaccard
 BIN_TRUE_JACCARD = true_jaccard

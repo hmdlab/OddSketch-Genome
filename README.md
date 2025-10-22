@@ -21,17 +21,16 @@ This repository evaluates OddSketch using synthetic genomes generated under `src
 2. Exact Jaccard (ground truth)
    - Run: `cd src/test && python cal/cal_diverse_true_jaccard.py`
    - Output: `src/test/data/test_genomes/jaccard_true_results.txt`
-   - Notes: Uses the C++ OpenMP binary if built (`src/cal/true_jaccard`) and reads thread count from `true_jaccard.threads` in the config (environment `ODDSKETCH_THREADS` can override).
+   - Notes: Uses the C++ binary if built (`src/cal/true_jaccard`). Processing is sequential; no thread setting is used.
 
 3. OddSketch estimation
    - Build: `cd src && make`
-   - Run: `cd src/test && python cal/cal_diverse_oddsketch.py`
+   - Run: `cd src/test && python cal/cal_diverse_oddsketch.py --config pipeline_config.json`
    - Outputs: `src/test/data/test_genomes/jaccard_oddsketch_results.txt`
    - Comparison CSV: `src/test/data/test_genomes/comparison_results_oddsketch.csv`
 
 4. BinDash estimation (optional)
-   - Run: `cd src/test && python cal/cal_diverse_bindash.py --config pipeline_config.json`
-     - Alternatively: `--config bindash_config.json` (set `bindash_bin` and parameters explicitly)
+   - Run: `cd src/test && python cal/cal_diverse_bindash.py`
    - Output: `src/test/data/test_genomes/comparison_results_bindash.csv`
    - Generic plotting from CSV:
      - `cd src/test/analysis_images && python plot_true_vs_estimate_csv.py --est-col jaccard_bindash --csv ../data/test_genomes/comparison_results_bindash.csv`
@@ -55,12 +54,14 @@ This repository evaluates OddSketch using synthetic genomes generated under `src
 ## Config files
 - `src/test/pipeline_config.json`
   - `make_genomes`: `genome_length`, `num_pairs`, `mutation_min/max`, `outdir`, `seed_base`
-  - `true_jaccard`: `kmerlen`, `threads`
-  - `oddsketch`: `kmerlen`, `sketch_size`, `j0`
+  - `true_jaccard`: `kmerlen`
+  - `oddsketch`: `kmerlen`, `sketch_size`, `j0`, `pos_mode` (`value|mix|stripe`)
   - `bindash`: `bindash_bin`, `kmerlen`, `sketchsize64`, `bbits`, `threads`
-- `bindash_config.json` (optional)
-  - Either a flat dict or `{ "bindash": { ... } }` works; `cal_diverse_bindash.py` supports both.
 
 ## Notes
 - Generated artifacts (FASTA/sketches/CSV/figures) are ignored by `.gitignore`. Do not commit large data.
 - `oddsketch` supports `--kmer`, `--sketch-size` (multiple of 64), and `--j0`. `cal_diverse_oddsketch.py` reads values from `src/test/pipeline_config.json` and passes them to the binary.
+- Position-aware mapping (experimental): `--pos-mode=value|mix|stripe`.
+  - `value` (default): bit position uses only the minhash value `pos = hv % nbits` (backward compatible).
+  - `mix`: mixes bucket index with value for mapping; recommended to reduce collisions while keeping bit budget.
+  - `stripe`: assigns a dedicated region per bucket when `nbits/k` is large enough; falls back to `mix` if too small.

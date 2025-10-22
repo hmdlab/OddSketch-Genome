@@ -8,19 +8,11 @@ cal_diverse_bindash.py
 - BinDash を `external/bindash` などに clone & build 済み
 - 入力FASTAは `src/test/make_genomes/make_diverse_genomes.py` により生成済み
 
+設定は必ず `src/test/pipeline_config.json` の `bindash` セクションから読み込みます。
+
 使い方（例）:
   cd src/test
-  python cal/cal_diverse_bindash.py --config bindash_config.json
-
-設定ファイル例（bindash_config.json）:
-{
-  "bindash_bin": "../../external/bindash/bin/bindash",
-  "threads": 8,
-  "outdir": "data/test_genomes",
-  "mode": "pairwise",
-  "pair_cmd": "{bin} jaccard {f1} {f2}",
-  "parse": "tsv3_or_fraction"  
-}
+  python cal/cal_diverse_bindash.py
 
 備考:
 - BinDash の具体的CLIはリポジトリ/バージョンに依存します。`pair_cmd`/`dist_cmd` を
@@ -29,7 +21,6 @@ cal_diverse_bindash.py
   - 例2: "{bin} dist   --list {sketch_list}  --threads {threads}"
 """
 
-import argparse
 import csv
 import json
 import os
@@ -89,10 +80,6 @@ def ensure_outdir(p: Path):
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument('--config', default='pipeline_config.json')
-    args = ap.parse_args()
-
     # 既定
     cfg = {
         'bindash_bin': 'bindash',
@@ -105,14 +92,12 @@ def main():
         'sketchsize64': 32,
         'bbits': 16,
     }
-    cpath = Path(args.config)
+    # src/test/pipeline_config.json を必ず参照
+    cpath = Path(__file__).resolve().parent / 'pipeline_config.json'
     if cpath.exists():
         loaded = json.loads(cpath.read_text())
-        # ネスト形式 {"bindash": {...}} またはフラットの両方に対応
         if isinstance(loaded, dict) and 'bindash' in loaded and isinstance(loaded['bindash'], dict):
             cfg.update(loaded['bindash'])
-        elif isinstance(loaded, dict):
-            cfg.update(loaded)
 
     base = Path(__file__).resolve().parent.parent
     outdir = (base / cfg['outdir']).resolve()

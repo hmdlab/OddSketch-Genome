@@ -13,11 +13,21 @@ def read_fasta(filename):
             seq += line
     return seq
 
+def revcomp(seq: str) -> str:
+    comp = str.maketrans('ACGTacgt', 'TGCAtgca')
+    return seq.translate(comp)[::-1]
+
+def canonical_kmer(s: str) -> str:
+    rc = revcomp(s)
+    return rc if rc < s else s
+
 def get_kmers(sequence, k):
-    """シーケンスからk-merセットを取得"""
+    """シーケンスからk-mer集合（正準化）を取得"""
     kmers = set()
-    for i in range(len(sequence) - k + 1):
-        kmers.add(sequence[i:i+k])
+    n = len(sequence)
+    for i in range(n - k + 1):
+        kmer = sequence[i:i+k]
+        kmers.add(canonical_kmer(kmer))
     return kmers
 
 def calculate_jaccard(kmers1, kmers2):
@@ -40,31 +50,11 @@ def main():
             pair_info = os.path.join('data', 'test_genomes', 'pair_info.txt')
             out_path = os.path.join('data', 'test_genomes', 'jaccard_true_results.txt')
             cfg_path = os.path.join('..', 'pipeline_config.json')
-            # スレッド数: config(true_jaccard.threads) > 環境変数 > CPU数
-            threads_val = None
-            try:
-                import json
-                with open(cfg_path) as f:
-                    cfg = json.load(f)
-                if isinstance(cfg, dict) and 'true_jaccard' in cfg and isinstance(cfg['true_jaccard'], dict):
-                    tv = cfg['true_jaccard'].get('threads')
-                    if isinstance(tv, int) and tv > 0:
-                        threads_val = tv
-            except Exception:
-                pass
-            if threads_val is None:
-                envv = os.environ.get('ODDSKETCH_THREADS')
-                if envv and envv.isdigit():
-                    threads_val = int(envv)
-            if threads_val is None:
-                threads_val = os.cpu_count() or 1
-            threads = str(max(1, int(threads_val)))
             cmd = [
                 cpp_bin,
                 f"--config={cfg_path}",
                 f"--pair-info={pair_info}",
                 f"--out={out_path}",
-                f"--threads={threads}",
             ]
             print(f"C++ true_jaccard を起動します: {' '.join(cmd)}")
             subprocess.run(cmd, check=True)
@@ -77,7 +67,6 @@ def main():
     # ファイルが無い場合やキーが無い場合は既定値にフォールバック。
     cfg_path_candidates = [
         os.path.join(os.path.dirname(__file__), '..', 'pipeline_config.json'),
-        os.path.join(os.path.dirname(__file__), '..', 'bindash_config.json'),  # 互換
     ]
     k = 64
     for c in cfg_path_candidates:
@@ -108,6 +97,17 @@ def main():
     print(f"k-mer長: {k}")
     print()
     
+    # 総ペア数（正しい形式の行）をカウントして進捗表示に使用
+    total_pairs = 0
+    try:
+        with open(pair_info_file, 'r') as fcnt:
+            _ = fcnt.readline()
+            for ln in fcnt:
+                if len(ln.strip().split('\t')) == 5:
+                    total_pairs += 1
+    except Exception:
+        total_pairs = 0
+
     with open(pair_info_file, 'r') as f:
         header = f.readline().strip()  # ヘッダー行をスキップ
         
@@ -149,6 +149,12 @@ def main():
                 })
                 
                 print(f"-> Jaccard: {jaccard:.6f}")
+                # 20ペアごとに進捗を表示
+                if len(results) % 20 == 0:
+                    if total_pairs > 0:
+                        print(f"進捗: {len(results)} / {total_pairs} ペア完了")
+                    else:
+                        print(f"進捗: {len(results)} ペア完了")
                 
             except Exception as e:
                 print(f"-> エラー: {e}")

@@ -42,6 +42,10 @@ static double J0 = 0.75;
 // odd sketchのハッシュ値の個数（One Permutation Hashingと組み合わせるため）
 // 実装上、ハッシュ数はスケッチビット数と同スケールで扱う
 
+// ビット位置決定のモード
+enum class PosMode { Value = 0, Mix = 1, Stripe = 2 };
+static PosMode G_POS_MODE = PosMode::Value; // 既定: 互換目的で従来挙動（hv のみ）
+
 
 // kmerをハッシュ化(xxhash)
 u_int64_t hash_kmer(const std::string_view &kmer){
@@ -177,11 +181,37 @@ std::vector<uint64_t> make_odd_sketch_from_fasta(const std::string &fname) {
     }
     std::vector<uint64_t> words(G_SKETCH_SIZE / 64, 0);
 
-    // One Permutation Hashingで得られた値（バケットごとの最小値）をスケッチに入れる（直写像のベースライン）
-    for (size_t i = 0; i < minhash_values.size(); i++) {
+    // One Permutation Hashingで得られた値（バケットごとの最小値）をスケッチに入れる
+    auto map_pos = [&](uint32_t idx, uint64_t hv, size_t nbits, size_t kbuckets)->size_t{
+        if (G_POS_MODE == PosMode::Value) {
+            return static_cast<size_t>(hv % nbits);
+        } else if (G_POS_MODE == PosMode::Mix) {
+            // ビン番号と値を混ぜて位置決定（位置情報を保持しつつ衝突を分散）
+            uint64_t buf[2]; buf[0] = hv; buf[1] = static_cast<uint64_t>(idx);
+            uint64_t h = XXH64(reinterpret_cast<const void*>(buf), sizeof(buf), 0x9E3779B97F4A7C15ULL);
+            return static_cast<size_t>(h % nbits);
+        } else { // Stripe
+            size_t stride = (kbuckets > 0) ? (nbits / kbuckets) : 0;
+            if (stride >= 2) {
+                size_t base = static_cast<size_t>(idx) * stride;
+                size_t offset = static_cast<size_t>(hv % stride);
+                size_t pos = base + offset;
+                if (pos >= nbits) pos = pos % nbits; // 念のため
+                return pos;
+            } else {
+                // ストライドが小さすぎる場合は Mix にフォールバック
+                uint64_t buf[2]; buf[0] = hv; buf[1] = static_cast<uint64_t>(idx);
+                uint64_t h = XXH64(reinterpret_cast<const void*>(buf), sizeof(buf), 0x9E3779B97F4A7C15ULL);
+                return static_cast<size_t>(h % nbits);
+            }
+        }
+    };
+
+    const size_t kbuckets = minhash_values.size();
+    for (size_t i = 0; i < kbuckets; i++) {
         uint64_t hv = minhash_values[i];
-        size_t pos = static_cast<size_t>(hv % G_SKETCH_SIZE);  // 直写像: hv の下位ビットで位置決定
-        flip_bit(words, pos);                                   // 反転 (odd‐sketch の核心)
+        size_t pos = map_pos(static_cast<uint32_t>(i), hv, G_SKETCH_SIZE, kbuckets);
+        flip_bit(words, pos); // 反転 (odd‐sketch の核心)
     }
     return words;
 }
@@ -369,6 +399,13 @@ static void parse_options(int argc, char** argv, std::string &mode) {
                     }
                 } catch (...) {}
             }
+        } else if (key == "pos-mode") {
+            // value|mix|stripe
+            if (!val.empty()) {
+                if (val == "value") G_POS_MODE = PosMode::Value;
+                else if (val == "mix") G_POS_MODE = PosMode::Mix;
+                else if (val == "stripe") G_POS_MODE = PosMode::Stripe;
+            }
         }
     }
 }
@@ -427,7 +464,9 @@ int main(int argc, char** argv) {
         // デバッグ: スケッチサイズとバケット数、J0 を表示
         std::cerr << "[oddsketch] sketch: nbits=" << G_SKETCH_SIZE
                   << ", kbuckets=" << G_LAST_NUM_BUCKETS
-                  << ", j0=" << std::fixed << std::setprecision(6) << J0 << "\n";
+                  << ", j0=" << std::fixed << std::setprecision(6) << J0
+                  << ", pos-mode=" << (G_POS_MODE==PosMode::Value?"value":(G_POS_MODE==PosMode::Mix?"mix":"stripe"))
+                  << "\n";
 
         for (auto &f : paths) {
             auto S = make_odd_sketch_from_fasta(f);
