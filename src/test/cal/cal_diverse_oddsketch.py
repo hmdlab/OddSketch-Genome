@@ -3,25 +3,29 @@ import subprocess
 import tempfile
 import json
 import argparse
+from pathlib import Path
+
+def _resolve_config_path(config_arg: str) -> Path:
+    candidates = []
+    if config_arg:
+        candidates.append(Path(config_arg))
+        candidates.append(Path(__file__).resolve().parent / config_arg)
+    candidates.append(Path(__file__).resolve().parent / 'pipeline_config.json')
+    candidates.append(Path('pipeline_config.json'))
+    for p in candidates:
+        if p.exists():
+            return p
+    return candidates[0]
+
 
 def load_pipeline_config(config_path: str = None):
-    candidates = []
-    # 1) 明示指定があれば最優先（作業ディレクトリ基準）
-    if config_path:
-        candidates.append(config_path)
-        # 2) スクリプト位置からの相対も試す
-        if not os.path.isabs(config_path):
-            candidates.append(os.path.join(os.path.dirname(__file__), config_path))
-    # 3) 既定の pipeline_config.json を最後に試す
-    candidates.append(os.path.join(os.path.dirname(__file__), '..', 'pipeline_config.json'))
-    for c in candidates:
-        if os.path.exists(c):
-            try:
-                with open(c) as f:
-                    return json.load(f)
-            except Exception:
-                pass
-    return {}
+    if config_path is None:
+        config_path = str(_resolve_config_path('pipeline_config.json'))
+    try:
+        with open(config_path) as f:
+            return json.load(f)
+    except Exception:
+        return {}
 
 
 def run_oddsketch_sketch(genome_files, cfg):
@@ -114,7 +118,8 @@ def main():
     ap.add_argument('--config', default='pipeline_config.json', help='Path to pipeline config JSON')
     args = ap.parse_args()
 
-    cfg = load_pipeline_config(args.config)
+    cfg_path = _resolve_config_path(args.config)
+    cfg = load_pipeline_config(str(cfg_path))
     # ペア情報の読み込み
     pair_info_file = "data/test_genomes/pair_info.txt"
     

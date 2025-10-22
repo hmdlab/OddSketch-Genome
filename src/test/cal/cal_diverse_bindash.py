@@ -27,6 +27,7 @@ import os
 import shlex
 import subprocess
 from pathlib import Path
+import argparse
 
 
 def read_pair_info(pair_info_path: Path):
@@ -79,7 +80,24 @@ def ensure_outdir(p: Path):
     p.mkdir(parents=True, exist_ok=True)
 
 
+def _resolve_config_path(config_arg: str) -> Path:
+    candidates = []
+    if config_arg:
+        candidates.append(Path(config_arg))
+        candidates.append(Path(__file__).resolve().parent / config_arg)
+    candidates.append(Path(__file__).resolve().parent / 'pipeline_config.json')
+    candidates.append(Path('pipeline_config.json'))
+    for p in candidates:
+        if p.exists():
+            return p
+    return candidates[0]
+
+
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--config', default='pipeline_config.json', help='Path to pipeline config JSON')
+    args = ap.parse_args()
+
     # 既定
     cfg = {
         'bindash_bin': 'bindash',
@@ -88,16 +106,21 @@ def main():
         'mode': 'sketch_dist',  # 'sketch_dist' (推奨) or 'pairwise'
         'pair_cmd': '{bin} exact --nthreads={threads} {f1} {f2}',
         'parse': 'tsv3_or_fraction',
-        'kmerlen': 16,
+        'kmerlen': 64,
         'sketchsize64': 32,
         'bbits': 16,
     }
-    # src/test/pipeline_config.json を必ず参照
-    cpath = Path(__file__).resolve().parent / 'pipeline_config.json'
-    if cpath.exists():
+    # config を読み込み（--config 明示指定に対応）
+    cpath = _resolve_config_path(args.config)
+    try:
         loaded = json.loads(cpath.read_text())
-        if isinstance(loaded, dict) and 'bindash' in loaded and isinstance(loaded['bindash'], dict):
+    except Exception:
+        loaded = None
+    if isinstance(loaded, dict):
+        if 'bindash' in loaded and isinstance(loaded['bindash'], dict):
             cfg.update(loaded['bindash'])
+        else:
+            cfg.update(loaded)
 
     base = Path(__file__).resolve().parent.parent
     outdir = (base / cfg['outdir']).resolve()
