@@ -27,3 +27,6 @@ external/
 # Common OS/editor files
 .DS_Store
 .vscode/
+
+# Project experiment data
+src/project/data/
