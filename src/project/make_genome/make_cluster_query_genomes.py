@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-make_clustered_genomes.py
+make_cluster_query_genomes.py
 
 Generates n clusters of genomes with SNP mutations from cluster centers.
 Outputs FASTA files under project data directory and list files for DB and queries.
 
 Usage:
   cd src/project
-  python make_genome/make_clustered_genomes.py --config config.json
+  python make_genome/make_cluster_query_genomes.py --config config.json
 
 Outputs (under paths.outdir):
   - genomes/cluster{cid}/g_{cid}_{idx}.fna

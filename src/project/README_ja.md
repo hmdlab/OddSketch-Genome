@@ -4,7 +4,7 @@
 
 ## ディレクトリ構成
 - `config.json`: 実験設定（ゲノム長・クラスタ数・ツール設定など）。
-- `make_genome/make_clustered_genomes.py`: クラスタ中心から DB 用ゲノムとクエリ用ゲノムを生成し、リストを出力。
+- `make_genome/make_cluster_query_genomes.py`: クラスタ中心から DB 用ゲノムとクエリ用ゲノムを生成し、リストを出力。
 - `cal/oddsketch_db.py`: OddSketch による DB/クエリのスケッチ化と検索。
 - `cal/bindash_db.py`: BinDash による DB/クエリのスケッチ化と検索。
 - `data/`: 生成物（FASTA、リスト、スケッチ、結果）。Git には無視されます。
@@ -13,7 +13,7 @@
 1) DB とクエリの生成
 - 例: 10 クラスタ × 各 1000 DB ゲノム、長さ 1e5 bp。DB はクラスタ中心を含み、各クラスタで合計 `cluster_size` 件（センター1 + 派生 `cluster_size-1`）。DBの SNP 数は U[clusters.mutation_min,clusters.mutation_max]、クエリの SNP 数は U[query.query_mutation_min,query.query_mutation_max]
 - `cd src/project`
-- `python make_genome/make_clustered_genomes.py --config config.json`
+- `python make_genome/make_cluster_query_genomes.py --config config.json`
 
 2) 真値と評価（任意）
 - クエリはクラスタ中心から生成しているため、概念的な最近傍はクラスタ中心です。概念ラベルでの評価と、厳密Jaccardによるラベルでの評価を切り替え可能です。

@@ -4,7 +4,7 @@ This project generates clustered synthetic genomes, builds a genome DB, and comp
 
 ## Layout
 - `config.json`: experiment settings (genomes, clustering, tools).
-- `make_genome/make_clustered_genomes.py`: generate clustered DB genomes and query genomes mutated from cluster centers; writes lists.
+- `make_genome/make_cluster_query_genomes.py`: generate clustered DB genomes and query genomes mutated from cluster centers; writes lists.
 - `cal/oddsketch_db.py`: sketch DB/queries and search with OddSketch.
 - `cal/bindash_db.py`: sketch DB/queries and search with BinDash.
 - `data/`: generated FASTA, lists, sketches, and results (gitignored).
@@ -13,7 +13,7 @@ This project generates clustered synthetic genomes, builds a genome DB, and comp
 1) DB and Query Generation
    - Generate DB and query genomes (e.g., 10 clusters × 1000 DB genomes, 1e5 bp each; DB includes cluster centers plus (cluster_size-1) derived per cluster; DB SNPs ~ U[clusters.mutation_min,clusters.mutation_max], Query SNPs ~ U[query.query_mutation_min,query.query_mutation_max]):
    - `cd src/project`
-   - `python make_genome/make_clustered_genomes.py --config config.json`
+   - `python make_genome/make_cluster_query_genomes.py --config config.json`
 
 2) Truth & Evaluation (optional)
    - Since queries are mutated from cluster centers, the conceptual nearest neighbor is the cluster center. You can evaluate with conceptual labels or switch to exact labels:

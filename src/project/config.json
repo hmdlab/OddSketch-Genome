@@ -8,7 +8,7 @@
     "seed": 1234
   },
   "query": {
-    "num_queries": 100,
+    "num_queries": 5,
     "query_mutation_min": 3,
     "query_mutation_max": 10
   },

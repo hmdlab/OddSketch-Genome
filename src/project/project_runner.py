@@ -36,7 +36,7 @@ def main():
         # try project root
         cfg_path = base / 'config.json'
     # 1) genomes
-    run(['python', str(base / 'make_genome' / 'make_clustered_genomes.py'), '--config', str(cfg_path)])
+    run(['python', str(base / 'make_genome' / 'make_cluster_query_genomes.py'), '--config', str(cfg_path)])
     # 2) oddsketch
     run(['python', str(base / 'cal' / 'oddsketch_db.py'), '--config', str(cfg_path)])
     # 3) bindash
@@ -56,4 +56,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
