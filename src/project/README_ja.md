@@ -35,11 +35,11 @@
 
 ## 設定のポイント（config.json）
 - `genome_length`: 各ゲノム長（例: 100000）
-- `clusters`: `cluster_num`（クラスタ数）, `size`（各クラスタの個体数）, `min_snps_num` / `max_snps_num`（DB 側のSNP範囲）, `seed`
+- `clusters`: `num_clusters`（クラスタ数）, `cluster_size`（各クラスタの個体数）, `mutation_min` / `mutation_max`（DB 側のSNP数の範囲）, `seed`
 - `paths.outdir`: 生成物の出力先（既定 `data`）
 - `oddsketch`: `kmerlen`, `sketch_size`, `j0`, `pos_mode`
 - `bindash`: `bindash_bin`, `kmerlen`, `sketchsize64`, `bbits`, `threads`
-- `query`: `num_queries`, `mutation_min`, `mutation_max`（クエリはクラスタ中心から独立に変異生成）
+- `query`: `num_queries`, `query_mutation_min`, `query_mutation_max`（クエリはクラスタ中心から独立に変異生成）
 
 ## メモ
 - クエリはクラスタ中心から独立に変異生成し、最近傍選択時は自己一致を除外します。真値（厳密Jaccard）は任意です。

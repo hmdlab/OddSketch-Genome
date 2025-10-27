@@ -40,6 +40,6 @@ This project generates clustered synthetic genomes, builds a genome DB, and comp
    - `python project_runner.py --config config.json` (runs 1 → 3a → 3b; truth/evaluation is optional and not included by default)
 
 ## Notes
-- DB genomes are SNP-mutated from cluster centers with per-genome SNP count ~ U[`clusters.min_snps_num`,`clusters.max_snps_num`]. Query genomes are independently mutated from cluster centers with SNP count ~ U[`query.mutation_min`,`query.mutation_max`]. Self-matches are excluded when picking the nearest neighbor. True Jaccard computation is optional.
+- DB genomes are SNP-mutated from cluster centers with per-genome SNP count ~ U[`clusters.mutation_min`,`clusters.mutation_max`]. Query genomes are independently mutated from cluster centers with SNP count ~ U[`query.query_mutation_min`,`query.query_mutation_max`]. Self-matches are excluded when picking the nearest neighbor. True Jaccard computation is optional.
 - Adjust `bindash.bindash_bin` to your binary path if not on PATH. Increase `bindash.sketchsize64` for high-ANI accuracy.
 - Large data volume (10k × 1e5 bp ≈ 1e9 bases). Ensure ample disk space.

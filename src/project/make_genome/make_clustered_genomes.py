@@ -72,19 +72,19 @@ def main():
 
     genome_len = int(cfg.get('genome_length', 100000))
     clusters = cfg.get('clusters', {})
-    n = int(clusters.get('cluster_num', 10))
-    size = int(clusters.get('size', 1000))
-    # 変異数は [min_snps_num, max_snps_num] の一様乱数
-    min_snps = int(clusters.get('min_snps_num', 1))
-    max_snps = int(clusters.get('max_snps_num', 1000))
+    n = int(clusters.get('num_clusters', 10))
+    size = int(clusters.get('cluster_size', 1000))
+    # DBゲノムのSNP数は [clusters.mutation_min, clusters.mutation_max] の一様乱数
+    min_snps = int(clusters.get('mutation_min', 1))
+    max_snps = int(clusters.get('mutation_max', 1000))
     if max_snps < min_snps:
         max_snps = min_snps
     seed = int(clusters.get('seed', 1234))
     outdir = Path(__file__).resolve().parent.parent / cfg.get('paths', {}).get('outdir', 'data')
     qcfg = cfg.get('query', {})
     qnum = args.override_queries if args.override_queries is not None else int(qcfg.get('num_queries', 100))
-    q_mut_min = int(qcfg.get('mutation_min', 1))
-    q_mut_max = int(qcfg.get('mutation_max', max_snps))
+    q_mut_min = int(qcfg.get('query_mutation_min', 1))
+    q_mut_max = int(qcfg.get('query_mutation_max', max_snps))
     if q_mut_max < q_mut_min:
         q_mut_max = q_mut_min
 
