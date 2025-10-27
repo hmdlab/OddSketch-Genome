@@ -72,7 +72,7 @@ def main():
 
     genome_len = int(cfg.get('genome_length', 100000))
     clusters = cfg.get('clusters', {})
-    n = int(clusters.get('n', 10))
+    n = int(clusters.get('cluster_num', 10))
     size = int(clusters.get('size', 1000))
     # 変異数は [min_snps_num, max_snps_num] の一様乱数
     min_snps = int(clusters.get('min_snps_num', 1))
@@ -81,7 +81,12 @@ def main():
         max_snps = min_snps
     seed = int(clusters.get('seed', 1234))
     outdir = Path(__file__).resolve().parent.parent / cfg.get('paths', {}).get('outdir', 'data')
-    qnum = args.override_queries if args.override_queries is not None else int(cfg.get('query', {}).get('num_queries', 100))
+    qcfg = cfg.get('query', {})
+    qnum = args.override_queries if args.override_queries is not None else int(qcfg.get('num_queries', 100))
+    q_mut_min = int(qcfg.get('mutation_min', 1))
+    q_mut_max = int(qcfg.get('mutation_max', max_snps))
+    if q_mut_max < q_mut_min:
+        q_mut_max = q_mut_min
 
     rng = random.Random(seed)
 
@@ -92,11 +97,13 @@ def main():
 
     genomes_dir.mkdir(parents=True, exist_ok=True)
     all_paths = []
+    centers = []  # store center sequences per cluster id (1-based)
     with cluster_map.open('w') as cmap:
         cmap.write('path\tcluster_id\n')
         for cid in range(1, n + 1):
             # cluster center
             center = ''.join(rng.choice('ACGT') for _ in range(genome_len))
+            centers.append(center)
             for idx in range(1, size + 1):
                 seq_list = list(center)
                 snps = rng.randint(min_snps, max_snps) if max_snps > 0 else 0
@@ -113,16 +120,49 @@ def main():
         for p in all_paths:
             f.write(p + '\n')
 
-    # Queries sampled from DB
-    q = min(qnum, len(all_paths))
-    qs = rng.sample(all_paths, k=q)
+    # Queries: mutate cluster centers (not sampled from DB)
+    queries_dir = outdir / 'queries'
+    queries_dir.mkdir(parents=True, exist_ok=True)
+    q_paths = []
+    # distribute queries roughly evenly across clusters
+    per_cluster = max(1, qnum // n) if n > 0 else qnum
+    made = 0
+    for cid in range(1, n + 1):
+        center = centers[cid - 1]
+        loc = 0
+        while made < qnum and loc < per_cluster:
+            seq_list = list(center)
+            qsnp = rng.randint(q_mut_min, q_mut_max) if q_mut_max > 0 else 0
+            mutate_snp(seq_list, qsnp, rng)
+            name = f"q_{cid}_{loc+1}"
+            out_path = queries_dir / f"cluster{cid}" / f"{name}.fna"
+            write_fasta(out_path, name=name, seq=''.join(seq_list))
+            q_paths.append(str(out_path))
+            made += 1
+            loc += 1
+        if made >= qnum:
+            break
+    # if still short due to truncation, fill randomly
+    while made < qnum and n > 0:
+        cid = rng.randint(1, n)
+        center = centers[cid - 1]
+        qsnp = rng.randint(q_mut_min, q_mut_max) if q_mut_max > 0 else 0
+        seq_list = list(center)
+        mutate_snp(seq_list, qsnp, rng)
+        name = f"q_{cid}_{made+1}"
+        out_path = queries_dir / f"cluster{cid}" / f"{name}.fna"
+        write_fasta(out_path, name=name, seq=''.join(seq_list))
+        q_paths.append(str(out_path))
+        made += 1
+
     with query_list.open('w') as f:
-        for p in qs:
+        for p in q_paths:
             f.write(p + '\n')
 
-    print(f"[make_genome] wrote {len(all_paths)} genomes to {genomes_dir}")
+    print(f"[make_genome] wrote {len(all_paths)} DB genomes to {genomes_dir}")
+    print(f"[make_genome] wrote {len(q_paths)} query genomes to {queries_dir}")
     print(f"[make_genome] db_list={db_list}")
-    print(f"[make_genome] queries={query_list} (N={q})")
+    print(f"[make_genome] queries={query_list} (N={len(q_paths)})")
 
 
 if __name__ == '__main__':

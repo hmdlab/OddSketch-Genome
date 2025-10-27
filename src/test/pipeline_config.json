@@ -2,8 +2,8 @@
   "make_genomes": {
     "genome_length": 1000000,
     "num_pairs": 50,
-    "mutation_min": 10,
-    "mutation_max": 5000,
+    "mutation_min": 100,
+    "mutation_max": 2000,
     "outdir": "data/test_genomes/genomes",
     "seed_base": 2000
   },

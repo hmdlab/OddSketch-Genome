@@ -4,36 +4,44 @@
 
 ## ディレクトリ構成
 - `config.json`: 実験設定（ゲノム長・クラスタ数・ツール設定など）。
-- `make_genome/make_clustered_genomes.py`: クラスタ化ゲノムとリストを生成。
+- `make_genome/make_clustered_genomes.py`: クラスタ中心から DB 用ゲノムとクエリ用ゲノムを生成し、リストを出力。
 - `cal/oddsketch_db.py`: OddSketch による DB/クエリのスケッチ化と検索。
 - `cal/bindash_db.py`: BinDash による DB/クエリのスケッチ化と検索。
 - `data/`: 生成物（FASTA、リスト、スケッチ、結果）。Git には無視されます。
 
 ## クイックスタート
-1) ゲノム生成（既定: 10 クラスタ × 各 1000 ゲノム、長さ 1e5 bp。各ゲノムのSNP数は一様分布 U[min_snps_num, max_snps_num]）
+1) DB とクエリの生成
+- 例: 10 クラスタ × 各 1000 DB ゲノム、長さ 1e5 bp。DB の SNP 数は U[min_snps_num,max_snps_num]、クエリの SNP 数は U[mutation_min,mutation_max]
 - `cd src/project`
 - `python make_genome/make_clustered_genomes.py --config config.json`
 
-2) OddSketch 検索
+2) 真値と評価（任意）
+- クエリはクラスタ中心から生成しているため、概念的な最近傍はクラスタ中心です。配列に基づく厳密ラベルで検証したい場合のみ実行してください。
+- 真の最近傍の作成（任意）: `python cal/true_db.py --config config.json`
+  - 出力: `data/true_nn.tsv`
+- 精度評価（任意・top-1）: `python cal/evaluate_nn.py --config config.json`
+  - 出力: `data/nn_eval.tsv`（端末に精度を表示）
+
+3a) OddSketch 検索
 - `python cal/oddsketch_db.py --config config.json`
 - 出力: `data/oddsketch_nn.tsv`、所要時間 `data/oddsketch_times.txt`
 
-3) BinDash 検索
+3b) BinDash 検索
 - `python cal/bindash_db.py --config config.json`
 - 出力: `data/bindash_nn.tsv`、所要時間 `data/bindash_times.txt`
 
 4) 一括実行
-- `python project_runner.py --config config.json`
+- `python project_runner.py --config config.json`（1 → 3a → 3b を実行。真値/評価は任意のため既定では含みません）
 
 ## 設定のポイント（config.json）
 - `genome_length`: 各ゲノム長（例: 100000）
-- `clusters`: `n`（クラスタ数）, `size`（各クラスタの個体数）, `min_snps_num` / `max_snps_num`（各ゲノムのSNP数の一様分布範囲）, `seed`
+- `clusters`: `cluster_num`（クラスタ数）, `size`（各クラスタの個体数）, `min_snps_num` / `max_snps_num`（DB 側のSNP範囲）, `seed`
 - `paths.outdir`: 生成物の出力先（既定 `data`）
 - `oddsketch`: `kmerlen`, `sketch_size`, `j0`, `pos_mode`
 - `bindash`: `bindash_bin`, `kmerlen`, `sketchsize64`, `bbits`, `threads`
-- `query.num_queries`: クエリとして DB からサンプリングする件数
+- `query`: `num_queries`, `mutation_min`, `mutation_max`（クエリはクラスタ中心から独立に変異生成）
 
 ## メモ
-- クエリは DB からサンプリングし、最近傍選択時は自己一致を除外します。
+- クエリはクラスタ中心から独立に変異生成し、最近傍選択時は自己一致を除外します。真値（厳密Jaccard）は任意です。
 - BinDash を PATH に置けない場合は `bindash.bindash_bin` に絶対パスを指定。高い類似度を扱う場合は `sketchsize64 ≥ 188` を推奨。
 - 規模が大きいため（例: 1 万 × 1e5 bp ≈ 1e9 塩基）、十分なディスク容量を確保し、初回は小規模で試すことを推奨します。

@@ -81,12 +81,15 @@ def main():
 
     # プロット用の集計バッファ
     series = []  # list of dict(label, bins:list[str], rmse:list[float], rm_lo:list[float], rm_hi:list[float])
+    base_dir = None  # 最初に見つかったCSVの親ディレクトリ（例: test_genomes）
 
     for csv_path in args.csv:
         p = Path(csv_path)
         if not p.exists():
             print(f"[skip] not found: {p}")
             continue
+        if base_dir is None:
+            base_dir = p.parent
         est_col, xs, ys = load_pairs(p, args.est_col)
         n_all = len(xs)
         r_all = rmse(xs, ys)
@@ -191,6 +194,12 @@ def main():
             ax.grid(axis='y', linestyle=':', alpha=0.5)
             fig.tight_layout()
             outp = Path(args.plot_out)
+            if not outp.is_absolute():
+                # 相対パスは最初のCSVの親（test_genomes など）基準に出力
+                if outp.parent == Path('.') and base_dir is not None:
+                    outp = base_dir / outp.name
+                elif base_dir is not None:
+                    outp = base_dir / outp
             outp.parent.mkdir(parents=True, exist_ok=True)
             fig.savefig(outp, dpi=150)
             print(f"saved figure: {outp}")
@@ -214,6 +223,11 @@ def main():
             ax.grid(axis='y', linestyle=':', alpha=0.5)
             fig.tight_layout()
             outp = Path(args.plot_out)
+            if not outp.is_absolute():
+                if outp.parent == Path('.') and base_dir is not None:
+                    outp = base_dir / outp.name
+                elif base_dir is not None:
+                    outp = base_dir / outp
             outp.parent.mkdir(parents=True, exist_ok=True)
             fig.savefig(outp, dpi=150)
             print(f"saved figure: {outp}")
