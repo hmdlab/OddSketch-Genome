@@ -104,7 +104,15 @@ def main():
             # cluster center
             center = ''.join(rng.choice('ACGT') for _ in range(genome_len))
             centers.append(center)
-            for idx in range(1, size + 1):
+            # write center into DB so it is searchable
+            center_name = f"center_{cid}"
+            center_path = genomes_dir / f"cluster{cid}" / f"{center_name}.fna"
+            write_fasta(center_path, name=center_name, seq=center)
+            all_paths.append(str(center_path))
+            cmap.write(f"{center_path}\t{cid}\n")
+
+            # derived genomes: total per cluster equals cluster_size, so generate (cluster_size - 1)
+            for idx in range(1, size):
                 seq_list = list(center)
                 snps = rng.randint(min_snps, max_snps) if max_snps > 0 else 0
                 mutate_snp(seq_list, snps, rng)

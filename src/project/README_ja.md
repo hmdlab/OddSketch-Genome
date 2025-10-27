@@ -11,15 +11,18 @@
 
 ## クイックスタート
 1) DB とクエリの生成
-- 例: 10 クラスタ × 各 1000 DB ゲノム、長さ 1e5 bp。DB の SNP 数は U[min_snps_num,max_snps_num]、クエリの SNP 数は U[mutation_min,mutation_max]
+- 例: 10 クラスタ × 各 1000 DB ゲノム、長さ 1e5 bp。DB はクラスタ中心を含み、各クラスタで合計 `cluster_size` 件（センター1 + 派生 `cluster_size-1`）。DBの SNP 数は U[clusters.mutation_min,clusters.mutation_max]、クエリの SNP 数は U[query.query_mutation_min,query.query_mutation_max]
 - `cd src/project`
 - `python make_genome/make_clustered_genomes.py --config config.json`
 
 2) 真値と評価（任意）
-- クエリはクラスタ中心から生成しているため、概念的な最近傍はクラスタ中心です。配列に基づく厳密ラベルで検証したい場合のみ実行してください。
-- 真の最近傍の作成（任意）: `python cal/true_db.py --config config.json`
-  - 出力: `data/true_nn.tsv`
-- 精度評価（任意・top-1）: `python cal/evaluate_nn.py --config config.json`
+- クエリはクラスタ中心から生成しているため、概念的な最近傍はクラスタ中心です。概念ラベルでの評価と、厳密Jaccardによるラベルでの評価を切り替え可能です。
+- 厳密ラベルの作成（任意）: `python cal/true_db.py --config config.json` → `data/true_nn.tsv`
+- 精度評価（top-1）:（既定は概念ラベル）
+  - 概念ラベル（既定）: `python cal/evaluate_nn.py --config config.json`
+    - 明示する場合は `--labels conceptual`
+  - 厳密ラベル: `python cal/evaluate_nn.py --config config.json --labels true`
+    - `data/true_nn.tsv` が無い場合は概念ラベルにフォールバックします。
   - 出力: `data/nn_eval.tsv`（端末に精度を表示）
 
 3a) OddSketch 検索
