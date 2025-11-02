@@ -114,6 +114,15 @@ def main():
                 continue
             db_map[Path(pth).with_suffix(Path(pth).suffix + '.sketch').name] = pth
 
+    # map query sketch filename -> original FASTA path
+    q_map = {}
+    with open(q_list) as f:
+        for ln in f:
+            pth = ln.strip()
+            if not pth:
+                continue
+            q_map[Path(pth).with_suffix(Path(pth).suffix + '.sketch').name] = pth
+
     nn_path = outdir / 'oddsketch_nn.tsv'
     with nn_path.open('w') as outf:
         outf.write('query\tnn\tjaccard_oddsketch\n')
@@ -141,7 +150,8 @@ def main():
                         best = (j, other)
             if best is not None:
                 nn_fasta = db_map.get(best[1], best[1])
-                outf.write(f"{qname}\t{nn_fasta}\t{best[0]:.10f}\n")
+                q_fasta = q_map.get(qname, qname)
+                outf.write(f"{q_fasta}\t{nn_fasta}\t{best[0]:.10f}\n")
 
     t3 = perf_counter()
     (outdir / 'oddsketch_times.txt').write_text(
@@ -151,4 +161,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

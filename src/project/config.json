@@ -1,16 +1,16 @@
 {
   "genome_length": 1000000,
   "clusters": {
-    "num_clusters": 3,
-    "cluster_size": 20,
-    "mutation_min": 100,
-    "mutation_max": 1500,
+    "num_clusters": 1,
+    "cluster_size": 100,
+    "mutation_min": 10,
+    "mutation_max": 100,
     "seed": 1234
   },
   "query": {
     "num_queries": 5,
-    "query_mutation_min": 3,
-    "query_mutation_max": 10
+    "query_mutation_min": 10,
+    "query_mutation_max": 100
   },
   "paths": {
     "outdir": "data"

@@ -37,10 +37,14 @@ def main():
         cfg_path = base / 'config.json'
     # 1) genomes
     run(['python', str(base / 'make_genome' / 'make_cluster_query_genomes.py'), '--config', str(cfg_path)])
-    # 2) oddsketch
+    # 2) compute exact labels (true Jaccard)
+    run(['python', str(base / 'cal' / 'true_db.py'), '--config', str(cfg_path)])
+    # 3) oddsketch
     run(['python', str(base / 'cal' / 'oddsketch_db.py'), '--config', str(cfg_path)])
-    # 3) bindash
+    # 4) bindash
     run(['python', str(base / 'cal' / 'bindash_db.py'), '--config', str(cfg_path)])
+    # 5) evaluate
+    run(['python', str(base / 'cal' / 'evaluate_nn.py'), '--config', str(cfg_path)])
 
     # 4) quick summary: counts and example head
     outdir = base / 'data'
