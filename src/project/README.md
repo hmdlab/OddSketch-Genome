@@ -8,6 +8,8 @@ This project generates clustered synthetic genomes, builds a genome DB, and comp
 - `cal/oddsketch_db.py`: sketch DB/queries and search with OddSketch.
 - `cal/bindash_db.py`: sketch DB/queries and search with BinDash.
 - `data/`: generated FASTA, lists, sketches, and results (gitignored).
+  - true_pairs.tsv / oddsketch_pairs.tsv / bindash_pairs.tsv: pairwise Jaccard (true/estimate)
+  - nn_eval.tsv: top-1 accuracy per tool
 
 ## Quick Start
 1) DB and Query Generation
@@ -16,10 +18,13 @@ This project generates clustered synthetic genomes, builds a genome DB, and comp
    - `python make_genome/make_cluster_query_genomes.py --config config.json`
 
 2) Truth & Evaluation (mandatory)
-   - Compute exact labels (true Jaccard) and evaluate search accuracy:
-   - True labels: `python cal/true_db.py --config config.json` → `data/true_nn.tsv`
+   - True pairwise Jaccard: `python cal/true_db.py --config config.json`
+     - Outputs: `data/true_pairs.tsv`, `data/true_nn.tsv`
    - Evaluate: `python cal/evaluate_nn.py --config config.json`
      - Outputs: `data/nn_eval.tsv` and prints accuracies
+   - Plot true vs estimate:
+     - OddSketch: `python analysis/plot_est_vs_true.py --true data/true_pairs.tsv --pred data/oddsketch_pairs.tsv --pred-col jaccard_oddsketch --out data/oddsketch_true_vs_estimate.png`
+     - BinDash:   `python analysis/plot_est_vs_true.py --true data/true_pairs.tsv --pred data/bindash_pairs.tsv   --pred-col jaccard_bindash   --out data/bindash_true_vs_estimate.png`
 
 3a) OddSketch search:
    - `python cal/oddsketch_db.py --config config.json`

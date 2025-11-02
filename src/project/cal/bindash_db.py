@@ -100,6 +100,9 @@ def main():
     best = {}
     qname_to_path = {Path(p.strip()).name: p.strip() for p in q_list.read_text().splitlines() if p.strip()}
     dbname_to_path = {Path(p.strip()).name: p.strip() for p in db_list.read_text().splitlines() if p.strip()}
+    pairs_path = outdir / 'bindash_pairs.tsv'
+    with pairs_path.open('w') as pf:
+        pf.write('query\tdb\tjaccard_bindash\n')
     for ln in out.strip().splitlines():
         parts = ln.strip().split('\t')
         if len(parts) < 5:
@@ -119,6 +122,9 @@ def main():
                 j = float(jac)
         except Exception:
             continue
+        # record pair
+        with pairs_path.open('a') as pf:
+            pf.write(f"{qname_to_path.get(qn, qn)}\t{dbname_to_path.get(tn, tn)}\t{j:.10f}\n")
         cur = best.get(qn)
         if (cur is None) or (j > cur[0]):
             best[qn] = (j, tn)
@@ -137,4 +143,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

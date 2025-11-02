@@ -8,6 +8,8 @@
 - `cal/oddsketch_db.py`: OddSketch による DB/クエリのスケッチ化と検索。
 - `cal/bindash_db.py`: BinDash による DB/クエリのスケッチ化と検索。
 - `data/`: 生成物（FASTA、リスト、スケッチ、結果）。Git には無視されます。
+  - true_pairs.tsv / oddsketch_pairs.tsv / bindash_pairs.tsv: クエリ×DBのペアごとのJaccard（真値/推定）
+  - nn_eval.tsv: ツールごとのtop-1精度
 
 ## クイックスタート
 1) DB とクエリの生成
@@ -16,10 +18,13 @@
 - `python make_genome/make_cluster_query_genomes.py --config config.json`
 
 2) 真値と評価（必須）
-- 厳密Jaccardで真の最近傍ラベルを作成し、検索精度を評価します。
-- 真の最近傍: `python cal/true_db.py --config config.json` → `data/true_nn.tsv`
+- 厳密Jaccard（クエリ×DB全組）: `python cal/true_db.py --config config.json`
+  - 出力: `data/true_pairs.tsv`, `data/true_nn.tsv`
 - 精度評価（top-1）: `python cal/evaluate_nn.py --config config.json`
   - 出力: `data/nn_eval.tsv`（端末に精度を表示）
+- 真値と推定の図示:
+  - OddSketch: `python analysis/plot_est_vs_true.py --true data/true_pairs.tsv --pred data/oddsketch_pairs.tsv --pred-col jaccard_oddsketch --out data/oddsketch_true_vs_estimate.png`
+  - BinDash:   `python analysis/plot_est_vs_true.py --true data/true_pairs.tsv --pred data/bindash_pairs.tsv   --pred-col jaccard_bindash   --out data/bindash_true_vs_estimate.png`
 
 3a) OddSketch 検索
 - `python cal/oddsketch_db.py --config config.json`

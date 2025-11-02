@@ -124,8 +124,10 @@ def main():
             q_map[Path(pth).with_suffix(Path(pth).suffix + '.sketch').name] = pth
 
     nn_path = outdir / 'oddsketch_nn.tsv'
-    with nn_path.open('w') as outf:
+    pairs_path = outdir / 'oddsketch_pairs.tsv'
+    with nn_path.open('w') as outf, pairs_path.open('w') as pf:
         outf.write('query\tnn\tjaccard_oddsketch\n')
+        pf.write('query\tdb\tjaccard_oddsketch\n')
         for qs in qry_sketches:
             # dist between [query] + all db
             lines = run_oddsketch_dist([Path(qs)] + [Path(p) for p in db_sketches], cfg)
@@ -146,6 +148,10 @@ def main():
                     # exclude self matches if any
                     if other == qname:
                         continue
+                    # record pair row (query FASTA, db FASTA)
+                    nn_fa = db_map.get(other, other)
+                    q_fa = q_map.get(qname, qname)
+                    pf.write(f"{q_fa}\t{nn_fa}\t{j:.10f}\n")
                     if (best is None) or (j > best[0]):
                         best = (j, other)
             if best is not None:
