@@ -71,7 +71,7 @@ def main():
     k = b.get('kmerlen', 64)
     ss = b.get('sketchsize64', 256)
     bb = b.get('bbits', 16)
-    th = b.get('threads', 8)
+    th = b.get('threads', 1)
 
     db_prefix = outdir / 'bindash_db_sketch'
     q_prefix = outdir / 'bindash_query_sketch'

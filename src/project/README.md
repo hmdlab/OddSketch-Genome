@@ -10,6 +10,7 @@ This project generates clustered synthetic genomes, builds a genome DB, and comp
 - `data/`: generated FASTA, lists, sketches, and results (gitignored).
   - true_pairs.tsv / oddsketch_pairs.tsv / bindash_pairs.tsv: pairwise Jaccard (true/estimate)
   - nn_eval.tsv: top-1 accuracy per tool
+  - genome_mutations.tsv: per-genome mutation counts used at generation (path, type=DB|query, cluster_id, mutations)
 
 ## Quick Start
 1) DB and Query Generation
@@ -34,14 +35,14 @@ This project generates clustered synthetic genomes, builds a genome DB, and comp
    - `python cal/bindash_db.py --config config.json`
    - Outputs: `data/bindash_nn.tsv`, times in `data/bindash_times.txt`
 
-3b) True labels (exact Jaccard) and evaluation:
-   - True NN labels: `python cal/true_db.py --config config.json`
-     - Outputs: `data/true_nn.tsv`
-   - Evaluate top-1 accuracy: `python cal/evaluate_nn.py --config config.json`
-     - Outputs: `data/nn_eval.tsv` and prints accuracies
+ 
 
 4) End‑to‑end:
    - `python project_runner.py --config config.json` (runs 1 → 2 → 3a → 3b → evaluate)
+
+5) Repeated Runs (cumulative accuracy):
+   - `python repeat_runner.py --config config.json --runs 10 --seed-base 1234`
+   - Overrides `clusters.seed = seed_base + run_index` each run, regenerates data, recomputes true labels, runs searches and evaluation, then prints cumulative accuracy for OddSketch and BinDash.
 
 ## Notes
 - DB contains only derived genomes (no explicit centers). Derived genomes are SNP-mutated from their center with SNP count ~ U[`clusters.mutation_min`,`clusters.mutation_max`]. Query genomes are independently mutated from cluster centers with SNP count ~ U[`query.query_mutation_min`,`query.query_mutation_max`]. Self-matches are excluded when picking the nearest neighbor. True Jaccard labels are required for evaluation.

@@ -94,9 +94,13 @@ def main():
     db_list = outdir / 'db_genomes.list'
     query_list = outdir / 'queries.list'
     cluster_map = outdir / 'cluster_map.tsv'
+    mut_log = outdir / 'genome_mutations.tsv'
 
     genomes_dir.mkdir(parents=True, exist_ok=True)
     all_paths = []
+    # 変異ログを初期化
+    with mut_log.open('w') as mf:
+        mf.write('path\ttype\tcluster_id\tmutations\n')
     centers = []  # store center sequences per cluster id (1-based)
     with cluster_map.open('w') as cmap:
         cmap.write('path\tcluster_id\n')
@@ -115,6 +119,8 @@ def main():
                 write_fasta(out_path, name=name, seq=seq)
                 all_paths.append(str(out_path))
                 cmap.write(f"{out_path}\t{cid}\n")
+                with mut_log.open('a') as mf:
+                    mf.write(f"{out_path}\tDB\t{cid}\t{snps}\n")
 
     # DB list
     with db_list.open('w') as f:
@@ -139,6 +145,8 @@ def main():
             out_path = queries_dir / f"cluster{cid}" / f"{name}.fna"
             write_fasta(out_path, name=name, seq=''.join(seq_list))
             q_paths.append(str(out_path))
+            with mut_log.open('a') as mf:
+                mf.write(f"{out_path}\tquery\t{cid}\t{qsnp}\n")
             made += 1
             loc += 1
         if made >= qnum:
@@ -154,6 +162,8 @@ def main():
         out_path = queries_dir / f"cluster{cid}" / f"{name}.fna"
         write_fasta(out_path, name=name, seq=''.join(seq_list))
         q_paths.append(str(out_path))
+        with mut_log.open('a') as mf:
+            mf.write(f"{out_path}\tquery\t{cid}\t{qsnp}\n")
         made += 1
 
     with query_list.open('w') as f:
@@ -164,6 +174,7 @@ def main():
     print(f"[make_genome] wrote {len(q_paths)} query genomes to {queries_dir}")
     print(f"[make_genome] db_list={db_list}")
     print(f"[make_genome] queries={query_list} (N={len(q_paths)})")
+    print(f"[make_genome] mutation log={mut_log}")
 
 
 if __name__ == '__main__':

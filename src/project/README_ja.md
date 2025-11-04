@@ -10,6 +10,7 @@
 - `data/`: 生成物（FASTA、リスト、スケッチ、結果）。Git には無視されます。
   - true_pairs.tsv / oddsketch_pairs.tsv / bindash_pairs.tsv: クエリ×DBのペアごとのJaccard（真値/推定）
   - nn_eval.tsv: ツールごとのtop-1精度
+  - genome_mutations.tsv: 生成時に各ゲノムへ導入した変異数の記録（path, type=DB|query, cluster_id, mutations）
 
 ## クイックスタート
 1) DB とクエリの生成
