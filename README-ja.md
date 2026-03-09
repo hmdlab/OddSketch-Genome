@@ -3,7 +3,7 @@
 本リポジトリは、`src/test/make_genomes` で生成した合成ゲノムのみを用いて OddSketch を評価します。外部（実）ゲノムは使いません。
 
 ## 必要環境
-- OpenMP 対応の `g++`（C++17）
+- C++17 コンパイラ（macOS なら `clang++` など）
 - Python 3.8+
 - Python 依存パッケージ: `pip install -r requirements.txt`
 - BinDash（任意・比較用）: 実行する場合はバイナリを用意し、設定ファイルでパスを指定
@@ -20,7 +20,7 @@
 
 2. 厳密 Jaccard（真値）
    - 実行: `cd src/test && python cal/cal_diverse_true_jaccard.py`
-   - 出力: `src/test/data/test_genomes/jaccard_true_results.txt`
+   - 出力: `src/test/data/test_genomes/jaccard_t..rue_results.txt`
    - 補足: `src/cal/true_jaccard`（C++）をビルド済みなら自動で使用します。処理は逐次で、スレッド設定は使用しません。
 
 3. OddSketch 推定
@@ -28,6 +28,7 @@
    - 実行: `cd src/test && python cal/cal_diverse_oddsketch.py --config pipeline_config.json`
    - 出力: `src/test/data/test_genomes/jaccard_oddsketch_results.txt`
    - 比較 CSV: `src/test/data/test_genomes/comparison_results_oddsketch.csv`
+   - 補足: OddSketch は canonical k-mer を既定で使用します。従来挙動に戻す場合は `pipeline_config.json` の `oddsketch.canonical=false` か `--canonical=0` を指定してください。
 
 4. BinDash 推定（任意）
    - 実行: `cd src/test && python cal/cal_diverse_bindash.py`
@@ -55,12 +56,12 @@
 - `src/test/pipeline_config.json`
   - `make_genomes`: `genome_length`, `num_pairs`, `mutation_min/max`, `outdir`, `seed_base`
   - `true_jaccard`: `kmerlen`
-  - `oddsketch`: `kmerlen`, `sketch_size`, `j0`, `pos_mode`（`value|mix|stripe`）
+  - `oddsketch`: `kmerlen`, `sketch_size`, `j0`, `pos_mode`（`value|mix|stripe`）, `canonical`（既定 true）
   - `bindash`: `bindash_bin`, `kmerlen`, `sketchsize64`, `bbits`, `threads`
 
 ## メモ/注意
 - 生成物（FASTA/スケッチ/CSV/図など）は `.gitignore` 済み。大容量データはコミットしないでください。
-- `oddsketch` は `--kmer`, `--sketch-size`（64 の倍数）, `--j0` をサポート。`cal_diverse_oddsketch.py` が `src/test/pipeline_config.json` の値を読み取り、バイナリへ引き渡します。
+- `oddsketch` は `--kmer`, `--sketch-size`（64 の倍数）, `--j0`, `--canonical=0|1`（既定 1）をサポート。`cal_diverse_oddsketch.py` が `src/test/pipeline_config.json` の値を読み取り、バイナリへ引き渡します。
 - 位置情報を考慮した写像（実験的）: `--pos-mode=value|mix|stripe`
   - `value`（既定）: `pos = hv % nbits`（従来互換）
   - `mix`: ビン番号と値を混ぜて位置決定（衝突分散・位置性の弱保持）

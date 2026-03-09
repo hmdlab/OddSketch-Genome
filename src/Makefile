@@ -1,5 +1,5 @@
-CXX := g++
-CXXFLAGS := -std=c++17 -O3 -march=native -fopenmp -Wall -Wextra
+CXX := clang++
+CXXFLAGS := -std=c++17 -O3 -march=native -Wall -Wextra
 
 TARGET := oddsketch
 SRCS := oddsketch.cpp
@@ -10,7 +10,7 @@ OBJS := $(SRCS:.cpp=.o)
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^ -fopenmp
+	$(CXX) $(CXXFLAGS) -o $@ $^
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@

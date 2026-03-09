@@ -3,7 +3,7 @@
 This repository evaluates OddSketch using synthetic genomes generated under `src/test/make_genomes`. No external/real genomes are used in this workflow.
 
 ## Requirements
-- `g++` with OpenMP (C++17)
+- C++17 compiler (e.g., `clang++` on macOS)
 - Python 3.8+
 - Python deps: `pip install -r requirements.txt`
 - BinDash (optional, for comparison). Provide the binary and configure its path in a config file if you want to run the BinDash baseline.
@@ -28,6 +28,7 @@ This repository evaluates OddSketch using synthetic genomes generated under `src
    - Run: `cd src/test && python cal/cal_diverse_oddsketch.py --config pipeline_config.json`
    - Outputs: `src/test/data/test_genomes/jaccard_oddsketch_results.txt`
    - Comparison CSV: `src/test/data/test_genomes/comparison_results_oddsketch.csv`
+   - Notes: OddSketch uses canonical k-mers by default. To reproduce legacy behavior, set `oddsketch.canonical=false` in `pipeline_config.json` or pass `--canonical=0` to the binary.
 
 4. BinDash estimation (optional)
    - Run: `cd src/test && python cal/cal_diverse_bindash.py`
@@ -55,12 +56,12 @@ This repository evaluates OddSketch using synthetic genomes generated under `src
 - `src/test/pipeline_config.json`
   - `make_genomes`: `genome_length`, `num_pairs`, `mutation_min/max`, `outdir`, `seed_base`
   - `true_jaccard`: `kmerlen`
-  - `oddsketch`: `kmerlen`, `sketch_size`, `j0`, `pos_mode` (`value|mix|stripe`)
+  - `oddsketch`: `kmerlen`, `sketch_size`, `j0`, `pos_mode` (`value|mix|stripe`), `canonical` (default true)
   - `bindash`: `bindash_bin`, `kmerlen`, `sketchsize64`, `bbits`, `threads`
 
 ## Notes
 - Generated artifacts (FASTA/sketches/CSV/figures) are ignored by `.gitignore`. Do not commit large data.
-- `oddsketch` supports `--kmer`, `--sketch-size` (multiple of 64), and `--j0`. `cal_diverse_oddsketch.py` reads values from `src/test/pipeline_config.json` and passes them to the binary.
+- `oddsketch` supports `--kmer`, `--sketch-size` (multiple of 64), `--j0`, and `--canonical=0|1` (default 1). `cal_diverse_oddsketch.py` reads values from `src/test/pipeline_config.json` and passes them to the binary.
 - Position-aware mapping (experimental): `--pos-mode=value|mix|stripe`.
   - `value` (default): bit position uses only the minhash value `pos = hv % nbits` (backward compatible).
   - `mix`: mixes bucket index with value for mapping; recommended to reduce collisions while keeping bit budget.
