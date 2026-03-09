@@ -1,9 +1,9 @@
 {
   "make_genomes": {
     "genome_length": 1000000,
-    "num_pairs": 50,
-    "mutation_min": 100,
-    "mutation_max": 2000,
+    "num_pairs": 100,
+    "mutation_min": 10,
+    "mutation_max": 5000,
     "outdir": "data/test_genomes/genomes",
     "seed_base": 2000
   },
@@ -14,6 +14,7 @@
     "kmerlen": 64,
     "sketch_size": 2048,
     "j0": 0.90,
+    "canonical": true,
     "note": "oddsketch は現状コンパイル時定数。C++側の KMER/SKETCH_SIZE を更新してください。"
   },
   "bindash": {

@@ -1,0 +1,15 @@
+--COMMENT=program began at Mon Feb 23 14:13:59 2026
+--COMMENT=program ended at Mon Feb 23 14:14:14 2026
+--COMMENT=program consumed 93 CPU seconds
+--COMMENT=revision  ()
+--bbits=16
+--iscasepreserved=false
+--isstrandpreserved=false
+--kmerlen=64
+--listfname=/Users/kikutakyouhei/local/codex/genome-oddsketch/src/test/data/test_genomes/bindash_sketch_list.txt
+--dens=2
+--minhashtype=2
+--nthreads=8
+--outfname=/Users/kikutakyouhei/local/codex/genome-oddsketch/src/test/data/test_genomes/bindash_sketch
+--randseed=41
+--sketchsize64=32

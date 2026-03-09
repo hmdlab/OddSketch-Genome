@@ -63,7 +63,7 @@ def main():
     ap.add_argument("--est-col", default=None, help="推定列名（例: jaccard_oddsketch, jaccard_bindash）")
     ap.add_argument("--threshold", type=float, default=0.75, help="高類似度RMSEのしきい値（真値>threshold）")
     ap.add_argument("--bins", default="0.5,0.6,0.7,0.8,0.9,1.0", help="類似度ビンの端点CSV（例: 0.5,0.6,0.7,0.8,0.9,1.0）")
-    ap.add_argument("--bootstrap", type=int, default=1000, help="95%CI推定のブートストラップ反復回数")
+    ap.add_argument("--bootstrap", type=int, default=1000, help="95%%CI推定のブートストラップ反復回数")
     ap.add_argument("--min-n", type=int, default=1, help="各ビンの最低サンプル数（0のみスキップ）")
     ap.add_argument("--plot-out", default=None, help="図の出力パス（例: rmse_comparison.png）")
     ap.add_argument("--title", default=None, help="図のタイトル")
