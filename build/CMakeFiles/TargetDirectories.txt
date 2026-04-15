@@ -1,5 +1,0 @@
-/Users/kikutakyouhei/local/codex/genome-oddsketch/build/CMakeFiles/oddsketch.dir
-/Users/kikutakyouhei/local/codex/genome-oddsketch/build/CMakeFiles/true_jaccard.dir
-/Users/kikutakyouhei/local/codex/genome-oddsketch/build/CMakeFiles/true_index_pairs.dir
-/Users/kikutakyouhei/local/codex/genome-oddsketch/build/CMakeFiles/edit_cache.dir
-/Users/kikutakyouhei/local/codex/genome-oddsketch/build/CMakeFiles/rebuild_cache.dir
