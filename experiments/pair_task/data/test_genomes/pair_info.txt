@@ -1,3 +1,0 @@
-pair_id	file1	file2	mutation_count	genome_length
-1	data/test_genomes/genomes/genome1_001.fna	data/test_genomes/genomes/genome2_001.fna	28	5000
-2	data/test_genomes/genomes/genome1_002.fna	data/test_genomes/genomes/genome2_002.fna	10	5000

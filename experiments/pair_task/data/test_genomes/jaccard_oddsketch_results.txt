@@ -1,3 +1,0 @@
-pair_id	mutation_count	genome_length	jaccard_estimate	sketch_file1	sketch_file2
-1	28	5000	0.7958560000	data/test_genomes/genomes/genome1_001.fna.sketch	data/test_genomes/genomes/genome2_001.fna.sketch
-2	10	5000	0.9263310000	data/test_genomes/genomes/genome1_002.fna.sketch	data/test_genomes/genomes/genome2_002.fna.sketch
