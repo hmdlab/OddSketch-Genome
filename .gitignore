@@ -24,6 +24,8 @@ external/
 
 # Project experiment data
 src/project/data/
+experiments/pair_task/outputs/
+experiments/search_task/outputs/
 
 # Object files
 src/*.o

@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+
+import argparse
+import json
+import shlex
+import subprocess
+from pathlib import Path
+from time import perf_counter
+
+
+def resolve_task_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def resolve_path(base: Path, raw: str | None) -> Path | None:
+    if not raw:
+        return None
+    path = Path(raw)
+    return path if path.is_absolute() else (base / path).resolve()
+
+
+def resolve_config_path(config_arg: str) -> Path:
+    task_root = resolve_task_root()
+    candidates = [
+        Path(config_arg),
+        task_root / config_arg,
+        Path(__file__).resolve().parent / config_arg,
+        task_root / "config.json",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate.resolve()
+    return (task_root / "config.json").resolve()
+
+
+def run_cmd(cmd: str, capture: bool = True) -> str:
+    process = subprocess.run(
+        cmd,
+        shell=True,
+        check=True,
+        stdout=subprocess.PIPE if capture else None,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    return process.stdout if capture else ""
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--config", default="config.json")
+    args = ap.parse_args()
+
+    task_root = resolve_task_root()
+    cfg = json.loads(resolve_config_path(args.config).read_text())
+    outdir = resolve_path(task_root, cfg.get("paths", {}).get("outdir", "outputs/default"))
+    db_list = outdir / "db_genomes.list"
+    q_list = outdir / "queries.list"
+    if not db_list.exists() or not q_list.exists():
+        raise SystemExit(f"missing inputs: {db_list} / {q_list}")
+
+    b = cfg.get("bindash", {})
+    binpath = b.get("bindash_bin", "bindash")
+    k = int(b.get("kmerlen", 64))
+    ss = int(b.get("sketchsize64", 256))
+    bb = int(b.get("bbits", 16))
+    th = int(b.get("threads", 1))
+
+    db_prefix = outdir / "bindash_db_sketch"
+    q_prefix = outdir / "bindash_query_sketch"
+
+    t0 = perf_counter()
+    run_cmd(
+        f"{shlex.quote(binpath)} sketch --listfname={db_list} --nthreads={th} "
+        f"--kmerlen={k} --sketchsize64={ss} --bbits={bb} --outfname={db_prefix}",
+        capture=False,
+    )
+    t1 = perf_counter()
+    run_cmd(
+        f"{shlex.quote(binpath)} sketch --listfname={q_list} --nthreads={th} "
+        f"--kmerlen={k} --sketchsize64={ss} --bbits={bb} --outfname={q_prefix}",
+        capture=False,
+    )
+    t2 = perf_counter()
+    out = run_cmd(f"{shlex.quote(binpath)} dist --nthreads={th} --outfname=- {q_prefix} {db_prefix}", capture=True)
+
+    qname_to_path = {Path(path.strip()).name: path.strip() for path in q_list.read_text().splitlines() if path.strip()}
+    dbname_to_path = {Path(path.strip()).name: path.strip() for path in db_list.read_text().splitlines() if path.strip()}
+
+    best = {}
+    pairs_path = outdir / "bindash_pairs.tsv"
+    with pairs_path.open("w") as pf:
+        pf.write("query\tdb\tjaccard_bindash\n")
+        for line in out.splitlines():
+            parts = line.strip().split("\t")
+            if len(parts) < 5:
+                continue
+            q, t, _, _, jac = parts[:5]
+            qn = Path(q).name
+            tn = Path(t).name
+            if qn == tn:
+                continue
+            try:
+                jaccard = float(jac.split("/")[0]) / float(jac.split("/")[1]) if "/" in jac else float(jac)
+            except Exception:
+                continue
+            pf.write(f"{qname_to_path.get(qn, qn)}\t{dbname_to_path.get(tn, tn)}\t{jaccard:.10f}\n")
+            current = best.get(qn)
+            if current is None or jaccard > current[0]:
+                best[qn] = (jaccard, tn)
+
+    nn_path = outdir / "bindash_nn.tsv"
+    with nn_path.open("w") as f:
+        f.write("query\tnn\tjaccard_bindash\n")
+        for qn, (jaccard, tn) in best.items():
+            f.write(f"{qname_to_path.get(qn, qn)}\t{dbname_to_path.get(tn, tn)}\t{jaccard:.10f}\n")
+
+    t3 = perf_counter()
+    (outdir / "bindash_times.txt").write_text(
+        f"sketch_db_sec\t{t1 - t0:.3f}\nsketch_queries_sec\t{t2 - t1:.3f}\nsearch_sec\t{t3 - t2:.3f}\n"
+    )
+    print(f"[bindash] wrote {nn_path}")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,77 +1,67 @@
-# genome-oddsketch (Synthetic Data Only)
+# genome-oddsketch
 
-This repository evaluates OddSketch using synthetic genomes generated under `src/test/make_genomes`. No external/real genomes are used in this workflow.
+OddSketch itself lives under `src/` and can be built and used independently. Benchmark and comparison workflows live under `experiments/`.
+
+## Layout
+- `src/`, `include/`: OddSketch implementation and CLI
+- `experiments/pair_task`: pairwise Jaccard benchmark on synthetic genome pairs
+- `experiments/search_task`: database search benchmark on clustered synthetic genomes
 
 ## Requirements
-- C++17 compiler (e.g., `clang++` on macOS)
+- C++17 compiler
 - Python 3.8+
-- Python deps (recommended): `uv sync`
-- Python deps (legacy): `pip install -r requirements.txt`
-- BinDash (optional, for comparison). Provide the binary and configure its path in a config file if you want to run the BinDash baseline.
+- `uv sync` recommended
+- BinDash only if you want comparison runs
 
-## Recommended Reproducible Setup (uv + BinDash)
-- See detailed setup: `docs/UV_BINDASH_SETUP.md`
-- Quick start:
-  - `uv sync`
-  - `cd src && make`
-  - `bindash --help` (if using BinDash baseline)
-  - `./scripts/check_env.sh`
+## Build OddSketch
+```bash
+cd src
+make
+```
 
-## Build (OddSketch)
-- `cd src && make`
-  - This produces the `oddsketch` binary in `src` (clean with `make clean`).
+This builds `src/oddsketch`.
 
-## Repro Steps (Synthetic Data)
-1. Generate input genomes
-   - Run: `cd src/test && python make_genomes/make_diverse_genomes.py --config pipeline_config.json`
-   - Configure: set genome length, number of pairs, etc. in `src/test/pipeline_config.json`
-   - Output: FASTA under `src/test/data/test_genomes/genomes/` plus `pair_info.txt` and `genome_paths.txt`
+## Pairwise Benchmark
+Default outputs are written under `experiments/pair_task/outputs/default/`. You can override the root output directory in `experiments/pair_task/config.json` via `paths.outdir`, or pass `--outdir` to the genome generation step.
 
-2. Exact Jaccard (ground truth)
-   - Run: `cd src/test && python cal/cal_diverse_true_jaccard.py`
-   - Output: `src/test/data/test_genomes/jaccard_true_results.txt`
-   - Notes: Uses the C++ binary if built (`src/cal/true_jaccard`). Processing is sequential; no thread setting is used.
+```bash
+cd experiments/pair_task
+python scripts/make_genomes.py --config config.json
+python scripts/cal_jaccard_true.py --config config.json
+python scripts/cal_jaccard_oddsketch.py --config config.json
+python scripts/cal_jaccard_bindash.py --config config.json
+python analysis/plot_true_vs_oddsketch.py
+python analysis/plot_true_vs_bindash.py
+python analysis/compute_rmse.py \
+  --csv outputs/default/results/comparison_results_oddsketch.csv \
+  --csv outputs/default/results/comparison_results_bindash.csv
+```
 
-3. OddSketch estimation
-   - Build: `cd src && make`
-   - Run: `cd src/test && python cal/cal_diverse_oddsketch.py --config pipeline_config.json`
-   - Outputs: `src/test/data/test_genomes/jaccard_oddsketch_results.txt`
-   - Comparison CSV: `src/test/data/test_genomes/comparison_results_oddsketch.csv`
-   - Notes: OddSketch uses canonical k-mers by default. To reproduce legacy behavior, set `oddsketch.canonical=false` in `pipeline_config.json` or pass `--canonical=0` to the binary.
+Generated files:
+- FASTA pairs: `experiments/pair_task/outputs/default/genomes/`
+- Pair metadata: `experiments/pair_task/outputs/default/pair_info.txt`
+- Result tables: `experiments/pair_task/outputs/default/results/`
+- Figures: `experiments/pair_task/outputs/default/figures/`
 
-4. BinDash estimation (optional)
-   - Run: `cd src/test && python cal/cal_diverse_bindash.py`
-   - Output: `src/test/data/test_genomes/comparison_results_bindash.csv`
-   - Generic plotting from CSV:
-     - `cd src/test/analysis_images && python plot_true_vs_estimate_csv.py --est-col jaccard_bindash --csv ../data/test_genomes/comparison_results_bindash.csv`
+## Search Benchmark
+Default outputs are written under `experiments/search_task/outputs/default/`. Override with `paths.outdir` in `experiments/search_task/config.json`.
 
-5. Comparison and plots
-   - True vs OddSketch
-     - Input: `../data/test_genomes/comparison_results_oddsketch.csv` (columns: pair_id, mutation_count, jaccard_true, jaccard_oddsketch)
-     - Output: `oddsketch_true_vs_estimate.png` (mutation-colored scatter, high-similarity zoom, RMSE by true-Jaccard bin, error histogram)
-     - Command: `cd src/test/analysis_images && python plot_true_vs_oddsketch.py`
-   - True vs BinDash
-     - Input: `../data/test_genomes/comparison_results_bindash.csv` (columns: pair_id, mutation_count, jaccard_true, jaccard_bindash)
-     - Output: `bindash_true_vs_estimate.png` (same four panels: colored, zoom, RMSE-by-bin, error)
-     - Command: `cd src/test/analysis_images && python plot_true_vs_bindash.py`
-   - Align RMSE y-axis across tools
-     - Pass the same limit to both scripts, e.g.: `--rmse-ylim-max 0.2`
-       - OddSketch: `python plot_true_vs_oddsketch.py --rmse-ylim-max 0.2`
-       - BinDash: `python plot_true_vs_bindash.py --rmse-ylim-max 0.2`
-   - RMSE comparison
-     - `cd src/test/analysis_images && python compute_rmse.py --csv ../data/test_genomes/comparison_results_oddsketch.csv --csv ../data/test_genomes/comparison_results_bindash.csv`
+```bash
+cd experiments/search_task
+python scripts/project_runner.py --config config.json
+python analysis/plot_est_vs_true.py \
+  --true outputs/default/true_pairs.tsv \
+  --pred outputs/default/oddsketch_pairs.tsv \
+  --pred-col jaccard_oddsketch \
+  --out outputs/default/figures/oddsketch_true_vs_estimate.png
+```
 
-## Config files
-- `src/test/pipeline_config.json`
-  - `make_genomes`: `genome_length`, `num_pairs`, `mutation_min/max`, `outdir`, `seed_base`
-  - `true_jaccard`: `kmerlen`
-  - `oddsketch`: `kmerlen`, `sketch_size`, `j0`, `pos_mode` (`value|mix|stripe`), `canonical` (default true)
-  - `bindash`: `bindash_bin`, `kmerlen`, `sketchsize64`, `bbits`, `threads`
+## End-to-end benchmark script
+From repository root:
 
-## Notes
-- Generated artifacts (FASTA/sketches/CSV/figures) are ignored by `.gitignore`. Do not commit large data.
-- `oddsketch` supports `--kmer`, `--sketch-size` (multiple of 64), `--j0`, and `--canonical=0|1` (default 1). `cal_diverse_oddsketch.py` reads values from `src/test/pipeline_config.json` and passes them to the binary.
-- Position-aware mapping (experimental): `--pos-mode=value|mix|stripe`.
-  - `value` (default): bit position uses only the minhash value `pos = hv % nbits` (backward compatible).
-  - `mix`: mixes bucket index with value for mapping; recommended to reduce collisions while keeping bit budget.
-  - `stripe`: assigns a dedicated region per bucket when `nbits/k` is large enough; falls back to `mix` if too small.
+```bash
+uv sync
+bash experiments/scripts/run_benchmark.sh --mode all
+```
+
+See `experiments/README.md`, `experiments/pair_task/README.md`, and `experiments/search_task/README.md` for task-specific details.

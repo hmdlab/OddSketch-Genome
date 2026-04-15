@@ -1,10 +1,12 @@
 {
+  "paths": {
+    "outdir": "outputs/default"
+  },
   "make_genomes": {
     "genome_length": 1000000,
     "num_pairs": 100,
     "mutation_min": 10,
     "mutation_max": 5000,
-    "outdir": "data/test_genomes/genomes",
     "seed_base": 2000
   },
   "true_jaccard": {
@@ -24,7 +26,6 @@
     "kmerlen": 64,
     "sketchsize64": 192,
     "bbits": 16,
-    "pair_cmd": "{bin} exact --nthreads={threads} {f1} {f2}",
-    "parse": "tsv3_or_fraction"
+    "pair_cmd": "{bin} exact --nthreads={threads} {f1} {f2}"
   }
 }

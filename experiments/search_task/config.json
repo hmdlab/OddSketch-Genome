@@ -13,7 +13,7 @@
     "query_mutation_max": 100
   },
   "paths": {
-    "outdir": "data"
+    "outdir": "outputs/default"
   },
   "oddsketch": {
     "kmerlen": 64,

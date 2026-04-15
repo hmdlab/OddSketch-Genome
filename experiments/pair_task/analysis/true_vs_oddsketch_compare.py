@@ -4,6 +4,7 @@ true_vs_oddsketch_compare.py (OddSketch版)
 真のJaccard係数とOddSketch推定値を比較し、compare_bindash_results.py と同等形式の包括的プロットを出力
 """
 
+import json
 import os
 from pathlib import Path
 
@@ -28,9 +29,16 @@ except Exception:
 
 
 def base_data_dir() -> Path:
-    # 本スクリプト: experiments/pair_task/analysis_images/compare_results.py
-    # データ:       experiments/pair_task/data/test_genomes/
-    return Path(__file__).resolve().parent.parent / 'data' / 'test_genomes'
+    cfg_path = Path(__file__).resolve().parent.parent / "config.json"
+    try:
+        cfg = json.loads(cfg_path.read_text())
+    except Exception:
+        cfg = {}
+    outdir = cfg.get("paths", {}).get("outdir", "outputs/default")
+    path = Path(outdir)
+    if not path.is_absolute():
+        path = (Path(__file__).resolve().parent.parent / path).resolve()
+    return path / "results"
 
 
 def load_true_jaccard(base_dir: Path):

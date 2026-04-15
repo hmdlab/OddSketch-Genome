@@ -13,8 +13,8 @@ comparison_results_*.csv から RMSE / MAE を計算します。
   明示したい場合は --est-col で指定。
 
 使用例:
-- OddSketch:  python compute_rmse.py --csv ../data/test_genomes/comparison_results_oddsketch.csv
-- BinDash:    python compute_rmse.py --csv ../data/test_genomes/comparison_results_bindash.csv --est-col jaccard_bindash
+- OddSketch:  python analysis/compute_rmse.py --csv outputs/default/results/comparison_results_oddsketch.csv
+- BinDash:    python analysis/compute_rmse.py --csv outputs/default/results/comparison_results_bindash.csv --est-col jaccard_bindash
 - 複数CSV:    python compute_rmse.py --csv file1.csv --csv file2.csv
 - ビン指定:   python compute_rmse.py --bins 0.5,0.6,0.7,0.8,0.9,1.0 --bootstrap 1000
 """

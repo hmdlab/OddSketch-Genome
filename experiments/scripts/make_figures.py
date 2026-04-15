@@ -17,19 +17,22 @@ def run(cmd, cwd=None, capture=False):
 
 def render_pair(exp_root: Path):
     pair_dir = exp_root / "pair_task"
-    out_dir = exp_root / "outputs" / "pair_task"
-    out_dir.mkdir(parents=True, exist_ok=True)
+    cfg = json.loads((pair_dir / "config.json").read_text())
+    out_dir = (pair_dir / cfg.get("paths", {}).get("outdir", "outputs/default")).resolve()
+    results_dir = out_dir / "results"
+    figures_dir = out_dir / "figures"
+    figures_dir.mkdir(parents=True, exist_ok=True)
 
-    analysis_dir = pair_dir / "analysis_images"
-    pair_csv = pair_dir / "data" / "test_genomes" / "comparison_results_oddsketch.csv"
-    bindash_csv = pair_dir / "data" / "test_genomes" / "comparison_results_bindash.csv"
+    analysis_dir = pair_dir / "analysis"
+    pair_csv = results_dir / "comparison_results_oddsketch.csv"
+    bindash_csv = results_dir / "comparison_results_bindash.csv"
 
     if pair_csv.exists():
         run([
             sys.executable,
             "plot_true_vs_oddsketch.py",
             "--csv", str(pair_csv),
-            "--out", str(out_dir / "oddsketch_true_vs_estimate.png"),
+            "--out", str(figures_dir / "oddsketch_true_vs_estimate.png"),
         ], cwd=analysis_dir)
 
     if bindash_csv.exists():
@@ -37,7 +40,7 @@ def render_pair(exp_root: Path):
             sys.executable,
             "plot_true_vs_bindash.py",
             "--csv", str(bindash_csv),
-            "--out", str(out_dir / "bindash_true_vs_estimate.png"),
+            "--out", str(figures_dir / "bindash_true_vs_estimate.png"),
         ], cwd=analysis_dir)
 
     if pair_csv.exists() and bindash_csv.exists():
@@ -47,15 +50,15 @@ def render_pair(exp_root: Path):
             "--csv", str(pair_csv),
             "--csv", str(bindash_csv),
         ], cwd=analysis_dir, capture=True)
-        (out_dir / "rmse_summary.txt").write_text(rmse)
+        (figures_dir / "rmse_summary.txt").write_text(rmse)
 
 
 def resolve_search_outdir(exp_root: Path):
-    cfg_path = exp_root / "configs" / "search_task.config.json"
+    cfg_path = exp_root / "search_task" / "config.json"
     if not cfg_path.exists():
-        return exp_root / "outputs" / "search_task"
+        return (exp_root / "search_task" / "outputs" / "default").resolve()
     cfg = json.loads(cfg_path.read_text())
-    rel = cfg.get("paths", {}).get("outdir", "../outputs/search_task")
+    rel = cfg.get("paths", {}).get("outdir", "outputs/default")
     return (exp_root / "search_task" / rel).resolve()
 
 
@@ -63,7 +66,8 @@ def render_search(exp_root: Path):
     search_dir = exp_root / "search_task"
     analysis_dir = search_dir / "analysis"
     out_dir = resolve_search_outdir(exp_root)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    figures_dir = out_dir / "figures"
+    figures_dir.mkdir(parents=True, exist_ok=True)
 
     true_pairs = out_dir / "true_pairs.tsv"
     odd_pairs = out_dir / "oddsketch_pairs.tsv"
@@ -76,7 +80,7 @@ def render_search(exp_root: Path):
             "--true", str(true_pairs),
             "--pred", str(odd_pairs),
             "--pred-col", "jaccard_oddsketch",
-            "--out", str(out_dir / "oddsketch_true_vs_estimate.png"),
+            "--out", str(figures_dir / "oddsketch_true_vs_estimate.png"),
         ], cwd=analysis_dir)
 
     if true_pairs.exists() and bds_pairs.exists():
@@ -86,7 +90,7 @@ def render_search(exp_root: Path):
             "--true", str(true_pairs),
             "--pred", str(bds_pairs),
             "--pred-col", "jaccard_bindash",
-            "--out", str(out_dir / "bindash_true_vs_estimate.png"),
+            "--out", str(figures_dir / "bindash_true_vs_estimate.png"),
         ], cwd=analysis_dir)
 
 

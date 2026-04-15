@@ -37,16 +37,12 @@ ROOT_DIR="$(cd "${EXP_DIR}/.." && pwd)"
 
 PAIR_DIR="${EXP_DIR}/pair_task"
 SEARCH_DIR="${EXP_DIR}/search_task"
-OUT_DIR="${EXP_DIR}/outputs"
-
 if [[ -z "${PAIR_CONFIG}" ]]; then
-  PAIR_CONFIG="${EXP_DIR}/configs/pair_task.pipeline_config.json"
+  PAIR_CONFIG="${PAIR_DIR}/config.json"
 fi
 if [[ -z "${SEARCH_CONFIG}" ]]; then
-  SEARCH_CONFIG="${EXP_DIR}/configs/search_task.config.json"
+  SEARCH_CONFIG="${SEARCH_DIR}/config.json"
 fi
-
-mkdir -p "${OUT_DIR}" "${OUT_DIR}/pair_task" "${OUT_DIR}/search_task"
 
 echo "[benchmark] sync python environment"
 uv sync
@@ -61,30 +57,25 @@ echo "[benchmark] ODDSKETCH_BIN=${ODDSKETCH_BIN}"
 if [[ "${MODE}" == "pair" || "${MODE}" == "all" ]]; then
   echo "[benchmark] running pair_task"
   pushd "${PAIR_DIR}" >/dev/null
-  uv run python make_genomes/make_diverse_genomes.py --config "${PAIR_CONFIG}"
-  uv run python cal/cal_jaccard_true.py --config "${PAIR_CONFIG}"
-  uv run python cal/cal_jaccard_oddsketch.py --config "${PAIR_CONFIG}"
+  uv run python scripts/make_genomes.py --config "${PAIR_CONFIG}"
+  uv run python scripts/cal_jaccard_true.py --config "${PAIR_CONFIG}"
+  uv run python scripts/cal_jaccard_oddsketch.py --config "${PAIR_CONFIG}"
   if [[ "${SKIP_BINDASH}" -eq 0 ]]; then
-    uv run python cal/cal_jaccard_bindash.py --config "${PAIR_CONFIG}"
+    uv run python scripts/cal_jaccard_bindash.py --config "${PAIR_CONFIG}"
   else
     echo "[benchmark] skip bindash for pair_task"
   fi
   popd >/dev/null
 
   uv run python "${EXP_DIR}/scripts/make_figures.py" --task pair --exp-root "${EXP_DIR}"
-
-  cp -f "${PAIR_DIR}/data/test_genomes/jaccard_true_results.txt" "${OUT_DIR}/pair_task/" 2>/dev/null || true
-  cp -f "${PAIR_DIR}/data/test_genomes/jaccard_oddsketch_results.txt" "${OUT_DIR}/pair_task/" 2>/dev/null || true
-  cp -f "${PAIR_DIR}/data/test_genomes/jaccard_bindash_results.txt" "${OUT_DIR}/pair_task/" 2>/dev/null || true
-  cp -f "${PAIR_DIR}/data/test_genomes/comparison_results_oddsketch.csv" "${OUT_DIR}/pair_task/" 2>/dev/null || true
-  cp -f "${PAIR_DIR}/data/test_genomes/comparison_results_bindash.csv" "${OUT_DIR}/pair_task/" 2>/dev/null || true
 fi
 
 if [[ "${MODE}" == "search" || "${MODE}" == "all" ]]; then
   echo "[benchmark] running search_task"
-  uv run python "${SEARCH_DIR}/project_runner.py" --config "${SEARCH_CONFIG}"
+  uv run python "${SEARCH_DIR}/scripts/project_runner.py" --config "${SEARCH_CONFIG}"
   uv run python "${EXP_DIR}/scripts/make_figures.py" --task search --exp-root "${EXP_DIR}"
 fi
 
 echo "[benchmark] done"
-echo "[benchmark] outputs: ${OUT_DIR}"
+echo "[benchmark] pair outputs: ${PAIR_DIR}/outputs"
+echo "[benchmark] search outputs: ${SEARCH_DIR}/outputs"
