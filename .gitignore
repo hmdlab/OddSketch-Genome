@@ -3,8 +3,10 @@ src/test/test_genomes/genomes
 
 
 # Build artifacts (local)
-src/*.o
+src/oddsketch
 src/cal/cal_Jaccard
+src/cal/true_jaccard
+src/cal/true_index_pairs
 
 # Virtualenvs and caches
 .venv/
@@ -22,3 +24,13 @@ external/
 
 # Project experiment data
 src/project/data/
+
+# Object files
+src/*.o
+experiments/**/*.fna
+experiments/**/*.fa
+experiments/**/*.fasta
+experiments/**/*.fna.gz
+experiments/**/*.fa.gz
+experiments/**/*.fasta.gz
+experiments/**/*.sketch

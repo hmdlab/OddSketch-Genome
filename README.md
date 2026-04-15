@@ -5,8 +5,17 @@ This repository evaluates OddSketch using synthetic genomes generated under `src
 ## Requirements
 - C++17 compiler (e.g., `clang++` on macOS)
 - Python 3.8+
-- Python deps: `pip install -r requirements.txt`
+- Python deps (recommended): `uv sync`
+- Python deps (legacy): `pip install -r requirements.txt`
 - BinDash (optional, for comparison). Provide the binary and configure its path in a config file if you want to run the BinDash baseline.
+
+## Recommended Reproducible Setup (uv + BinDash)
+- See detailed setup: `docs/UV_BINDASH_SETUP.md`
+- Quick start:
+  - `uv sync`
+  - `cd src && make`
+  - `bindash --help` (if using BinDash baseline)
+  - `./scripts/check_env.sh`
 
 ## Build (OddSketch)
 - `cd src && make`

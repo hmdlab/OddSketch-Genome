@@ -5,8 +5,17 @@
 ## 必要環境
 - C++17 コンパイラ（macOS なら `clang++` など）
 - Python 3.8+
-- Python 依存パッケージ: `pip install -r requirements.txt`
+- Python 依存パッケージ（推奨）: `uv sync`
+- Python 依存パッケージ（従来）: `pip install -r requirements.txt`
 - BinDash（任意・比較用）: 実行する場合はバイナリを用意し、設定ファイルでパスを指定
+
+## 推奨セットアップ（uv + BinDash）
+- 詳細: `docs/UV_BINDASH_SETUP.md`
+- クイックスタート:
+  - `uv sync`
+  - `cd src && make`
+  - `bindash --help`（BinDash 比較を使う場合）
+  - `./scripts/check_env.sh`
 
 ## ビルド（OddSketch）
 - `cd src && make`

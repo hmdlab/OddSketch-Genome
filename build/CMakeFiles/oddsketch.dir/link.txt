@@ -1,0 +1,1 @@
+/Library/Developer/CommandLineTools/usr/bin/c++  -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX26.2.sdk -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/oddsketch.dir/src/apps/oddsketch_main.cpp.o CMakeFiles/oddsketch.dir/src/core/oddsketch.cpp.o CMakeFiles/oddsketch.dir/src/third_party/xxhash.cpp.o -o bin/oddsketch
