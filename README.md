@@ -19,7 +19,12 @@ cd src
 make
 ```
 
-This builds `src/oddsketch`.
+This builds:
+- `src/oddsketch`
+- `tools/bin/true_jaccard`
+- `tools/bin/true_index_pairs`
+
+`tools/bin/true_jaccard` and `tools/bin/true_index_pairs` are experimental helper binaries used by the benchmark workflows, not part of the core OddSketch CLI surface.
 
 ## Pairwise Benchmark
 Default outputs are written under `experiments/pair_task/outputs/default/`. You can override the root output directory in `experiments/pair_task/config.json` via `paths.outdir`, or pass `--outdir` to the genome generation step.

@@ -22,12 +22,14 @@ python scripts/evaluate_nn.py --config config.json
 
 ```bash
 python scripts/project_runner.py --config config.json
+python scripts/project_runner.py --config config.json --skip-bindash
 ```
 
 繰り返し実行:
 
 ```bash
 python scripts/repeat_runner.py --config config.json --runs 10 --seed-base 1234
+python scripts/repeat_runner.py --config config.json --runs 10 --seed-base 1234 --skip-bindash
 ```
 
 ## 出力

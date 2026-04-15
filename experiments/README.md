@@ -34,3 +34,4 @@ bash experiments/scripts/run_benchmark.sh --mode all --skip-bindash
 - To use a specific OddSketch binary, set `ODDSKETCH_BIN`.
 - BinDash is external and is not vendored in this repository.
 - Task-local `config.json` files define the default output roots via `paths.outdir`.
+- Exact-Jaccard helper binaries are built into `tools/bin/` by `make -C src`.

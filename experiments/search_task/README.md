@@ -22,12 +22,14 @@ End-to-end:
 
 ```bash
 python scripts/project_runner.py --config config.json
+python scripts/project_runner.py --config config.json --skip-bindash
 ```
 
 Repeated runs:
 
 ```bash
 python scripts/repeat_runner.py --config config.json --runs 10 --seed-base 1234
+python scripts/repeat_runner.py --config config.json --runs 10 --seed-base 1234 --skip-bindash
 ```
 
 ## Outputs

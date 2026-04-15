@@ -34,3 +34,4 @@ bash experiments/scripts/run_benchmark.sh --mode all --skip-bindash
 - 特定の OddSketch バイナリを使う場合は `ODDSKETCH_BIN` を設定してください。
 - BinDash は外部ツールであり、このリポジトリには同梱していません。
 - 各 task の既定出力先は `config.json` の `paths.outdir` で定義しています。
+- 厳密 Jaccard 計算用の補助バイナリは `make -C src` で `tools/bin/` に生成されます。

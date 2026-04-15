@@ -4,9 +4,7 @@ src/test/test_genomes/genomes
 
 # Build artifacts (local)
 src/oddsketch
-src/cal/cal_Jaccard
-src/cal/true_jaccard
-src/cal/true_index_pairs
+tools/bin/
 
 # Virtualenvs and caches
 .venv/

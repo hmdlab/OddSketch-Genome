@@ -72,7 +72,11 @@ fi
 
 if [[ "${MODE}" == "search" || "${MODE}" == "all" ]]; then
   echo "[benchmark] running search_task"
-  uv run python "${SEARCH_DIR}/scripts/project_runner.py" --config "${SEARCH_CONFIG}"
+  if [[ "${SKIP_BINDASH}" -eq 0 ]]; then
+    uv run python "${SEARCH_DIR}/scripts/project_runner.py" --config "${SEARCH_CONFIG}"
+  else
+    uv run python "${SEARCH_DIR}/scripts/project_runner.py" --config "${SEARCH_CONFIG}" --skip-bindash
+  fi
   uv run python "${EXP_DIR}/scripts/make_figures.py" --task search --exp-root "${EXP_DIR}"
 fi
 

@@ -19,7 +19,12 @@ cd src
 make
 ```
 
-`src/oddsketch` が生成されます。
+生成されるもの:
+- `src/oddsketch`
+- `tools/bin/true_jaccard`
+- `tools/bin/true_index_pairs`
+
+`tools/bin/true_jaccard` と `tools/bin/true_index_pairs` は実験ワークフロー用の補助バイナリであり、OddSketch 本体 CLI そのものではありません。
 
 ## pair_task
 既定では `experiments/pair_task/outputs/default/` 以下に入出力します。別の場所を使いたい場合は `experiments/pair_task/config.json` の `paths.outdir` を変更するか、生成ステップで `--outdir` を指定してください。

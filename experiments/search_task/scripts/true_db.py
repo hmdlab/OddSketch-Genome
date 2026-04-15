@@ -64,7 +64,7 @@ def main() -> None:
                 except Exception:
                     pass
 
-    cpp = task_root.parents[1] / "src" / "cal" / "true_index_pairs"
+    cpp = task_root.parents[1] / "tools" / "bin" / "true_index_pairs"
     if not cpp.exists():
         raise SystemExit(f"binary not found: {cpp}")
 

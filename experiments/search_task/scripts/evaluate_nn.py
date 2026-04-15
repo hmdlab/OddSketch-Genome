@@ -44,6 +44,7 @@ def load_map(tsv_path: Path, q_col: int, nn_col: int) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="config.json")
+    ap.add_argument("--skip-bindash", action="store_true", help="Evaluate only OddSketch columns")
     args = ap.parse_args()
 
     task_root = resolve_task_root()
@@ -51,14 +52,15 @@ def main() -> None:
     outdir = resolve_path(task_root, cfg.get("paths", {}).get("outdir", "outputs/default"))
 
     odd_tsv = outdir / "oddsketch_nn.tsv"
-    bds_tsv = outdir / "bindash_nn.tsv"
     label_path = outdir / "true_nn.tsv"
-    if not (odd_tsv.exists() and bds_tsv.exists() and label_path.exists()):
+    bds_tsv = outdir / "bindash_nn.tsv"
+    need_bindash = not args.skip_bindash
+    if not odd_tsv.exists() or not label_path.exists() or (need_bindash and not bds_tsv.exists()):
         raise SystemExit(f"missing inputs under {outdir}")
 
     true_map = load_map(label_path, 0, 1)
     odd_map = load_map(odd_tsv, 0, 1)
-    bds_map = load_map(bds_tsv, 0, 1)
+    bds_map = load_map(bds_tsv, 0, 1) if need_bindash else {}
 
     ok_odd = 0
     ok_bds = 0
@@ -67,9 +69,9 @@ def main() -> None:
         f.write("query\tnn_true\tnn_oddsketch\tcorrect_oddsketch\tnn_bindash\tcorrect_bindash\n")
         for query, truth in true_map.items():
             odd_pred = odd_map.get(query, "")
-            bds_pred = bds_map.get(query, "")
+            bds_pred = bds_map.get(query, "") if need_bindash else ""
             c_odd = int(odd_pred == truth)
-            c_bds = int(bds_pred == truth)
+            c_bds = int(bds_pred == truth) if need_bindash else 0
             ok_odd += c_odd
             ok_bds += c_bds
             f.write(f"{query}\t{truth}\t{odd_pred}\t{c_odd}\t{bds_pred}\t{c_bds}\n")
@@ -77,7 +79,8 @@ def main() -> None:
     n = len(true_map)
     print(f"[eval] queries={n}")
     print(f"[eval] oddsketch top1 accuracy = {ok_odd}/{n} ({(ok_odd / n * 100):.2f}%)")
-    print(f"[eval] bindash   top1 accuracy = {ok_bds}/{n} ({(ok_bds / n * 100):.2f}%)")
+    if need_bindash:
+        print(f"[eval] bindash   top1 accuracy = {ok_bds}/{n} ({(ok_bds / n * 100):.2f}%)")
     print(f"[eval] wrote {eval_path}")
 
 
