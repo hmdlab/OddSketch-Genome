@@ -8,8 +8,8 @@ TRUE_JACCARD_BIN := $(TOOLS_BIN_DIR)/true_jaccard
 TRUE_INDEX_PAIRS_BIN := $(TOOLS_BIN_DIR)/true_index_pairs
 
 ODDSKETCH_SRCS := apps/oddsketch_main.cpp core/oddsketch.cpp third_party/xxhash.cpp
-TRUE_JACCARD_SRCS := apps/true_jaccard_main.cpp
-TRUE_INDEX_PAIRS_SRCS := apps/true_index_pairs_main.cpp
+TRUE_JACCARD_SRCS := ../tools/src/true_jaccard_main.cpp
+TRUE_INDEX_PAIRS_SRCS := ../tools/src/true_index_pairs_main.cpp
 
 .PHONY: all clean
 

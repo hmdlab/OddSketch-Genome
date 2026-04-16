@@ -4,6 +4,7 @@ OddSketch itself lives under `src/` and can be built and used independently. Ben
 
 ## Layout
 - `src/`, `include/`: OddSketch implementation and CLI
+- `tools/src/`, `tools/bin/`: experimental helper tools used by benchmarks
 - `experiments/pair_task`: pairwise Jaccard benchmark on synthetic genome pairs
 - `experiments/search_task`: database search benchmark on clustered synthetic genomes
 
@@ -25,6 +26,7 @@ This builds:
 - `tools/bin/true_index_pairs`
 
 `tools/bin/true_jaccard` and `tools/bin/true_index_pairs` are experimental helper binaries used by the benchmark workflows, not part of the core OddSketch CLI surface.
+Their source files live in `tools/src/`.
 
 ## Pairwise Benchmark
 Default outputs are written under `experiments/pair_task/outputs/default/`. You can override the root output directory in `experiments/pair_task/config.json` via `paths.outdir`, or pass `--outdir` to the genome generation step.
