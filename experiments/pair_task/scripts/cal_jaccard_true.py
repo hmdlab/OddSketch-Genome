@@ -105,7 +105,7 @@ def main() -> None:
 
     try:
         repo_root = task_root.parents[1]
-        cpp_bin = repo_root / "tools" / "bin" / "true_jaccard"
+        cpp_bin = repo_root / "experiments" / "tools" / "bin" / "true_jaccard"
         if cpp_bin.exists() and os.access(cpp_bin, os.X_OK):
             cmd = [
                 str(cpp_bin),

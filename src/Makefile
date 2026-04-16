@@ -3,13 +3,13 @@ CXXFLAGS := -std=c++17 -O3 -march=native -Wall -Wextra
 CPPFLAGS := -I../include
 
 ODDSKETCH_BIN := oddsketch
-TOOLS_BIN_DIR := ../tools/bin
+TOOLS_BIN_DIR := ../experiments/tools/bin
 TRUE_JACCARD_BIN := $(TOOLS_BIN_DIR)/true_jaccard
 TRUE_INDEX_PAIRS_BIN := $(TOOLS_BIN_DIR)/true_index_pairs
 
 ODDSKETCH_SRCS := apps/oddsketch_main.cpp core/oddsketch.cpp third_party/xxhash.cpp
-TRUE_JACCARD_SRCS := ../tools/src/true_jaccard_main.cpp
-TRUE_INDEX_PAIRS_SRCS := ../tools/src/true_index_pairs_main.cpp
+TRUE_JACCARD_SRCS := ../experiments/tools/src/true_jaccard_main.cpp
+TRUE_INDEX_PAIRS_SRCS := ../experiments/tools/src/true_index_pairs_main.cpp
 
 .PHONY: all clean
 

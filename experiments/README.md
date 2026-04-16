@@ -5,6 +5,7 @@ This directory contains benchmark workflows built around the standalone OddSketc
 ## Structure
 - `pair_task/`: pairwise Jaccard benchmark on synthetic genome pairs
 - `search_task/`: nearest-neighbor search benchmark on clustered synthetic genomes
+- `tools/`: C++ helper tools used only by experiment workflows
 - `scripts/run_benchmark.sh`: runs one or both tasks
 - `scripts/make_figures.py`: regenerates figures from each task output directory
 - `env/Dockerfile`: container environment
@@ -34,4 +35,4 @@ bash experiments/scripts/run_benchmark.sh --mode all --skip-bindash
 - To use a specific OddSketch binary, set `ODDSKETCH_BIN`.
 - BinDash is external and is not vendored in this repository.
 - Task-local `config.json` files define the default output roots via `paths.outdir`.
-- Exact-Jaccard helper binaries are built from `tools/src/` into `tools/bin/` by `make -C src`.
+- Exact-Jaccard helper binaries are built from `experiments/tools/src/` into `experiments/tools/bin/` by `make -C src`.

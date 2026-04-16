@@ -4,7 +4,8 @@ src/test/test_genomes/genomes
 
 # Build artifacts (local)
 src/oddsketch
-tools/bin/
+experiments/tools/bin/*
+!experiments/tools/bin/.gitignore
 
 # Virtualenvs and caches
 .venv/
