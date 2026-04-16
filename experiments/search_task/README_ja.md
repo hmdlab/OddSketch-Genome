@@ -5,31 +5,29 @@
 ## 構成
 - `config.json`: task 設定
 - `scripts/`: 生成、真値計算、検索、評価、一括実行
-- `analysis/`: 図示
+- `analysis/`: 図示と figure 生成
 - `outputs/default/`: 既定の生成物
 
 ## 基本手順
 ```bash
 cd experiments/search_task
-python scripts/make_cluster_query_genomes.py --config config.json
-python scripts/true_db.py --config config.json
-python scripts/oddsketch_db.py --config config.json
-python scripts/bindash_db.py --config config.json
-python scripts/evaluate_nn.py --config config.json
+uv run python scripts/project_runner.py --config config.json
+uv run python analysis/make_figures.py
 ```
 
 一括実行:
 
 ```bash
-python scripts/project_runner.py --config config.json
-python scripts/project_runner.py --config config.json --skip-bindash
+uv run python scripts/project_runner.py --config config.json
+uv run python scripts/project_runner.py --config config.json --skip-bindash
+uv run python analysis/make_figures.py
 ```
 
 繰り返し実行:
 
 ```bash
-python scripts/repeat_runner.py --config config.json --runs 10 --seed-base 1234
-python scripts/repeat_runner.py --config config.json --runs 10 --seed-base 1234 --skip-bindash
+uv run python scripts/repeat_runner.py --config config.json --runs 10 --seed-base 1234
+uv run python scripts/repeat_runner.py --config config.json --runs 10 --seed-base 1234 --skip-bindash
 ```
 
 ## 出力

@@ -5,9 +5,7 @@ This directory contains benchmark workflows built around the standalone OddSketc
 ## Structure
 - `pair_task/`: pairwise Jaccard benchmark on synthetic genome pairs
 - `search_task/`: nearest-neighbor search benchmark on clustered synthetic genomes
-- `tools/`: C++ helper tools used only by experiment workflows
-- `scripts/run_benchmark.sh`: runs one or both tasks
-- `scripts/make_figures.py`: regenerates figures from each task output directory
+- `tools/`: C++ helper tools and external-tool setup scripts used only by experiment workflows
 - `env/Dockerfile`: container environment
 
 Each task keeps its own defaults:
@@ -16,19 +14,21 @@ Each task keeps its own defaults:
 - generated data: `<task>/outputs/default/`
 
 ## Quick Run
-From repository root:
+Run each task from its own directory:
 
 ```bash
 uv sync
-bash experiments/scripts/run_benchmark.sh --mode all
+cd experiments/pair_task
+uv run python scripts/project_runner.py --config config.json
+uv run python analysis/make_figures.py
 ```
 
-Optional:
+Or:
 
 ```bash
-bash experiments/scripts/run_benchmark.sh --mode pair
-bash experiments/scripts/run_benchmark.sh --mode search
-bash experiments/scripts/run_benchmark.sh --mode all --skip-bindash
+cd experiments/search_task
+uv run python scripts/project_runner.py --config config.json
+uv run python analysis/make_figures.py
 ```
 
 ## Notes

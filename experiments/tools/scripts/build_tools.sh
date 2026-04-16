@@ -22,8 +22,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-EXP_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-TOOLS_DIR="${EXP_DIR}/tools"
+TOOLS_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 BIN_DIR="${TOOLS_DIR}/bin"
 SRC_DIR="${TOOLS_DIR}/bindash"
 BUILD_DIR="${SRC_DIR}/build"

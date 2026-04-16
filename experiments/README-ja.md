@@ -5,9 +5,7 @@
 ## 構成
 - `pair_task/`: 合成ゲノムペアに対する Jaccard 比較
 - `search_task/`: クラスタ化合成ゲノムに対する最近傍検索比較
-- `tools/`: 実験ワークフロー専用の C++ 補助ツール
-- `scripts/run_benchmark.sh`: 片方または両方の task を実行
-- `scripts/make_figures.py`: 各 task の出力から図を再生成
+- `tools/`: 実験ワークフロー専用の C++ 補助ツールと外部ツール準備スクリプト
 - `env/Dockerfile`: 実験用コンテナ環境
 
 各 task はそれぞれ次を持ちます。
@@ -16,19 +14,21 @@
 - 生成物: `<task>/outputs/default/`
 
 ## クイック実行
-リポジトリルートで実行します。
+各 task のディレクトリで実行します。
 
 ```bash
 uv sync
-bash experiments/scripts/run_benchmark.sh --mode all
+cd experiments/pair_task
+uv run python scripts/project_runner.py --config config.json
+uv run python analysis/make_figures.py
 ```
 
-任意オプション:
+または:
 
 ```bash
-bash experiments/scripts/run_benchmark.sh --mode pair
-bash experiments/scripts/run_benchmark.sh --mode search
-bash experiments/scripts/run_benchmark.sh --mode all --skip-bindash
+cd experiments/search_task
+uv run python scripts/project_runner.py --config config.json
+uv run python analysis/make_figures.py
 ```
 
 ## メモ

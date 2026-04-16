@@ -23,9 +23,9 @@ COPY . /workspace
 
 RUN uv sync
 RUN make -C src
-RUN bash experiments/scripts/build_tools.sh --method source --ref ${BINDASH_REF}
+RUN bash experiments/tools/scripts/build_tools.sh --method source --ref ${BINDASH_REF}
 
 ENV PATH="/workspace/experiments/tools/bin:${PATH}"
 ENV ODDSKETCH_BIN="/workspace/src/oddsketch"
 
-CMD ["bash", "experiments/scripts/run_benchmark.sh", "--mode", "all"]
+CMD ["uv", "run", "python", "experiments/pair_task/scripts/project_runner.py", "--config", "experiments/pair_task/config.json"]

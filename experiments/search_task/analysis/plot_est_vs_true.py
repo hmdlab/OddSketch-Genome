@@ -6,11 +6,7 @@ Join true Jaccard (query, db, jaccard_true) with estimated Jaccard and plot.
 
 Usage:
   cd experiments/search_task
-  python analysis/plot_est_vs_true.py \
-    --true ../data/true_pairs.tsv \
-    --pred ../data/oddsketch_pairs.tsv \
-    --pred-col jaccard_oddsketch \
-    --out ../data/oddsketch_true_vs_estimate.png
+  python analysis/make_figures.py
 """
 
 import argparse
@@ -71,4 +67,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

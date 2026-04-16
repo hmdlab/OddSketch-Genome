@@ -4,25 +4,38 @@ This task generates synthetic genome pairs and compares exact Jaccard, OddSketch
 
 ## Layout
 - `config.json`: task settings
-- `scripts/`: genome generation and Jaccard calculation
-- `analysis/`: plotting and RMSE utilities
+- `scripts/`: genome generation, Jaccard calculation, and task runner
+- `analysis/`: plotting, RMSE utilities, and figure generation
 - `outputs/default/`: default generated data
 
 ## Quick Start
 ```bash
 cd experiments/pair_task
-python scripts/make_genomes.py --config config.json
-python scripts/cal_jaccard_true.py --config config.json
-python scripts/cal_jaccard_oddsketch.py --config config.json
-python scripts/cal_jaccard_bindash.py --config config.json
-python analysis/plot_true_vs_oddsketch.py
-python analysis/plot_true_vs_bindash.py
+uv run python scripts/project_runner.py --config config.json
+uv run python analysis/make_figures.py
+```
+
+Skip BinDash:
+
+```bash
+uv run python scripts/project_runner.py --config config.json --skip-bindash
+uv run python analysis/make_figures.py
+```
+
+Step-by-step:
+
+```bash
+uv run python scripts/make_genomes.py --config config.json
+uv run python scripts/cal_jaccard_true.py --config config.json
+uv run python scripts/cal_jaccard_oddsketch.py --config config.json
+uv run python scripts/cal_jaccard_bindash.py --config config.json
+uv run python analysis/make_figures.py
 ```
 
 RMSE summary:
 
 ```bash
-python analysis/compute_rmse.py \
+uv run python analysis/compute_rmse.py \
   --csv outputs/default/results/comparison_results_oddsketch.csv \
   --csv outputs/default/results/comparison_results_bindash.csv
 ```
