@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -29,19 +30,27 @@ def run(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True)
 
 
+def bindash_enabled(cfg_path: Path) -> bool:
+    cfg = json.loads(cfg_path.read_text())
+    bindash_cfg = cfg.get("bindash", {})
+    if not isinstance(bindash_cfg, dict):
+        return True
+    return bool(bindash_cfg.get("enabled", True))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="config.json")
-    ap.add_argument("--skip-bindash", action="store_true", help="Skip BinDash estimation")
     args = ap.parse_args()
 
     scripts_dir = Path(__file__).resolve().parent
     cfg_path = resolve_config_path(args.config)
+    use_bindash = bindash_enabled(cfg_path)
 
     run([sys.executable, str(scripts_dir / "make_genomes.py"), "--config", str(cfg_path)])
     run([sys.executable, str(scripts_dir / "cal_jaccard_true.py"), "--config", str(cfg_path)])
     run([sys.executable, str(scripts_dir / "cal_jaccard_oddsketch.py"), "--config", str(cfg_path)])
-    if not args.skip_bindash:
+    if use_bindash:
         run([sys.executable, str(scripts_dir / "cal_jaccard_bindash.py"), "--config", str(cfg_path)])
 
 

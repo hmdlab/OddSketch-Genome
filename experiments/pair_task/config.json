@@ -20,6 +20,7 @@
     "canonical": true
   },
   "bindash": {
+    "enabled": true,
     "bindash_bin": "bindash",
     "threads": 8,
     "mode": "sketch_dist",

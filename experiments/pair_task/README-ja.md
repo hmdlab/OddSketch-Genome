@@ -15,13 +15,6 @@ uv run python scripts/project_runner.py --config config.json
 uv run python analysis/make_figures.py
 ```
 
-BinDash を使わない場合:
-
-```bash
-uv run python scripts/project_runner.py --config config.json --skip-bindash
-uv run python analysis/make_figures.py
-```
-
 個別実行:
 
 ```bash
@@ -69,6 +62,9 @@ uv run python analysis/compute_rmse.py \
   - canonical k-mer を使うかどうかです。
 - `bindash.bindash_bin`
   - BinDash 実行ファイルの名前またはパスです。
+- `bindash.enabled`
+  - この task で BinDash の処理を実行するかどうかです。
+  - `false` にすると OddSketch のみで実験します。
 - `bindash.threads`
   - BinDash のスレッド数です。
 - `bindash.mode`

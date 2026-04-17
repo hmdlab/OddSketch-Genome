@@ -15,13 +15,6 @@ uv run python scripts/project_runner.py --config config.json
 uv run python analysis/make_figures.py
 ```
 
-Skip BinDash:
-
-```bash
-uv run python scripts/project_runner.py --config config.json --skip-bindash
-uv run python analysis/make_figures.py
-```
-
 Step-by-step:
 
 ```bash
@@ -69,6 +62,9 @@ uv run python analysis/compute_rmse.py \
   - Whether canonical k-mers are used.
 - `bindash.bindash_bin`
   - BinDash executable name or path.
+- `bindash.enabled`
+  - Whether BinDash steps are executed in this task.
+  - Set `false` to run OddSketch-only experiments.
 - `bindash.threads`
   - Number of threads used by BinDash.
 - `bindash.mode`
