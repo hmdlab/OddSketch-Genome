@@ -40,6 +40,55 @@ uv run python analysis/compute_rmse.py \
   --csv outputs/default/results/comparison_results_bindash.csv
 ```
 
+## Config
+`config.json` controls both the synthetic data generation and the estimation settings.
+
+- `paths.outdir`
+  - Root directory for all generated files.
+  - Default: `outputs/default`
+- `make_genomes.genome_length`
+  - Length of each synthetic genome in base pairs.
+- `make_genomes.num_pairs`
+  - Number of genome pairs to generate.
+- `make_genomes.mutation_min`, `make_genomes.mutation_max`
+  - Minimum and maximum mutation counts applied to each pair.
+  - Each pair is sampled within this range.
+- `make_genomes.seed_base`
+  - Base random seed for reproducible genome generation.
+- `true_jaccard.kmerlen`
+  - `k` used for exact Jaccard calculation.
+- `oddsketch.kmerlen`
+  - `k` used by OddSketch.
+- `oddsketch.sketch_size`
+  - Sketch size for OddSketch estimation.
+- `oddsketch.j0`
+  - OddSketch similarity threshold parameter.
+- `oddsketch.pos_mode`
+  - Positional sampling mode passed to OddSketch.
+- `oddsketch.canonical`
+  - Whether canonical k-mers are used.
+- `bindash.bindash_bin`
+  - BinDash executable name or path.
+- `bindash.threads`
+  - Number of threads used by BinDash.
+- `bindash.mode`
+  - BinDash execution mode. The current default is `sketch_dist`.
+- `bindash.kmerlen`, `bindash.sketch_size`, `bindash.bbits`
+  - Main BinDash sketch parameters.
+  - `sketch_size` is the requested number of bins.
+  - Internally the script converts this to BinDash's `--sketchsize64`, so the effective size is rounded up to a multiple of 64 bins.
+- `bindash.pair_cmd`
+  - Command template used when evaluating one genome pair with BinDash.
+
+Common edits:
+
+- Change output location:
+  - set `paths.outdir`
+- Make a smaller smoke test:
+  - reduce `make_genomes.genome_length` and `make_genomes.num_pairs`
+- Compare different sketch settings:
+  - change `oddsketch.sketch_size`, `oddsketch.j0`, or `bindash.sketch_size`
+
 ## Outputs
 Default root: `outputs/default/`
 

@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import math
 import shlex
 import subprocess
 from pathlib import Path
@@ -45,6 +46,19 @@ def run_cmd(cmd: str, capture: bool = True) -> str:
     return process.stdout if capture else ""
 
 
+def resolve_bindash_sketch_params(cfg: dict) -> tuple[int, int]:
+    bbits = int(cfg.get("bbits", 16))
+    if "sketch_size" in cfg:
+        sketch_size = int(cfg["sketch_size"])
+    else:
+        sketch_size = 64 * int(cfg.get("sketchsize64", 256))
+    if sketch_size <= 0:
+        raise SystemExit("bindash.sketch_size must be positive")
+    sketchsize64 = math.ceil(sketch_size / 64)
+    effective_sketch_size = 64 * sketchsize64
+    return effective_sketch_size, bbits
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="config.json")
@@ -61,8 +75,8 @@ def main() -> None:
     b = cfg.get("bindash", {})
     binpath = b.get("bindash_bin", "bindash")
     k = int(b.get("kmerlen", 64))
-    ss = int(b.get("sketchsize64", 256))
-    bb = int(b.get("bbits", 16))
+    sketch_size, bb = resolve_bindash_sketch_params(b)
+    ss = math.ceil(sketch_size / 64)
     th = int(b.get("threads", 1))
 
     db_prefix = outdir / "bindash_db_sketch"

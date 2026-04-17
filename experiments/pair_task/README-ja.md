@@ -40,6 +40,55 @@ uv run python analysis/compute_rmse.py \
   --csv outputs/default/results/comparison_results_bindash.csv
 ```
 
+## config.json の説明
+`config.json` では、合成データ生成と推定パラメータの両方を設定します。
+
+- `paths.outdir`
+  - 生成物の出力ルートです。
+  - 既定値: `outputs/default`
+- `make_genomes.genome_length`
+  - 合成ゲノム 1 本あたりの長さです。
+- `make_genomes.num_pairs`
+  - 生成するゲノムペア数です。
+- `make_genomes.mutation_min`, `make_genomes.mutation_max`
+  - 各ペアに入れる変異数の最小値と最大値です。
+  - 各ペアの変異数はこの範囲でサンプリングされます。
+- `make_genomes.seed_base`
+  - 再現性のための乱数 seed の基準値です。
+- `true_jaccard.kmerlen`
+  - 真値 Jaccard 計算で使う `k` です。
+- `oddsketch.kmerlen`
+  - OddSketch で使う `k` です。
+- `oddsketch.sketch_size`
+  - OddSketch の sketch size です。
+- `oddsketch.j0`
+  - OddSketch の類似度しきい値パラメータです。
+- `oddsketch.pos_mode`
+  - OddSketch に渡す positional sampling mode です。
+- `oddsketch.canonical`
+  - canonical k-mer を使うかどうかです。
+- `bindash.bindash_bin`
+  - BinDash 実行ファイルの名前またはパスです。
+- `bindash.threads`
+  - BinDash のスレッド数です。
+- `bindash.mode`
+  - BinDash の実行モードです。現在の既定値は `sketch_dist` です。
+- `bindash.kmerlen`, `bindash.sketch_size`, `bindash.bbits`
+  - BinDash の主要な sketch パラメータです。
+  - `sketch_size` は指定したいビン数です。
+  - 内部では BinDash の `--sketchsize64` に変換するため、実効値は 64 ビン単位に切り上がります。
+- `bindash.pair_cmd`
+  - 1 ペア評価時に使う BinDash コマンドテンプレートです。
+
+よくある変更:
+
+- 出力先を変えたい:
+  - `paths.outdir` を変更
+- 軽いスモークテストにしたい:
+  - `make_genomes.genome_length` と `make_genomes.num_pairs` を小さくする
+- sketch 設定を比較したい:
+  - `oddsketch.sketch_size`, `oddsketch.j0`, `bindash.sketch_size` などを変更
+
 ## 出力
 既定の出力ルートは `outputs/default/` です。
 

@@ -24,7 +24,7 @@
   "bindash": {
     "bindash_bin": "bindash",
     "kmerlen": 64,
-    "sketchsize64": 128,
+    "sketch_size": 8192,
     "bbits": 16,
     "threads": 8
   }

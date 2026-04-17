@@ -2,6 +2,7 @@
 
 import argparse
 import csv
+import math
 import json
 import subprocess
 from pathlib import Path
@@ -81,6 +82,19 @@ def run_cmd(cmd: str, capture: bool = True) -> str:
     return process.stdout if capture else ""
 
 
+def resolve_bindash_sketch_params(cfg: dict) -> tuple[int, int]:
+    bbits = int(cfg.get("bbits", 16))
+    if "sketch_size" in cfg:
+        sketch_size = int(cfg["sketch_size"])
+    else:
+        sketch_size = 64 * int(cfg.get("sketchsize64", 32))
+    if sketch_size <= 0:
+        raise SystemExit("bindash.sketch_size must be positive")
+    sketchsize64 = math.ceil(sketch_size / 64)
+    effective_sketch_size = 64 * sketchsize64
+    return effective_sketch_size, bbits
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="config.json", help="Path to task config JSON")
@@ -102,8 +116,8 @@ def main() -> None:
     threads = int(cfg.get("threads", 8))
     mode = cfg.get("mode", "sketch_dist")
     kmerlen = int(cfg.get("kmerlen", 64))
-    sketchsize64 = int(cfg.get("sketchsize64", 32))
-    bbits = int(cfg.get("bbits", 16))
+    sketch_size, bbits = resolve_bindash_sketch_params(cfg)
+    sketchsize64 = math.ceil(sketch_size / 64)
     pair_cmd = cfg.get("pair_cmd", "{bin} exact --nthreads={threads} {f1} {f2}")
 
     pairs = read_pair_info(pair_info)
