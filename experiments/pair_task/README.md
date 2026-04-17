@@ -12,7 +12,7 @@ This task generates synthetic genome pairs and compares exact Jaccard, OddSketch
 ```bash
 cd experiments/pair_task
 uv run python scripts/project_runner.py --config config.json
-uv run python analysis/make_figures.py
+uv run python analysis/make_figures.py --config outputs/default/latest_used_config.json
 ```
 
 Step-by-step:
@@ -24,6 +24,9 @@ uv run python scripts/cal_jaccard_oddsketch.py --config config.json
 uv run python scripts/cal_jaccard_bindash.py --config config.json
 uv run python analysis/make_figures.py
 ```
+
+`project_runner.py` creates a unique run directory under the configured output root and saves the resolved config to `<run>/metadata/used_config.json`.
+When you use the default config, it also updates `outputs/default/latest_used_config.json` so `make_figures.py` can target the latest run.
 
 RMSE summary:
 

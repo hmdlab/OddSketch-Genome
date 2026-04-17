@@ -12,7 +12,7 @@
 ```bash
 cd experiments/pair_task
 uv run python scripts/project_runner.py --config config.json
-uv run python analysis/make_figures.py
+uv run python analysis/make_figures.py --config outputs/default/latest_used_config.json
 ```
 
 個別実行:
@@ -24,6 +24,9 @@ uv run python scripts/cal_jaccard_oddsketch.py --config config.json
 uv run python scripts/cal_jaccard_bindash.py --config config.json
 uv run python analysis/make_figures.py
 ```
+
+`project_runner.py` は、設定された出力ルート配下に run ごとのディレクトリを作り、その run で使った設定を `<run>/metadata/used_config.json` に保存します。
+既定設定では、`outputs/default/latest_used_config.json` も更新するので、図生成はそれを使って最新 run を対象にできます。
 
 RMSE 集計:
 
