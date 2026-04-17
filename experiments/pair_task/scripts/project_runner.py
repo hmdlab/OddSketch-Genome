@@ -75,6 +75,59 @@ def prepare_run_config(cfg_path: Path) -> tuple[Path, Path]:
     return run_dir, used_config_path
 
 
+def generate_figures(used_config_path: Path) -> None:
+    task_root = resolve_task_root()
+    analysis_dir = task_root / "analysis"
+    out_dir = resolve_output_root(task_root, json.loads(used_config_path.read_text()))
+    results_dir = out_dir / "results"
+    figures_dir = out_dir / "figures"
+    figures_dir.mkdir(parents=True, exist_ok=True)
+
+    odd_csv = results_dir / "comparison_results_oddsketch.csv"
+    bindash_csv = results_dir / "comparison_results_bindash.csv"
+
+    if odd_csv.exists():
+        run(
+            [
+                sys.executable,
+                str(analysis_dir / "plot_true_vs_oddsketch.py"),
+                "--csv",
+                str(odd_csv),
+                "--out",
+                str(figures_dir / "oddsketch_true_vs_estimate.png"),
+            ]
+        )
+
+    if bindash_csv.exists():
+        run(
+            [
+                sys.executable,
+                str(analysis_dir / "plot_true_vs_bindash.py"),
+                "--csv",
+                str(bindash_csv),
+                "--out",
+                str(figures_dir / "bindash_true_vs_estimate.png"),
+            ]
+        )
+
+    if odd_csv.exists() and bindash_csv.exists():
+        rmse = subprocess.run(
+            [
+                sys.executable,
+                str(analysis_dir / "compute_rmse.py"),
+                "--csv",
+                str(odd_csv),
+                "--csv",
+                str(bindash_csv),
+            ],
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        (figures_dir / "rmse_summary.txt").write_text(rmse.stdout)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="config.json")
@@ -93,6 +146,7 @@ def main() -> None:
     run([sys.executable, str(scripts_dir / "cal_jaccard_oddsketch.py"), "--config", str(used_config_path)])
     if use_bindash:
         run([sys.executable, str(scripts_dir / "cal_jaccard_bindash.py"), "--config", str(used_config_path)])
+    generate_figures(used_config_path)
 
 
 if __name__ == "__main__":
