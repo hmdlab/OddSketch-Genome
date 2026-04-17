@@ -34,7 +34,6 @@ Default outputs are written under `experiments/pair_task/outputs/default/`. You 
 ```bash
 cd experiments/pair_task
 uv run python scripts/project_runner.py --config config.json
-uv run python analysis/make_figures.py
 ```
 
 Step-by-step:
@@ -44,14 +43,6 @@ uv run python scripts/make_genomes.py --config config.json
 uv run python scripts/cal_jaccard_true.py --config config.json
 uv run python scripts/cal_jaccard_oddsketch.py --config config.json
 uv run python scripts/cal_jaccard_bindash.py --config config.json
-uv run python analysis/make_figures.py
-```
-
-Skip BinDash:
-
-```bash
-uv run python scripts/project_runner.py --config config.json --skip-bindash
-uv run python analysis/make_figures.py
 ```
 
 RMSE summary:
@@ -74,7 +65,6 @@ Default outputs are written under `experiments/search_task/outputs/default/`. Ov
 ```bash
 cd experiments/search_task
 uv run python scripts/project_runner.py --config config.json
-uv run python analysis/make_figures.py
 ```
 
 See `experiments/README.md`, `experiments/pair_task/README.md`, and `experiments/search_task/README.md` for task-specific details.

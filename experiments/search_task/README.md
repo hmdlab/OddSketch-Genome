@@ -12,14 +12,12 @@ This task generates clustered synthetic genomes, builds a genome DB, and compare
 ```bash
 cd experiments/search_task
 uv run python scripts/project_runner.py --config config.json
-uv run python analysis/make_figures.py
 ```
 
 End-to-end:
 
 ```bash
 uv run python scripts/project_runner.py --config config.json
-uv run python analysis/make_figures.py
 ```
 
 Repeated runs:
@@ -27,6 +25,10 @@ Repeated runs:
 ```bash
 uv run python scripts/repeat_runner.py --config config.json --runs 10 --seed-base 1234
 ```
+
+`project_runner.py` creates a unique run directory under the configured output root, saves the resolved config to `<run>/metadata/used_config.json`, and generates figures for that run.
+`repeat_runner.py` creates a unique batch directory and stores each per-run config under `runs/run_XXX/metadata/used_config.json`.
+With the default config, the latest resolved config is also written to `outputs/default/latest_used_config.json`.
 
 ## Config
 `config.json` controls the synthetic database generation, query generation, and search parameters.
@@ -96,5 +98,5 @@ Default root: `outputs/default/`
 Example plot:
 
 ```bash
-uv run python analysis/make_figures.py
+uv run python scripts/project_runner.py --config config.json
 ```

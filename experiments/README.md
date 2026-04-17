@@ -20,7 +20,6 @@ Run each task from its own directory:
 uv sync
 cd experiments/pair_task
 uv run python scripts/project_runner.py --config config.json
-uv run python analysis/make_figures.py
 ```
 
 Or:
@@ -28,11 +27,11 @@ Or:
 ```bash
 cd experiments/search_task
 uv run python scripts/project_runner.py --config config.json
-uv run python analysis/make_figures.py
 ```
 
 ## Notes
 - To use a specific OddSketch binary, set `ODDSKETCH_BIN`.
 - BinDash is external and is not vendored in this repository.
 - Task-local `config.json` files define the default output roots via `paths.outdir`.
+- `project_runner.py` creates a unique run directory under `paths.outdir` and saves the resolved config to `<run>/metadata/used_config.json`.
 - Exact-Jaccard helper binaries are built from `experiments/tools/src/` into `experiments/tools/bin/` by `make -C src`.

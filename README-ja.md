@@ -34,7 +34,6 @@ make
 ```bash
 cd experiments/pair_task
 uv run python scripts/project_runner.py --config config.json
-uv run python analysis/make_figures.py
 ```
 
 個別実行:
@@ -44,14 +43,6 @@ uv run python scripts/make_genomes.py --config config.json
 uv run python scripts/cal_jaccard_true.py --config config.json
 uv run python scripts/cal_jaccard_oddsketch.py --config config.json
 uv run python scripts/cal_jaccard_bindash.py --config config.json
-uv run python analysis/make_figures.py
-```
-
-BinDash を使わない場合:
-
-```bash
-uv run python scripts/project_runner.py --config config.json --skip-bindash
-uv run python analysis/make_figures.py
 ```
 
 RMSE 集計:
@@ -74,7 +65,6 @@ uv run python analysis/compute_rmse.py \
 ```bash
 cd experiments/search_task
 uv run python scripts/project_runner.py --config config.json
-uv run python analysis/make_figures.py
 ```
 
 詳細は `experiments/README-ja.md`, `experiments/pair_task/README-ja.md`, `experiments/search_task/README_ja.md` を参照してください。

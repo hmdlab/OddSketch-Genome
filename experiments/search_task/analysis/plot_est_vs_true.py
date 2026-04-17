@@ -6,7 +6,7 @@ Join true Jaccard (query, db, jaccard_true) with estimated Jaccard and plot.
 
 Usage:
   cd experiments/search_task
-  python analysis/make_figures.py
+  python scripts/project_runner.py --config config.json
 """
 
 import argparse

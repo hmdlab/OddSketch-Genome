@@ -12,14 +12,12 @@
 ```bash
 cd experiments/search_task
 uv run python scripts/project_runner.py --config config.json
-uv run python analysis/make_figures.py
 ```
 
 一括実行:
 
 ```bash
 uv run python scripts/project_runner.py --config config.json
-uv run python analysis/make_figures.py
 ```
 
 繰り返し実行:
@@ -27,6 +25,10 @@ uv run python analysis/make_figures.py
 ```bash
 uv run python scripts/repeat_runner.py --config config.json --runs 10 --seed-base 1234
 ```
+
+`project_runner.py` は、設定された出力ルート配下に run ごとのディレクトリを作り、その run で使った設定を `<run>/metadata/used_config.json` に保存し、図生成まで行います。
+`repeat_runner.py` は batch ディレクトリを作成し、各 run の設定を `runs/run_XXX/metadata/used_config.json` に保存します。
+既定設定では、最新の設定を `outputs/default/latest_used_config.json` にも保存します。
 
 ## config.json の説明
 `config.json` では、合成 DB 生成、query 生成、検索パラメータを設定します。

@@ -4,6 +4,7 @@ import argparse
 import json
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 
@@ -30,6 +31,90 @@ def run(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True)
 
 
+def resolve_output_root(task_root: Path, cfg: dict) -> Path:
+    outdir = cfg.get("paths", {}).get("outdir", "outputs/default")
+    path = Path(outdir)
+    return path if path.is_absolute() else (task_root / path).resolve()
+
+
+def allocate_run_dir(base_outdir: Path, prefix: str = "run") -> Path:
+    stamp = datetime.now().strftime(f"{prefix}_%Y%m%d_%H%M%S")
+    candidate = base_outdir / stamp
+    suffix = 1
+    while candidate.exists():
+        candidate = base_outdir / f"{stamp}_{suffix:02d}"
+        suffix += 1
+    return candidate
+
+
+def prepare_run_config(cfg_path: Path) -> tuple[Path, Path]:
+    task_root = resolve_task_root()
+    cfg = json.loads(cfg_path.read_text())
+    base_outdir = resolve_output_root(task_root, cfg)
+    base_outdir.mkdir(parents=True, exist_ok=True)
+
+    run_dir = allocate_run_dir(base_outdir, prefix="run")
+    metadata_dir = run_dir / "metadata"
+    metadata_dir.mkdir(parents=True, exist_ok=True)
+
+    cfg.setdefault("paths", {})
+    cfg["paths"]["outdir"] = str(run_dir)
+
+    used_config_path = metadata_dir / "used_config.json"
+    config_text = json.dumps(cfg, indent=2) + "\n"
+    used_config_path.write_text(config_text)
+    (base_outdir / "latest_used_config.json").write_text(config_text)
+    return run_dir, used_config_path
+
+
+def generate_figures(used_config_path: Path) -> None:
+    task_root = resolve_task_root()
+    analysis_dir = task_root / "analysis"
+    out_dir = resolve_output_root(task_root, json.loads(used_config_path.read_text()))
+    figures_dir = out_dir / "figures"
+    figures_dir.mkdir(parents=True, exist_ok=True)
+
+    truth_dir = out_dir / "results" / "truth"
+    odd_dir = out_dir / "results" / "oddsketch"
+    bindash_dir = out_dir / "results" / "bindash"
+
+    true_pairs = truth_dir / "exact_query_db_jaccard.tsv"
+    odd_pairs = odd_dir / "oddsketch_query_db_jaccard.tsv"
+    bindash_pairs = bindash_dir / "bindash_query_db_jaccard.tsv"
+
+    if true_pairs.exists() and odd_pairs.exists():
+        run(
+            [
+                sys.executable,
+                str(analysis_dir / "plot_est_vs_true.py"),
+                "--true",
+                str(true_pairs),
+                "--pred",
+                str(odd_pairs),
+                "--pred-col",
+                "jaccard_oddsketch",
+                "--out",
+                str(figures_dir / "oddsketch_true_vs_estimate.png"),
+            ]
+        )
+
+    if true_pairs.exists() and bindash_pairs.exists():
+        run(
+            [
+                sys.executable,
+                str(analysis_dir / "plot_est_vs_true.py"),
+                "--true",
+                str(true_pairs),
+                "--pred",
+                str(bindash_pairs),
+                "--pred-col",
+                "jaccard_bindash",
+                "--out",
+                str(figures_dir / "bindash_true_vs_estimate.png"),
+            ]
+        )
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="config.json")
@@ -38,18 +123,23 @@ def main() -> None:
     task_root = resolve_task_root()
     scripts_dir = Path(__file__).resolve().parent
     cfg_path = resolve_config_path(args.config)
-    cfg = json.loads(cfg_path.read_text())
+    run_dir, used_config_path = prepare_run_config(cfg_path)
+    cfg = json.loads(used_config_path.read_text())
     bindash_cfg = cfg.get("bindash", {})
     use_bindash = bool(bindash_cfg.get("enabled", True)) if isinstance(bindash_cfg, dict) else True
 
-    run([sys.executable, str(scripts_dir / "make_cluster_query_genomes.py"), "--config", str(cfg_path)])
-    run([sys.executable, str(scripts_dir / "true_db.py"), "--config", str(cfg_path)])
-    run([sys.executable, str(scripts_dir / "oddsketch_db.py"), "--config", str(cfg_path)])
+    print("[run-dir]", run_dir)
+    print("[used-config]", used_config_path)
+
+    run([sys.executable, str(scripts_dir / "make_cluster_query_genomes.py"), "--config", str(used_config_path)])
+    run([sys.executable, str(scripts_dir / "true_db.py"), "--config", str(used_config_path)])
+    run([sys.executable, str(scripts_dir / "oddsketch_db.py"), "--config", str(used_config_path)])
     if use_bindash:
-        run([sys.executable, str(scripts_dir / "bindash_db.py"), "--config", str(cfg_path)])
-        run([sys.executable, str(scripts_dir / "evaluate_nn.py"), "--config", str(cfg_path)])
+        run([sys.executable, str(scripts_dir / "bindash_db.py"), "--config", str(used_config_path)])
+        run([sys.executable, str(scripts_dir / "evaluate_nn.py"), "--config", str(used_config_path)])
     else:
-        run([sys.executable, str(scripts_dir / "evaluate_nn.py"), "--config", str(cfg_path)])
+        run([sys.executable, str(scripts_dir / "evaluate_nn.py"), "--config", str(used_config_path)])
+    generate_figures(used_config_path)
     outdir = cfg.get("paths", {}).get("outdir", "outputs/default")
     out_path = Path(outdir) if Path(outdir).is_absolute() else (task_root / outdir).resolve()
     print("[summary] oddsketch results ->", out_path / "results" / "oddsketch" / "oddsketch_top1_neighbors.tsv")
@@ -57,6 +147,7 @@ def main() -> None:
         print("[summary] bindash results   ->", out_path / "results" / "bindash" / "bindash_top1_neighbors.tsv")
     else:
         print("[summary] bindash results   -> disabled by config")
+    print("[summary] figures           ->", out_path / "figures")
 
 
 if __name__ == "__main__":
