@@ -50,13 +50,14 @@ def main() -> None:
     ap.add_argument("--config", default="config.json")
     ap.add_argument("--runs", type=int, default=5)
     ap.add_argument("--seed-base", type=int, default=None)
-    ap.add_argument("--skip-bindash", action="store_true", help="Skip BinDash search and evaluation columns that depend on it")
     args = ap.parse_args()
 
     task_root = resolve_task_root()
     scripts_dir = Path(__file__).resolve().parent
     cfg_path = resolve_config_path(args.config)
     cfg = json.loads(cfg_path.read_text())
+    bindash_cfg = cfg.get("bindash", {})
+    use_bindash = bool(bindash_cfg.get("enabled", True)) if isinstance(bindash_cfg, dict) else True
 
     outdir_raw = cfg.get("paths", {}).get("outdir", "outputs/default")
     outdir = Path(outdir_raw) if Path(outdir_raw).is_absolute() else (task_root / outdir_raw).resolve()
@@ -75,16 +76,16 @@ def main() -> None:
         run([sys.executable, str(scripts_dir / "make_cluster_query_genomes.py"), "--config", str(tmp_cfg_path)])
         run([sys.executable, str(scripts_dir / "true_db.py"), "--config", str(tmp_cfg_path)])
         run([sys.executable, str(scripts_dir / "oddsketch_db.py"), "--config", str(tmp_cfg_path)])
-        if not args.skip_bindash:
+        if use_bindash:
             run([sys.executable, str(scripts_dir / "bindash_db.py"), "--config", str(tmp_cfg_path)])
             run([sys.executable, str(scripts_dir / "evaluate_nn.py"), "--config", str(tmp_cfg_path)])
         else:
-            run([sys.executable, str(scripts_dir / "evaluate_nn.py"), "--config", str(tmp_cfg_path), "--skip-bindash"])
+            run([sys.executable, str(scripts_dir / "evaluate_nn.py"), "--config", str(tmp_cfg_path)])
 
-        eval_tsv = outdir / "nn_eval.tsv"
+        eval_tsv = outdir / "results" / "evaluation" / "top1_accuracy_comparison.tsv"
         ok_odd, n_odd, ok_bds, n_bds = read_accuracy(eval_tsv)
         print(f"[run {i}] oddsketch accuracy = {ok_odd}/{n_odd} ({(ok_odd / max(1, n_odd)) * 100:.2f}%)")
-        if not args.skip_bindash:
+        if use_bindash:
             print(f"[run {i}] bindash   accuracy = {ok_bds}/{n_bds} ({(ok_bds / max(1, n_bds)) * 100:.2f}%)")
         total_ok_odd += ok_odd
         total_n_odd += n_odd
@@ -93,7 +94,7 @@ def main() -> None:
 
     print("\n=== Cumulative Accuracy ===")
     print(f"oddsketch: {total_ok_odd}/{total_n_odd} ({(total_ok_odd / max(1, total_n_odd)) * 100:.2f}%)")
-    if not args.skip_bindash:
+    if use_bindash:
         print(f"bindash  : {total_ok_bds}/{total_n_bds} ({(total_ok_bds / max(1, total_n_bds)) * 100:.2f}%)")
 
 

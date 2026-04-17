@@ -67,8 +67,9 @@ def main() -> None:
     task_root = resolve_task_root()
     cfg = json.loads(resolve_config_path(args.config).read_text())
     outdir = resolve_path(task_root, cfg.get("paths", {}).get("outdir", "outputs/default"))
-    db_list = outdir / "db_genomes.list"
-    q_list = outdir / "queries.list"
+    manifests_dir = outdir / "data" / "manifests"
+    db_list = manifests_dir / "db_genome_paths.txt"
+    q_list = manifests_dir / "query_genome_paths.txt"
     if not db_list.exists() or not q_list.exists():
         raise SystemExit(f"missing inputs: {db_list} / {q_list}")
 
@@ -79,8 +80,13 @@ def main() -> None:
     ss = math.ceil(sketch_size / 64)
     th = int(b.get("threads", 1))
 
-    db_prefix = outdir / "bindash_db_sketch"
-    q_prefix = outdir / "bindash_query_sketch"
+    intermediate_dir = outdir / "intermediate" / "bindash"
+    intermediate_dir.mkdir(parents=True, exist_ok=True)
+    results_dir = outdir / "results" / "bindash"
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    db_prefix = intermediate_dir / "db_sketch"
+    q_prefix = intermediate_dir / "query_sketch"
 
     t0 = perf_counter()
     run_cmd(
@@ -101,7 +107,7 @@ def main() -> None:
     dbname_to_path = {Path(path.strip()).name: path.strip() for path in db_list.read_text().splitlines() if path.strip()}
 
     best = {}
-    pairs_path = outdir / "bindash_pairs.tsv"
+    pairs_path = results_dir / "bindash_query_db_jaccard.tsv"
     with pairs_path.open("w") as pf:
         pf.write("query\tdb\tjaccard_bindash\n")
         for line in out.splitlines():
@@ -122,14 +128,14 @@ def main() -> None:
             if current is None or jaccard > current[0]:
                 best[qn] = (jaccard, tn)
 
-    nn_path = outdir / "bindash_nn.tsv"
+    nn_path = results_dir / "bindash_top1_neighbors.tsv"
     with nn_path.open("w") as f:
         f.write("query\tnn\tjaccard_bindash\n")
         for qn, (jaccard, tn) in best.items():
             f.write(f"{qname_to_path.get(qn, qn)}\t{dbname_to_path.get(tn, tn)}\t{jaccard:.10f}\n")
 
     t3 = perf_counter()
-    (outdir / "bindash_times.txt").write_text(
+    (results_dir / "bindash_timing.tsv").write_text(
         f"sketch_db_sec\t{t1 - t0:.3f}\nsketch_queries_sec\t{t2 - t1:.3f}\nsearch_sec\t{t3 - t2:.3f}\n"
     )
     print(f"[bindash] wrote {nn_path}")

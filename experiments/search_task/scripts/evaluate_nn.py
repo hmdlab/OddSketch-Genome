@@ -44,17 +44,23 @@ def load_map(tsv_path: Path, q_col: int, nn_col: int) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="config.json")
-    ap.add_argument("--skip-bindash", action="store_true", help="Evaluate only OddSketch columns")
     args = ap.parse_args()
 
     task_root = resolve_task_root()
     cfg = json.loads(resolve_config_path(args.config).read_text())
     outdir = resolve_path(task_root, cfg.get("paths", {}).get("outdir", "outputs/default"))
+    bindash_cfg = cfg.get("bindash", {})
+    need_bindash = bool(bindash_cfg.get("enabled", True)) if isinstance(bindash_cfg, dict) else True
 
-    odd_tsv = outdir / "oddsketch_nn.tsv"
-    label_path = outdir / "true_nn.tsv"
-    bds_tsv = outdir / "bindash_nn.tsv"
-    need_bindash = not args.skip_bindash
+    truth_dir = outdir / "results" / "truth"
+    odd_dir = outdir / "results" / "oddsketch"
+    bindash_dir = outdir / "results" / "bindash"
+    eval_dir = outdir / "results" / "evaluation"
+    eval_dir.mkdir(parents=True, exist_ok=True)
+
+    odd_tsv = odd_dir / "oddsketch_top1_neighbors.tsv"
+    label_path = truth_dir / "exact_top1_neighbors.tsv"
+    bds_tsv = bindash_dir / "bindash_top1_neighbors.tsv"
     if not odd_tsv.exists() or not label_path.exists() or (need_bindash and not bds_tsv.exists()):
         raise SystemExit(f"missing inputs under {outdir}")
 
@@ -64,7 +70,7 @@ def main() -> None:
 
     ok_odd = 0
     ok_bds = 0
-    eval_path = outdir / "nn_eval.tsv"
+    eval_path = eval_dir / "top1_accuracy_comparison.tsv"
     with eval_path.open("w") as f:
         f.write("query\tnn_true\tnn_oddsketch\tcorrect_oddsketch\tnn_bindash\tcorrect_bindash\n")
         for query, truth in true_map.items():

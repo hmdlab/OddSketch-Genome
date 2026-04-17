@@ -19,7 +19,6 @@ End-to-end:
 
 ```bash
 uv run python scripts/project_runner.py --config config.json
-uv run python scripts/project_runner.py --config config.json --skip-bindash
 uv run python analysis/make_figures.py
 ```
 
@@ -27,7 +26,6 @@ Repeated runs:
 
 ```bash
 uv run python scripts/repeat_runner.py --config config.json --runs 10 --seed-base 1234
-uv run python scripts/repeat_runner.py --config config.json --runs 10 --seed-base 1234 --skip-bindash
 ```
 
 ## Config
@@ -60,6 +58,9 @@ uv run python scripts/repeat_runner.py --config config.json --runs 10 --seed-bas
   - Positional sampling mode passed to OddSketch.
 - `bindash.bindash_bin`
   - BinDash executable name or path.
+- `bindash.enabled`
+  - Whether BinDash search and evaluation are executed.
+  - Set `false` to run OddSketch-only experiments.
 - `bindash.kmerlen`, `bindash.sketch_size`, `bindash.bbits`
   - Main BinDash sketch parameters.
   - `sketch_size` is the requested number of bins.
@@ -79,12 +80,17 @@ Common edits:
 ## Outputs
 Default root: `outputs/default/`
 
-- `genomes/`, `queries/`
-- `db_genomes.list`, `queries.list`
-- `true_pairs.tsv`, `true_nn.tsv`
-- `oddsketch_pairs.tsv`, `oddsketch_nn.tsv`
-- `bindash_pairs.tsv`, `bindash_nn.tsv`
-- `nn_eval.tsv`
+- `data/db_genomes/`, `data/queries/`
+- `data/manifests/db_genome_paths.txt`, `data/manifests/query_genome_paths.txt`
+- `data/manifests/cluster_map.tsv`, `data/manifests/genome_mutations.tsv`
+- `intermediate/oddsketch/`, `intermediate/bindash/`
+- `results/truth/exact_query_db_jaccard.tsv`
+- `results/truth/exact_top1_neighbors.tsv`
+- `results/oddsketch/oddsketch_query_db_jaccard.tsv`
+- `results/oddsketch/oddsketch_top1_neighbors.tsv`
+- `results/bindash/bindash_query_db_jaccard.tsv`
+- `results/bindash/bindash_top1_neighbors.tsv`
+- `results/evaluation/top1_accuracy_comparison.tsv`
 - `figures/`
 
 Example plot:

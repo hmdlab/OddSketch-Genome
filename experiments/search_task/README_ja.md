@@ -19,7 +19,6 @@ uv run python analysis/make_figures.py
 
 ```bash
 uv run python scripts/project_runner.py --config config.json
-uv run python scripts/project_runner.py --config config.json --skip-bindash
 uv run python analysis/make_figures.py
 ```
 
@@ -27,7 +26,6 @@ uv run python analysis/make_figures.py
 
 ```bash
 uv run python scripts/repeat_runner.py --config config.json --runs 10 --seed-base 1234
-uv run python scripts/repeat_runner.py --config config.json --runs 10 --seed-base 1234 --skip-bindash
 ```
 
 ## config.json の説明
@@ -60,6 +58,9 @@ uv run python scripts/repeat_runner.py --config config.json --runs 10 --seed-bas
   - OddSketch に渡す positional sampling mode です。
 - `bindash.bindash_bin`
   - BinDash 実行ファイルの名前またはパスです。
+- `bindash.enabled`
+  - BinDash の検索と評価を実行するかどうかです。
+  - `false` にすると OddSketch のみで実験します。
 - `bindash.kmerlen`, `bindash.sketch_size`, `bindash.bbits`
   - BinDash の主要な sketch パラメータです。
   - `sketch_size` は指定したいビン数です。
@@ -79,10 +80,15 @@ uv run python scripts/repeat_runner.py --config config.json --runs 10 --seed-bas
 ## 出力
 既定の出力ルートは `outputs/default/` です。
 
-- `genomes/`, `queries/`
-- `db_genomes.list`, `queries.list`
-- `true_pairs.tsv`, `true_nn.tsv`
-- `oddsketch_pairs.tsv`, `oddsketch_nn.tsv`
-- `bindash_pairs.tsv`, `bindash_nn.tsv`
-- `nn_eval.tsv`
+- `data/db_genomes/`, `data/queries/`
+- `data/manifests/db_genome_paths.txt`, `data/manifests/query_genome_paths.txt`
+- `data/manifests/cluster_map.tsv`, `data/manifests/genome_mutations.tsv`
+- `intermediate/oddsketch/`, `intermediate/bindash/`
+- `results/truth/exact_query_db_jaccard.tsv`
+- `results/truth/exact_top1_neighbors.tsv`
+- `results/oddsketch/oddsketch_query_db_jaccard.tsv`
+- `results/oddsketch/oddsketch_top1_neighbors.tsv`
+- `results/bindash/bindash_query_db_jaccard.tsv`
+- `results/bindash/bindash_top1_neighbors.tsv`
+- `results/evaluation/top1_accuracy_comparison.tsv`
 - `figures/`

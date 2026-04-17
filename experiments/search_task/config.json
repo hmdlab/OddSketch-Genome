@@ -1,8 +1,8 @@
 {
   "genome_length": 1000000,
   "clusters": {
-    "num_clusters": 10,
-    "cluster_size": 10000,
+    "num_clusters": 2,
+    "cluster_size": 3,
     "mutation_min": 100,
     "mutation_max": 200,
     "seed": 1234
@@ -22,6 +22,7 @@
     "pos_mode": "mix"
   },
   "bindash": {
+    "enabled": true,
     "bindash_bin": "bindash",
     "kmerlen": 64,
     "sketch_size": 8192,

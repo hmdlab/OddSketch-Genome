@@ -81,11 +81,16 @@ def main() -> None:
     rng = random.Random(seed)
     outdir.mkdir(parents=True, exist_ok=True)
 
-    genomes_dir = outdir / "genomes"
-    db_list = outdir / "db_genomes.list"
-    query_list = outdir / "queries.list"
-    cluster_map = outdir / "cluster_map.tsv"
-    mut_log = outdir / "genome_mutations.tsv"
+    data_dir = outdir / "data"
+    genomes_dir = data_dir / "db_genomes"
+    queries_dir = data_dir / "queries"
+    manifests_dir = data_dir / "manifests"
+    manifests_dir.mkdir(parents=True, exist_ok=True)
+
+    db_list = manifests_dir / "db_genome_paths.txt"
+    query_list = manifests_dir / "query_genome_paths.txt"
+    cluster_map = manifests_dir / "cluster_map.tsv"
+    mut_log = manifests_dir / "genome_mutations.tsv"
 
     all_paths = []
     centers = []
@@ -113,7 +118,6 @@ def main() -> None:
         for path in all_paths:
             f.write(path + "\n")
 
-    queries_dir = outdir / "queries"
     queries_dir.mkdir(parents=True, exist_ok=True)
     q_paths = []
     per_cluster = max(1, qnum // n) if n > 0 else qnum

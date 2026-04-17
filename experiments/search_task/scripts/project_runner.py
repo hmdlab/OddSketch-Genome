@@ -33,27 +33,30 @@ def run(cmd: list[str]) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="config.json")
-    ap.add_argument("--skip-bindash", action="store_true", help="Skip BinDash search and evaluation columns that depend on it")
     args = ap.parse_args()
 
     task_root = resolve_task_root()
     scripts_dir = Path(__file__).resolve().parent
     cfg_path = resolve_config_path(args.config)
+    cfg = json.loads(cfg_path.read_text())
+    bindash_cfg = cfg.get("bindash", {})
+    use_bindash = bool(bindash_cfg.get("enabled", True)) if isinstance(bindash_cfg, dict) else True
 
     run([sys.executable, str(scripts_dir / "make_cluster_query_genomes.py"), "--config", str(cfg_path)])
     run([sys.executable, str(scripts_dir / "true_db.py"), "--config", str(cfg_path)])
     run([sys.executable, str(scripts_dir / "oddsketch_db.py"), "--config", str(cfg_path)])
-    if not args.skip_bindash:
+    if use_bindash:
         run([sys.executable, str(scripts_dir / "bindash_db.py"), "--config", str(cfg_path)])
         run([sys.executable, str(scripts_dir / "evaluate_nn.py"), "--config", str(cfg_path)])
     else:
-        run([sys.executable, str(scripts_dir / "evaluate_nn.py"), "--config", str(cfg_path), "--skip-bindash"])
-
-    cfg = json.loads(cfg_path.read_text())
+        run([sys.executable, str(scripts_dir / "evaluate_nn.py"), "--config", str(cfg_path)])
     outdir = cfg.get("paths", {}).get("outdir", "outputs/default")
     out_path = Path(outdir) if Path(outdir).is_absolute() else (task_root / outdir).resolve()
-    print("[summary] oddsketch_nn.tsv ->", out_path / "oddsketch_nn.tsv")
-    print("[summary] bindash_nn.tsv   ->", out_path / "bindash_nn.tsv")
+    print("[summary] oddsketch results ->", out_path / "results" / "oddsketch" / "oddsketch_top1_neighbors.tsv")
+    if use_bindash:
+        print("[summary] bindash results   ->", out_path / "results" / "bindash" / "bindash_top1_neighbors.tsv")
+    else:
+        print("[summary] bindash results   -> disabled by config")
 
 
 if __name__ == "__main__":

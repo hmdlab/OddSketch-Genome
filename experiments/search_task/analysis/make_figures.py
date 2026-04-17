@@ -50,9 +50,13 @@ def main() -> None:
     figures_dir = out_dir / "figures"
     figures_dir.mkdir(parents=True, exist_ok=True)
 
-    true_pairs = out_dir / "true_pairs.tsv"
-    odd_pairs = out_dir / "oddsketch_pairs.tsv"
-    bindash_pairs = out_dir / "bindash_pairs.tsv"
+    truth_dir = out_dir / "results" / "truth"
+    odd_dir = out_dir / "results" / "oddsketch"
+    bindash_dir = out_dir / "results" / "bindash"
+
+    true_pairs = truth_dir / "exact_query_db_jaccard.tsv"
+    odd_pairs = odd_dir / "oddsketch_query_db_jaccard.tsv"
+    bindash_pairs = bindash_dir / "bindash_query_db_jaccard.tsv"
 
     if true_pairs.exists() and odd_pairs.exists():
         run(

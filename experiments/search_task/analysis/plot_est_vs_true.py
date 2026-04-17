@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--true', required=True, help='TSV with columns: query, db, jaccard_true (or true_pairs.tsv)')
+    ap.add_argument('--true', required=True, help='TSV with columns: query, db, jaccard_true (for example exact_query_db_jaccard.tsv)')
     ap.add_argument('--pred', required=True, help='TSV with columns: query, db, <pred-col>')
     ap.add_argument('--pred-col', default='jaccard_oddsketch')
     ap.add_argument('--out', required=True)
@@ -32,7 +32,7 @@ def main():
 
     dt = pd.read_csv(tpath, sep='\t')
     if 'jaccard_true' not in dt.columns:
-        # true_pairs.tsv has jaccard_true; else raise
+        # exact_query_db_jaccard.tsv has jaccard_true; else raise
         raise SystemExit('true file must have jaccard_true column')
     dp = pd.read_csv(ppath, sep='\t')
     if args.pred_col not in dp.columns:

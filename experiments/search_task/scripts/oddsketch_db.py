@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -89,6 +90,20 @@ def run_oddsketch_dist(list_paths: list[Path], cfg: dict) -> list[str]:
             pass
 
 
+def relocate_sketches(sketch_paths: list[str], target_dir: Path) -> list[str]:
+    target_dir.mkdir(parents=True, exist_ok=True)
+    relocated = []
+    for raw_path in sketch_paths:
+        src = Path(raw_path)
+        dst = target_dir / src.name
+        if src.resolve() != dst.resolve():
+            if dst.exists():
+                dst.unlink()
+            shutil.move(str(src), str(dst))
+        relocated.append(str(dst.resolve()))
+    return relocated
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="config.json")
@@ -97,17 +112,20 @@ def main() -> None:
     task_root = resolve_task_root()
     cfg = json.loads(resolve_config_path(args.config).read_text())
     outdir = resolve_path(task_root, cfg.get("paths", {}).get("outdir", "outputs/default"))
-    db_list = outdir / "db_genomes.list"
-    q_list = outdir / "queries.list"
+    manifests_dir = outdir / "data" / "manifests"
+    db_list = manifests_dir / "db_genome_paths.txt"
+    q_list = manifests_dir / "query_genome_paths.txt"
     if not db_list.exists() or not q_list.exists():
         raise SystemExit(f"missing inputs: {db_list} / {q_list}")
 
+    intermediate_dir = outdir / "intermediate" / "oddsketch"
+    results_dir = outdir / "results" / "oddsketch"
+    results_dir.mkdir(parents=True, exist_ok=True)
+
     t0 = perf_counter()
-    db_sketches = run_oddsketch_sketch(db_list, cfg)
-    (outdir / "db_genomes.sketchlist").write_text("\n".join(db_sketches) + "\n")
+    db_sketches = relocate_sketches(run_oddsketch_sketch(db_list, cfg), intermediate_dir / "db_sketches")
     t1 = perf_counter()
-    qry_sketches = run_oddsketch_sketch(q_list, cfg)
-    (outdir / "queries.sketchlist").write_text("\n".join(qry_sketches) + "\n")
+    qry_sketches = relocate_sketches(run_oddsketch_sketch(q_list, cfg), intermediate_dir / "query_sketches")
     t2 = perf_counter()
 
     db_map = {
@@ -119,8 +137,8 @@ def main() -> None:
         for path in q_list.read_text().splitlines() if path.strip()
     }
 
-    nn_path = outdir / "oddsketch_nn.tsv"
-    pairs_path = outdir / "oddsketch_pairs.tsv"
+    nn_path = results_dir / "oddsketch_top1_neighbors.tsv"
+    pairs_path = results_dir / "oddsketch_query_db_jaccard.tsv"
     with nn_path.open("w") as outf, pairs_path.open("w") as pf:
         outf.write("query\tnn\tjaccard_oddsketch\n")
         pf.write("query\tdb\tjaccard_oddsketch\n")
@@ -151,7 +169,7 @@ def main() -> None:
                 outf.write(f"{q_map.get(qname, qname)}\t{db_map.get(best[1], best[1])}\t{best[0]:.10f}\n")
 
     t3 = perf_counter()
-    (outdir / "oddsketch_times.txt").write_text(
+    (results_dir / "oddsketch_timing.tsv").write_text(
         f"sketch_db_sec\t{t1 - t0:.3f}\nsketch_queries_sec\t{t2 - t1:.3f}\nsearch_sec\t{t3 - t2:.3f}\n"
     )
     print(f"[oddsketch] wrote {nn_path}")

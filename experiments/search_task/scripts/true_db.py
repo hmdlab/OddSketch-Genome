@@ -3,6 +3,7 @@
 import argparse
 import json
 import subprocess
+import tempfile
 from pathlib import Path
 
 
@@ -42,15 +43,11 @@ def main() -> None:
     outdir = resolve_path(task_root, cfg.get("paths", {}).get("outdir", "outputs/default"))
     outdir.mkdir(parents=True, exist_ok=True)
 
-    db_list = outdir / "db_genomes.list"
-    q_list = outdir / "queries.list"
+    manifests_dir = outdir / "data" / "manifests"
+    db_list = manifests_dir / "db_genome_paths.txt"
+    q_list = manifests_dir / "query_genome_paths.txt"
     if not db_list.exists() or not q_list.exists():
         raise SystemExit(f"missing inputs: {db_list} / {q_list}")
-
-    combined = outdir / "all_genomes.list"
-    with combined.open("w") as cf:
-        cf.write(db_list.read_text())
-        cf.write(q_list.read_text())
 
     k = int(cfg.get("true_jaccard", {}).get("kmerlen", 64))
     db_paths = [line.strip() for line in db_list.read_text().splitlines() if line.strip()]
@@ -68,25 +65,48 @@ def main() -> None:
     if not cpp.exists():
         raise SystemExit(f"binary not found: {cpp}")
 
-    cmd1 = [str(cpp), "preprocess", "--list", str(combined), "--k", str(k)]
-    print("[run]", " ".join(cmd1))
-    subprocess.run(cmd1, check=True)
+    truth_dir = outdir / "results" / "truth"
+    truth_dir.mkdir(parents=True, exist_ok=True)
+    exact_pairs = truth_dir / "exact_query_db_jaccard.tsv"
+    exact_top1 = truth_dir / "exact_top1_neighbors.tsv"
 
-    true_pairs = outdir / "true_pairs.tsv"
-    true_nn = outdir / "true_nn.tsv"
-    cmd2 = [
-        str(cpp),
-        "pairs",
-        "--qlist", str(q_list),
-        "--dblist", str(db_list),
-        "--out-pairs", str(true_pairs),
-        "--out-nn", str(true_nn),
-        "--k", str(k),
-    ]
-    print("[run]", " ".join(cmd2))
-    subprocess.run(cmd2, check=True)
-    print(f"[true] wrote {true_pairs}")
-    print(f"[true] wrote {true_nn}")
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".list") as tmp:
+        tmp.write(db_list.read_text())
+        tmp.write(q_list.read_text())
+        combined_path = Path(tmp.name)
+
+    try:
+        cmd1 = [str(cpp), "preprocess", "--list", str(combined_path), "--k", str(k)]
+        print("[run]", " ".join(cmd1))
+        subprocess.run(cmd1, check=True)
+
+        cmd2 = [
+            str(cpp),
+            "pairs",
+            "--qlist", str(q_list),
+            "--dblist", str(db_list),
+            "--out-pairs", str(exact_pairs),
+            "--out-nn", str(exact_top1),
+            "--k", str(k),
+        ]
+        print("[run]", " ".join(cmd2))
+        subprocess.run(cmd2, check=True)
+    finally:
+        try:
+            combined_path.unlink()
+        except Exception:
+            pass
+        for fasta in set(db_paths + q_paths):
+            for suffix in (f".k{k}.bin", f".k{k}.idx"):
+                idx_path = Path(fasta + suffix)
+                if idx_path.exists():
+                    try:
+                        idx_path.unlink()
+                    except Exception:
+                        pass
+
+    print(f"[true] wrote {exact_pairs}")
+    print(f"[true] wrote {exact_top1}")
 
 
 if __name__ == "__main__":
