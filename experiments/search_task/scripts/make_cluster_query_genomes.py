@@ -10,6 +10,20 @@ def resolve_task_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
+def resolve_repo_root() -> Path:
+    return resolve_task_root().parents[1]
+
+
+def display_path(raw: str | Path) -> str:
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        return str(path)
+    try:
+        return str(path.resolve().relative_to(resolve_repo_root()))
+    except Exception:
+        return str(path)
+
+
 def resolve_path(base: Path, raw: str | None) -> Path | None:
     if not raw:
         return None
@@ -77,6 +91,19 @@ def main() -> None:
     qnum = args.override_queries if args.override_queries is not None else int(qcfg.get("num_queries", 100))
     q_mut_min = int(qcfg.get("query_mutation_min", 1))
     q_mut_max = max(q_mut_min, int(qcfg.get("query_mutation_max", max_snps)))
+
+    print("[make_genome] start synthetic search dataset generation")
+    print(f"[make_genome] config={display_path(cpath)}")
+    print(f"[make_genome] output_root={display_path(outdir)}")
+    print(
+        "[make_genome] db clusters="
+        f"{n}, cluster_size={size}, total_db={n * size}, genome_length={genome_len}, "
+        f"cluster_mutations={min_snps}-{max_snps}"
+    )
+    print(
+        "[make_genome] queries="
+        f"{qnum}, query_mutations={q_mut_min}-{q_mut_max}, seed={seed}"
+    )
 
     rng = random.Random(seed)
     outdir.mkdir(parents=True, exist_ok=True)
@@ -159,10 +186,11 @@ def main() -> None:
         for path in q_paths:
             f.write(path + "\n")
 
-    print(f"[make_genome] wrote {len(all_paths)} DB genomes to {genomes_dir}")
-    print(f"[make_genome] wrote {len(q_paths)} query genomes to {queries_dir}")
-    print(f"[make_genome] db_list={db_list}")
-    print(f"[make_genome] queries={query_list} (N={len(q_paths)})")
+    print(f"[make_genome] wrote DB genomes    -> {display_path(genomes_dir)} (N={len(all_paths)})")
+    print(f"[make_genome] wrote query genomes -> {display_path(queries_dir)} (N={len(q_paths)})")
+    print(f"[make_genome] db list            -> {display_path(db_list)}")
+    print(f"[make_genome] query list         -> {display_path(query_list)}")
+    print(f"[make_genome] metadata           -> {display_path(manifests_dir)}")
 
 
 if __name__ == "__main__":

@@ -10,6 +10,24 @@ def resolve_task_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
+def resolve_repo_root() -> Path:
+    return resolve_task_root().parents[1]
+
+
+def display_path(raw: str | Path) -> str:
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        return str(path)
+    try:
+        return str(path.resolve().relative_to(resolve_repo_root()))
+    except Exception:
+        return str(path)
+
+
+def display_cmd(cmd: list[str]) -> str:
+    return " ".join(display_path(part) for part in cmd)
+
+
 def collect_config_paths(config_args: list[str], config_dir: str | None, pattern: str) -> list[Path]:
     paths: list[Path] = []
     task_root = resolve_task_root()
@@ -45,7 +63,7 @@ def collect_config_paths(config_args: list[str], config_dir: str | None, pattern
 
 
 def run(cmd: list[str]) -> int:
-    print("[run]", " ".join(str(x) for x in cmd))
+    print("[run]", display_cmd(cmd))
     completed = subprocess.run(cmd)
     return completed.returncode
 
@@ -66,7 +84,7 @@ def main() -> None:
     failures: list[tuple[Path, int]] = []
     for index, config_path in enumerate(config_paths, start=1):
         print(f"\n=== Config {index}/{len(config_paths)} ===")
-        print(f"[config] {config_path}")
+        print(f"[config] {display_path(config_path)}")
         exit_code = run([sys.executable, str(project_runner), "--config", str(config_path)])
         if exit_code != 0:
             failures.append((config_path, exit_code))
@@ -76,7 +94,7 @@ def main() -> None:
     if failures:
         print("\n=== Failed Configs ===")
         for path, exit_code in failures:
-            print(f"{path}\texit={exit_code}")
+            print(f"{display_path(path)}\texit={exit_code}")
         raise SystemExit(1)
 
     print(f"\nCompleted {len(config_paths)} config runs under {task_root}")

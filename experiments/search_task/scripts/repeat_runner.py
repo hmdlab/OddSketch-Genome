@@ -12,6 +12,24 @@ def resolve_task_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
+def resolve_repo_root() -> Path:
+    return resolve_task_root().parents[1]
+
+
+def display_path(raw: str | Path) -> str:
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        return str(path)
+    try:
+        return str(path.resolve().relative_to(resolve_repo_root()))
+    except Exception:
+        return str(path)
+
+
+def display_cmd(cmd: list[str]) -> str:
+    return " ".join(display_path(part) for part in cmd)
+
+
 def resolve_config_path(config_arg: str) -> Path:
     task_root = resolve_task_root()
     candidates = [
@@ -27,7 +45,7 @@ def resolve_config_path(config_arg: str) -> Path:
 
 
 def run(cmd: list[str]) -> None:
-    print("[run]", " ".join(cmd))
+    print("[run]", display_cmd(cmd))
     subprocess.run(cmd, check=True)
 
 
@@ -90,8 +108,8 @@ def main() -> None:
     batch_cfg_path.write_text(batch_cfg_text)
     (base_outdir / "latest_used_config.json").write_text(batch_cfg_text)
 
-    print("[batch-dir]", batch_dir)
-    print("[used-config]", batch_cfg_path)
+    print("[batch-dir]", display_path(batch_dir))
+    print("[used-config]", display_path(batch_cfg_path))
 
     total_ok_odd = total_n_odd = total_ok_bds = total_n_bds = 0
     for i in range(1, args.runs + 1):

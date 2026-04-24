@@ -12,6 +12,24 @@ def resolve_task_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
+def resolve_repo_root() -> Path:
+    return resolve_task_root().parents[1]
+
+
+def display_path(raw: str | Path) -> str:
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        return str(path)
+    try:
+        return str(path.resolve().relative_to(resolve_repo_root()))
+    except Exception:
+        return str(path)
+
+
+def display_cmd(cmd: list[str]) -> str:
+    return " ".join(display_path(part) for part in cmd)
+
+
 def resolve_config_path(config_arg: str) -> Path:
     task_root = resolve_task_root()
     candidates = [
@@ -27,7 +45,7 @@ def resolve_config_path(config_arg: str) -> Path:
 
 
 def run(cmd: list[str]) -> None:
-    print("[run]", " ".join(cmd))
+    print("[run]", display_cmd(cmd))
     subprocess.run(cmd, check=True)
 
 
@@ -128,26 +146,38 @@ def main() -> None:
     bindash_cfg = cfg.get("bindash", {})
     use_bindash = bool(bindash_cfg.get("enabled", True)) if isinstance(bindash_cfg, dict) else True
 
-    print("[run-dir]", run_dir)
-    print("[used-config]", used_config_path)
+    print("[run-dir]", display_path(run_dir))
+    print("[used-config]", display_path(used_config_path))
 
+    print("\n=== Stage 1/5: Generate DB and query genomes ===")
     run([sys.executable, str(scripts_dir / "make_cluster_query_genomes.py"), "--config", str(used_config_path)])
+
+    print("\n=== Stage 2/5: Compute exact Jaccard truth ===")
     run([sys.executable, str(scripts_dir / "true_db.py"), "--config", str(used_config_path)])
+
+    print("\n=== Stage 3/5: Run OddSketch search ===")
     run([sys.executable, str(scripts_dir / "oddsketch_db.py"), "--config", str(used_config_path)])
+
     if use_bindash:
+        print("\n=== Stage 4/5: Run BinDash search ===")
         run([sys.executable, str(scripts_dir / "bindash_db.py"), "--config", str(used_config_path)])
+        print("\n=== Stage 5/5: Evaluate and render figures ===")
         run([sys.executable, str(scripts_dir / "evaluate_nn.py"), "--config", str(used_config_path)])
     else:
+        print("\n=== Stage 4/5: Skip BinDash (disabled by config) ===")
+        print("\n=== Stage 5/5: Evaluate and render figures ===")
         run([sys.executable, str(scripts_dir / "evaluate_nn.py"), "--config", str(used_config_path)])
     generate_figures(used_config_path)
+
+    print("\n=== Run Summary ===")
     outdir = cfg.get("paths", {}).get("outdir", "outputs/default")
     out_path = Path(outdir) if Path(outdir).is_absolute() else (task_root / outdir).resolve()
-    print("[summary] oddsketch results ->", out_path / "results" / "oddsketch" / "oddsketch_top1_neighbors.tsv")
+    print("[summary] oddsketch results ->", display_path(out_path / "results" / "oddsketch" / "oddsketch_top1_neighbors.tsv"))
     if use_bindash:
-        print("[summary] bindash results   ->", out_path / "results" / "bindash" / "bindash_top1_neighbors.tsv")
+        print("[summary] bindash results   ->", display_path(out_path / "results" / "bindash" / "bindash_top1_neighbors.tsv"))
     else:
         print("[summary] bindash results   -> disabled by config")
-    print("[summary] figures           ->", out_path / "figures")
+    print("[summary] figures           ->", display_path(out_path / "figures"))
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -143,6 +144,17 @@ static void usage(){
          "  pairs --qlist queries.list --dblist db.list --out-pairs true_pairs.tsv --out-nn true_nn.tsv [--k 64]\n";
 }
 
+static bool should_report_progress(size_t done, size_t total, size_t step_items = 50){
+  if(total == 0 || done == 0) return false;
+  return done >= total || done % step_items == 0;
+}
+
+struct IndexedGenome {
+  string path;
+  filesystem::path filename;
+  vector<K128> kmers;
+};
+
 int main(int argc, char**argv){
   ios::sync_with_stdio(false);
   cin.tie(nullptr);
@@ -161,8 +173,20 @@ int main(int argc, char**argv){
     if(mode=="preprocess"){
       if(list.empty()){ usage(); return 2; }
       ifstream lf(list); if(!lf){ cerr<<"cannot open list: "<<list<<"\n"; return 3; }
-      string p; size_t n=0; while(getline(lf,p)){ if(p.empty()) continue; build_index_for_fasta(p, k); ++n; if(n%50==0) cerr<<"[preprocess] done="<<n<<"\n"; }
-      cerr<<"[preprocess] completed files="<<n<<" k="<<k<<"\n"; return 0;
+      vector<string> paths;
+      string p;
+      while(getline(lf,p)){ if(!p.empty()) paths.push_back(p); }
+      const size_t total = paths.size();
+      size_t n=0;
+      for(const auto &path : paths){
+        build_index_for_fasta(path, k);
+        ++n;
+        if(should_report_progress(n, total)){
+          cerr<<"[preprocess] done="<<n<<"/"<<total<<"\n";
+        }
+      }
+      cerr<<"[preprocess] completed files="<<n<<"/"<<total<<" k="<<k<<"\n";
+      return 0;
     }else if(mode=="pairs"){
       if(qlist.empty()||dblist.empty()||outpairs.empty()||outnn.empty()){ usage(); return 2; }
       ifstream qf(qlist), df(dblist);
@@ -173,20 +197,45 @@ int main(int argc, char**argv){
       // ensure indices exist
       for(auto &p: qs) build_index_for_fasta(p, k);
       for(auto &p: db) build_index_for_fasta(p, k);
+
+      cerr<<"[pairs] loading DB indices: "<<db.size()<<" genomes\n";
+      vector<IndexedGenome> db_indices;
+      db_indices.reserve(db.size());
+      for(size_t di=0; di<db.size(); ++di){
+        IndexedGenome item;
+        item.path = db[di];
+        item.filename = filesystem::path(db[di]).filename();
+        load_index(db[di]+".k"+to_string(k)+".bin", item.kmers);
+        db_indices.push_back(std::move(item));
+        if(should_report_progress(di+1, db.size())){
+          cerr<<"[pairs] loaded DB indices "<<(di+1)<<"/"<<db.size()<<"\n";
+        }
+      }
+
       ofstream op(outpairs); op<<"query\tdb\tinter\tn1\tn2\tjaccard_true\n";
       unordered_map<string, pair<double,string>> best; best.reserve(qs.size()*2);
-      namespace fs = std::filesystem;
+      const size_t total_pairs = qs.size() * db_indices.size();
+      size_t processed_pairs = 0;
+      cerr<<"[pairs] start comparisons: queries="<<qs.size()
+          <<" db="<<db_indices.size()
+          <<" total_pairs="<<total_pairs<<"\n";
       for(size_t qi=0; qi<qs.size(); ++qi){
         string q = qs[qi];
         vector<K128> qa; load_index(q+".k"+to_string(k)+".bin", qa);
-        for(size_t di=0; di<db.size(); ++di){
-          string d = db[di]; if(fs::path(d).filename()==fs::path(q).filename()){ continue; }
-          vector<K128> da; load_index(d+".k"+to_string(k)+".bin", da);
-          auto [inter, n1, n2] = intersect_count(qa, da);
+        filesystem::path q_filename = filesystem::path(q).filename();
+        for(size_t di=0; di<db_indices.size(); ++di){
+          const auto &d = db_indices[di];
+          if(d.filename == q_filename){ continue; }
+          auto [inter, n1, n2] = intersect_count(qa, d.kmers);
           size_t uni = n1 + n2 - inter; double jac = (uni? (double)inter / (double)uni : 0.0);
-          op<<q<<"\t"<<d<<"\t"<<inter<<"\t"<<n1<<"\t"<<n2<<"\t"<<fixed<<setprecision(10)<<jac<<"\n";
+          op<<q<<"\t"<<d.path<<"\t"<<inter<<"\t"<<n1<<"\t"<<n2<<"\t"<<fixed<<setprecision(10)<<jac<<"\n";
           auto it = best.find(q);
-          if(it==best.end() || jac > it->second.first){ best[q] = {jac, d}; }
+          if(it==best.end() || jac > it->second.first){ best[q] = {jac, d.path}; }
+          ++processed_pairs;
+        }
+        if(should_report_progress(qi+1, qs.size())){
+          cerr<<"[pairs] processed queries "<<(qi+1)<<"/"<<qs.size()
+              <<", "<<processed_pairs<<"/"<<total_pairs<<" pairs\n";
         }
       }
       ofstream on(outnn); on<<"query\tnn_true\tjaccard_true\n";

@@ -12,6 +12,24 @@ def resolve_task_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
+def resolve_repo_root() -> Path:
+    return resolve_task_root().parents[1]
+
+
+def display_path(raw: str | Path) -> str:
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        return str(path)
+    try:
+        return str(path.resolve().relative_to(resolve_repo_root()))
+    except Exception:
+        return str(path)
+
+
+def display_cmd(cmd: list[str]) -> str:
+    return " ".join(display_path(part) for part in cmd)
+
+
 def resolve_config_path(config_arg: str) -> Path:
     task_root = resolve_task_root()
     candidates = [
@@ -27,7 +45,7 @@ def resolve_config_path(config_arg: str) -> Path:
 
 
 def run(cmd: list[str]) -> None:
-    print("[run]", " ".join(cmd))
+    print("[run]", display_cmd(cmd))
     subprocess.run(cmd, check=True)
 
 
@@ -138,8 +156,8 @@ def main() -> None:
     run_dir, used_config_path = prepare_run_config(cfg_path)
     use_bindash = bindash_enabled(used_config_path)
 
-    print("[run-dir]", run_dir)
-    print("[used-config]", used_config_path)
+    print("[run-dir]", display_path(run_dir))
+    print("[used-config]", display_path(used_config_path))
 
     run([sys.executable, str(scripts_dir / "make_genomes.py"), "--config", str(used_config_path)])
     run([sys.executable, str(scripts_dir / "cal_jaccard_true.py"), "--config", str(used_config_path)])
