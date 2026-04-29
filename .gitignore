@@ -35,3 +35,5 @@ experiments/**/*.fna.gz
 experiments/**/*.fa.gz
 experiments/**/*.fasta.gz
 experiments/**/*.sketch
+*.o*
+*.e*
