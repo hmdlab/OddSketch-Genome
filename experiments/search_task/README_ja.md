@@ -22,6 +22,20 @@ uv run python scripts/project_runner.py --config config.json
 uv run python scripts/project_runner.py --config config.json
 ```
 
+qsub 実行:
+
+```bash
+cd experiments/search_task
+qsub jobs/qsub_project_runner.sh
+```
+
+別 config を使う場合:
+
+```bash
+cd experiments/search_task
+qsub jobs/qsub_project_runner.sh path/to/config.json
+```
+
 繰り返し実行:
 
 ```bash
@@ -31,6 +45,7 @@ uv run python scripts/repeat_runner.py --config config.json --runs 10 --seed-bas
 `project_runner.py` は、設定された出力ルート配下に run ごとのディレクトリを作り、その run で使った設定を `<run>/metadata/used_config.json` に保存し、図生成まで行います。
 `repeat_runner.py` は batch ディレクトリを作成し、各 run の設定を `runs/run_XXX/metadata/used_config.json` に保存します。
 既定設定では、最新の設定を `outputs/default/latest_used_config.json` にも保存します。
+既定の `search_scope` は `cluster_local` で、各クラスタを独立した DB / query 実験として扱います。
 
 ## config.json の説明
 `config.json` では、合成 DB 生成、query 生成、検索パラメータを設定します。
@@ -52,6 +67,10 @@ uv run python scripts/repeat_runner.py --config config.json --runs 10 --seed-bas
 - `paths.outdir`
   - 生成物の出力ルートです。
   - 既定値: `outputs/default`
+- `search_scope`
+  - `cluster_local` または `global` を指定します。
+  - 既定値: `cluster_local`
+  - `cluster_local` では各クラスタごとに DB / query を分けて独立に検索し、最後に各クラスタ結果を縦結合して評価します。
 - `oddsketch.kmerlen`
   - OddSketch で使う `k` です。
 - `oddsketch.sketch_size`
@@ -88,8 +107,13 @@ uv run python scripts/repeat_runner.py --config config.json --runs 10 --seed-bas
 - `data/db_genomes/`, `data/queries/`
 - `data/manifests/db_genome_paths.txt`, `data/manifests/query_genome_paths.txt`
 - `data/manifests/cluster_map.tsv`, `data/manifests/genome_mutations.tsv`
+- `data/manifests/clusters/clusterXXX/db_genome_paths.txt`
+- `data/manifests/clusters/clusterXXX/query_genome_paths.txt`
 - `intermediate/oddsketch/`, `intermediate/bindash/`
   - OddSketch では query / DB の sketch と、それぞれの path list を使って二部比較を 1 回実行します。
+- `results/truth/clusters/clusterXXX/`
+- `results/oddsketch/clusters/clusterXXX/`
+- `results/bindash/clusters/clusterXXX/`
 - `results/truth/exact_query_db_jaccard.tsv`
 - `results/truth/exact_top1_neighbors.tsv`
 - `results/oddsketch/oddsketch_query_db_jaccard.tsv`

@@ -22,6 +22,20 @@ End-to-end:
 uv run python scripts/project_runner.py --config config.json
 ```
 
+qsub execution:
+
+```bash
+cd experiments/search_task
+qsub jobs/qsub_project_runner.sh
+```
+
+With a different config:
+
+```bash
+cd experiments/search_task
+qsub jobs/qsub_project_runner.sh path/to/config.json
+```
+
 Repeated runs:
 
 ```bash
@@ -31,6 +45,7 @@ uv run python scripts/repeat_runner.py --config config.json --runs 10 --seed-bas
 `project_runner.py` creates a unique run directory under the configured output root, saves the resolved config to `<run>/metadata/used_config.json`, and generates figures for that run.
 `repeat_runner.py` creates a unique batch directory and stores each per-run config under `runs/run_XXX/metadata/used_config.json`.
 With the default config, the latest resolved config is also written to `outputs/default/latest_used_config.json`.
+The default `search_scope` is `cluster_local`, which treats each cluster as an independent DB/query experiment.
 
 ## Config
 `config.json` controls the synthetic database generation, query generation, and search parameters.
@@ -52,6 +67,10 @@ With the default config, the latest resolved config is also written to `outputs/
 - `paths.outdir`
   - Root directory for all generated files.
   - Default: `outputs/default`
+- `search_scope`
+  - Either `cluster_local` or `global`.
+  - Default: `cluster_local`
+  - `cluster_local` splits DB/query search by cluster, runs each cluster independently, and then concatenates cluster outputs for evaluation.
 - `oddsketch.kmerlen`
   - `k` used by OddSketch.
 - `oddsketch.sketch_size`
@@ -88,8 +107,13 @@ Default root: `outputs/default/`
 - `data/db_genomes/`, `data/queries/`
 - `data/manifests/db_genome_paths.txt`, `data/manifests/query_genome_paths.txt`
 - `data/manifests/cluster_map.tsv`, `data/manifests/genome_mutations.tsv`
+- `data/manifests/clusters/clusterXXX/db_genome_paths.txt`
+- `data/manifests/clusters/clusterXXX/query_genome_paths.txt`
 - `intermediate/oddsketch/`, `intermediate/bindash/`
   - OddSketch runs one bipartite query-vs-DB comparison using the generated sketch files and their path lists.
+- `results/truth/clusters/clusterXXX/`
+- `results/oddsketch/clusters/clusterXXX/`
+- `results/bindash/clusters/clusterXXX/`
 - `results/truth/exact_query_db_jaccard.tsv`
 - `results/truth/exact_top1_neighbors.tsv`
 - `results/oddsketch/oddsketch_query_db_jaccard.tsv`

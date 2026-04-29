@@ -50,9 +50,19 @@ def resolve_config_path(config_arg: str) -> Path:
     return (task_root / "config.json").resolve()
 
 
+def resolve_optional_path(task_root: Path, raw: str | None) -> Path | None:
+    if not raw:
+        return None
+    path = Path(raw)
+    return path if path.is_absolute() else (task_root / path).resolve()
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="config.json")
+    ap.add_argument("--db-list", default=None)
+    ap.add_argument("--query-list", default=None)
+    ap.add_argument("--results-dir", default=None)
     args = ap.parse_args()
 
     task_root = resolve_task_root()
@@ -62,8 +72,8 @@ def main() -> None:
     outdir.mkdir(parents=True, exist_ok=True)
 
     manifests_dir = outdir / "data" / "manifests"
-    db_list = manifests_dir / "db_genome_paths.txt"
-    q_list = manifests_dir / "query_genome_paths.txt"
+    db_list = resolve_optional_path(task_root, args.db_list) or (manifests_dir / "db_genome_paths.txt")
+    q_list = resolve_optional_path(task_root, args.query_list) or (manifests_dir / "query_genome_paths.txt")
     if not db_list.exists() or not q_list.exists():
         raise SystemExit(f"missing inputs: {db_list} / {q_list}")
 
@@ -94,7 +104,7 @@ def main() -> None:
     if not cpp.exists():
         raise SystemExit(f"binary not found: {cpp}")
 
-    truth_dir = outdir / "results" / "truth"
+    truth_dir = resolve_optional_path(task_root, args.results_dir) or (outdir / "results" / "truth")
     truth_dir.mkdir(parents=True, exist_ok=True)
     exact_pairs = truth_dir / "exact_query_db_jaccard.tsv"
     exact_top1 = truth_dir / "exact_top1_neighbors.tsv"

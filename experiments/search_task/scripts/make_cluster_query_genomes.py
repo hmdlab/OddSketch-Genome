@@ -69,6 +69,13 @@ def write_fasta(path: Path, name: str, seq: str, width: int = 80) -> None:
             f.write(seq[i:i + width] + "\n")
 
 
+def write_manifest(path: Path, paths: list[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w") as f:
+        for item in paths:
+            f.write(item + "\n")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="config.json")
@@ -120,6 +127,8 @@ def main() -> None:
     mut_log = manifests_dir / "genome_mutations.tsv"
 
     all_paths = []
+    cluster_db_paths: dict[int, list[str]] = {cid: [] for cid in range(1, n + 1)}
+    cluster_query_paths: dict[int, list[str]] = {cid: [] for cid in range(1, n + 1)}
     centers = []
     with mut_log.open("w") as mf:
         mf.write("path\ttype\tcluster_id\tmutations\n")
@@ -137,13 +146,12 @@ def main() -> None:
                 write_fasta(out_path, name=name, seq="".join(seq_list))
                 abs_path = out_path.resolve()
                 all_paths.append(str(abs_path))
+                cluster_db_paths[cid].append(str(abs_path))
                 cmap.write(f"{abs_path}\t{cid}\n")
                 with mut_log.open("a") as mf:
                     mf.write(f"{abs_path}\tDB\t{cid}\t{snps}\n")
 
-    with db_list.open("w") as f:
-        for path in all_paths:
-            f.write(path + "\n")
+    write_manifest(db_list, all_paths)
 
     queries_dir.mkdir(parents=True, exist_ok=True)
     q_paths = []
@@ -161,6 +169,7 @@ def main() -> None:
             write_fasta(out_path, name=name, seq="".join(seq_list))
             abs_path = out_path.resolve()
             q_paths.append(str(abs_path))
+            cluster_query_paths[cid].append(str(abs_path))
             with mut_log.open("a") as mf:
                 mf.write(f"{abs_path}\tquery\t{cid}\t{qsnp}\n")
             made += 1
@@ -178,13 +187,18 @@ def main() -> None:
         write_fasta(out_path, name=name, seq="".join(seq_list))
         abs_path = out_path.resolve()
         q_paths.append(str(abs_path))
+        cluster_query_paths[cid].append(str(abs_path))
         with mut_log.open("a") as mf:
             mf.write(f"{abs_path}\tquery\t{cid}\t{qsnp}\n")
         made += 1
 
-    with query_list.open("w") as f:
-        for path in q_paths:
-            f.write(path + "\n")
+    write_manifest(query_list, q_paths)
+
+    clusters_dir = manifests_dir / "clusters"
+    for cid in range(1, n + 1):
+        cluster_dir = clusters_dir / f"cluster{cid:03d}"
+        write_manifest(cluster_dir / "db_genome_paths.txt", cluster_db_paths.get(cid, []))
+        write_manifest(cluster_dir / "query_genome_paths.txt", cluster_query_paths.get(cid, []))
 
     print(f"[make_genome] wrote DB genomes    -> {display_path(genomes_dir)} (N={len(all_paths)})")
     print(f"[make_genome] wrote query genomes -> {display_path(queries_dir)} (N={len(q_paths)})")

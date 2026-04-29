@@ -35,6 +35,13 @@ def resolve_config_path(config_arg: str) -> Path:
     return (task_root / "config.json").resolve()
 
 
+def resolve_optional_path(task_root: Path, raw: str | None) -> Path | None:
+    if not raw:
+        return None
+    path = Path(raw)
+    return path if path.is_absolute() else (task_root / path).resolve()
+
+
 def resolve_bindash_bin(raw: str | None) -> str:
     task_root = resolve_task_root()
     repo_root = task_root.parents[1]
@@ -89,14 +96,18 @@ def resolve_bindash_sketch_params(cfg: dict) -> tuple[int, int, int]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="config.json")
+    ap.add_argument("--db-list", default=None)
+    ap.add_argument("--query-list", default=None)
+    ap.add_argument("--results-dir", default=None)
+    ap.add_argument("--intermediate-dir", default=None)
     args = ap.parse_args()
 
     task_root = resolve_task_root()
     cfg = json.loads(resolve_config_path(args.config).read_text())
     outdir = resolve_path(task_root, cfg.get("paths", {}).get("outdir", "outputs/default"))
     manifests_dir = outdir / "data" / "manifests"
-    db_list = manifests_dir / "db_genome_paths.txt"
-    q_list = manifests_dir / "query_genome_paths.txt"
+    db_list = resolve_optional_path(task_root, args.db_list) or (manifests_dir / "db_genome_paths.txt")
+    q_list = resolve_optional_path(task_root, args.query_list) or (manifests_dir / "query_genome_paths.txt")
     if not db_list.exists() or not q_list.exists():
         raise SystemExit(f"missing inputs: {db_list} / {q_list}")
 
@@ -106,9 +117,9 @@ def main() -> None:
     ss, _, bb = resolve_bindash_sketch_params(b)
     th = int(b.get("threads", 1))
 
-    intermediate_dir = outdir / "intermediate" / "bindash"
+    intermediate_dir = resolve_optional_path(task_root, args.intermediate_dir) or (outdir / "intermediate" / "bindash")
     intermediate_dir.mkdir(parents=True, exist_ok=True)
-    results_dir = outdir / "results" / "bindash"
+    results_dir = resolve_optional_path(task_root, args.results_dir) or (outdir / "results" / "bindash")
     results_dir.mkdir(parents=True, exist_ok=True)
 
     db_prefix = intermediate_dir / "db_sketch"
