@@ -5,7 +5,6 @@ import json
 import os
 import shutil
 import subprocess
-import tempfile
 from pathlib import Path
 from time import perf_counter
 
@@ -66,28 +65,25 @@ def run_oddsketch_sketch(list_path: Path, cfg: dict) -> list[str]:
     return [line.strip() for line in p.stdout.splitlines() if line.strip()]
 
 
-def run_oddsketch_dist(list_paths: list[Path], cfg: dict) -> list[str]:
+def write_path_list(list_path: Path, paths: list[str]) -> None:
+    list_path.parent.mkdir(parents=True, exist_ok=True)
+    list_path.write_text("".join(f"{path}\n" for path in paths))
+
+
+def run_oddsketch_dist_bipartite(query_list_path: Path, db_list_path: Path, cfg: dict) -> list[str]:
     odd = cfg.get("oddsketch", {})
     cmd = [
         resolve_oddsketch_bin(),
         "dist",
+        f"--qlist={query_list_path}",
+        f"--dblist={db_list_path}",
         f"--kmer={odd.get('kmerlen', 64)}",
         f"--sketch-size={odd.get('sketch_size', 2048)}",
         f"--j0={odd.get('j0', 0.90)}",
         f"--pos-mode={odd.get('pos_mode', 'mix')}",
     ]
-    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
-        for path in list_paths:
-            f.write(str(path) + "\n")
-        temp = f.name
-    try:
-        p = subprocess.run(cmd, stdin=open(temp, "r"), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=True)
-        return [line for line in p.stdout.splitlines() if line.strip()]
-    finally:
-        try:
-            os.unlink(temp)
-        except Exception:
-            pass
+    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=True)
+    return [line for line in p.stdout.splitlines() if line.strip()]
 
 
 def relocate_sketches(sketch_paths: list[str], target_dir: Path) -> list[str]:
@@ -128,6 +124,11 @@ def main() -> None:
     qry_sketches = relocate_sketches(run_oddsketch_sketch(q_list, cfg), intermediate_dir / "query_sketches")
     t2 = perf_counter()
 
+    db_sketch_list = intermediate_dir / "db_sketch_paths.txt"
+    query_sketch_list = intermediate_dir / "query_sketch_paths.txt"
+    write_path_list(db_sketch_list, db_sketches)
+    write_path_list(query_sketch_list, qry_sketches)
+
     db_map = {
         Path(path.strip()).with_suffix(Path(path.strip()).suffix + ".sketch").name: path.strip()
         for path in db_list.read_text().splitlines() if path.strip()
@@ -139,34 +140,34 @@ def main() -> None:
 
     nn_path = results_dir / "oddsketch_top1_neighbors.tsv"
     pairs_path = results_dir / "oddsketch_query_db_jaccard.tsv"
+    lines = run_oddsketch_dist_bipartite(query_sketch_list, db_sketch_list, cfg)
     with nn_path.open("w") as outf, pairs_path.open("w") as pf:
         outf.write("query\tnn\tjaccard_oddsketch\n")
         pf.write("query\tdb\tjaccard_oddsketch\n")
-        for query_sketch in qry_sketches:
-            lines = run_oddsketch_dist([Path(query_sketch)] + [Path(path) for path in db_sketches], cfg)
-            best = None
-            qname = Path(query_sketch).name
-            for line in lines:
-                parts = line.split("\t")
-                if len(parts) != 3:
-                    continue
-                f1, f2, val = parts
-                try:
-                    jaccard = float(val)
-                except Exception:
-                    continue
-                if qname not in (Path(f1).name, Path(f2).name):
-                    continue
-                other = Path(f2).name if Path(f1).name == qname else Path(f1).name
-                if other == qname:
-                    continue
-                query_fasta = q_map.get(qname, qname)
-                db_fasta = db_map.get(other, other)
-                pf.write(f"{query_fasta}\t{db_fasta}\t{jaccard:.10f}\n")
-                if best is None or jaccard > best[0]:
-                    best = (jaccard, other)
-            if best is not None:
-                outf.write(f"{q_map.get(qname, qname)}\t{db_map.get(best[1], best[1])}\t{best[0]:.10f}\n")
+        best_by_query: dict[str, tuple[float, str]] = {}
+        for line in lines:
+            parts = line.split("\t")
+            if len(parts) != 3:
+                continue
+            qsketch, dsketch, val = parts
+            qname = Path(qsketch).name
+            dname = Path(dsketch).name
+            try:
+                jaccard = float(val)
+            except Exception:
+                continue
+
+            query_fasta = q_map.get(qname, qname)
+            db_fasta = db_map.get(dname, dname)
+            pf.write(f"{query_fasta}\t{db_fasta}\t{jaccard:.10f}\n")
+
+            current = best_by_query.get(qname)
+            if current is None or jaccard > current[0]:
+                best_by_query[qname] = (jaccard, dname)
+
+        for qname in sorted(best_by_query):
+            jaccard, dname = best_by_query[qname]
+            outf.write(f"{q_map.get(qname, qname)}\t{db_map.get(dname, dname)}\t{jaccard:.10f}\n")
 
     t3 = perf_counter()
     (results_dir / "oddsketch_timing.tsv").write_text(

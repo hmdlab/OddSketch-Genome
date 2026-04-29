@@ -4,6 +4,7 @@ import argparse
 import csv
 import math
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -31,6 +32,30 @@ def resolve_config_path(config_arg: str) -> Path:
         if candidate.exists():
             return candidate.resolve()
     return (task_root / "config.json").resolve()
+
+
+def resolve_bindash_bin(raw: str | None) -> str:
+    task_root = resolve_task_root()
+    repo_root = task_root.parents[1]
+    candidates = [
+        raw or "",
+        str(repo_root / "experiments" / "tools" / "bin" / "bindash"),
+        "bindash",
+    ]
+    for candidate in candidates:
+        if not candidate:
+            continue
+        path = Path(candidate)
+        if path.is_absolute():
+            if path.exists() and os.access(path, os.X_OK):
+                return str(path)
+            continue
+        repo_relative = (repo_root / candidate).resolve()
+        if repo_relative.exists() and os.access(repo_relative, os.X_OK):
+            return str(repo_relative)
+        if path.exists() and os.access(path, os.X_OK):
+            return str(path.resolve())
+    return raw or "bindash"
 
 
 def load_cfg(cpath: Path) -> dict:
@@ -114,7 +139,7 @@ def main() -> None:
     if not pair_info.exists():
         raise SystemExit(f"pair_info が見つかりません: {pair_info}")
 
-    bindash_bin = cfg.get("bindash_bin", "bindash")
+    bindash_bin = resolve_bindash_bin(cfg.get("bindash_bin"))
     threads = int(cfg.get("threads", 8))
     mode = cfg.get("mode", "sketch_dist")
     kmerlen = int(cfg.get("kmerlen", 64))

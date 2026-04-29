@@ -400,8 +400,71 @@ double jaccard_distance(const Sketch &a,
     return jacc;
 }
 
+static std::vector<std::string> read_paths_from_stdin() {
+    std::vector<std::string> paths;
+    std::string line;
+    while (std::getline(std::cin, line)) {
+        if (line.empty()) continue;
+        paths.push_back(line);
+    }
+    return paths;
+}
+
+static std::vector<std::string> read_paths_from_list_file(const std::string &list_path) {
+    std::ifstream ifs(list_path);
+    if (!ifs) {
+        throw std::runtime_error("Cannot open list file: " + list_path);
+    }
+
+    std::vector<std::string> paths;
+    std::string line;
+    while (std::getline(ifs, line)) {
+        if (line.empty()) continue;
+        paths.push_back(line);
+    }
+    return paths;
+}
+
+static void run_dist_all_vs_all(const std::vector<std::string> &paths) {
+    auto sketches = load_all_sketches(paths);
+    if (!sketches.empty()) {
+        const auto &s0 = sketches.front();
+        uint64_t nbits = s0.bit_size ? s0.bit_size : static_cast<uint64_t>(s0.words.size() * 64);
+        std::cerr << "[oddsketch] dist(all-vs-all): nbits=" << nbits
+                  << ", kbuckets(header)=" << s0.k_buckets
+                  << ", j0(current)=" << std::fixed << std::setprecision(6) << J0 << "\n";
+    }
+    for (size_t i = 0; i < sketches.size(); ++i) {
+        for (size_t j = i + 1; j < sketches.size(); ++j) {
+            double d = jaccard_distance(sketches[i], sketches[j]);
+            std::cout << paths[i] << '\t' << paths[j] << '\t' << d << "\n";
+        }
+    }
+}
+
+static void run_dist_bipartite(const std::vector<std::string> &qpaths,
+                               const std::vector<std::string> &dbpaths) {
+    auto qsketches = load_all_sketches(qpaths);
+    auto dbsketches = load_all_sketches(dbpaths);
+    if (!qsketches.empty()) {
+        const auto &s0 = qsketches.front();
+        uint64_t nbits = s0.bit_size ? s0.bit_size : static_cast<uint64_t>(s0.words.size() * 64);
+        std::cerr << "[oddsketch] dist(bipartite): nbits=" << nbits
+                  << ", queries=" << qsketches.size()
+                  << ", db=" << dbsketches.size()
+                  << ", kbuckets(header)=" << s0.k_buckets
+                  << ", j0(current)=" << std::fixed << std::setprecision(6) << J0 << "\n";
+    }
+    for (size_t qi = 0; qi < qsketches.size(); ++qi) {
+        for (size_t di = 0; di < dbsketches.size(); ++di) {
+            double d = jaccard_distance(qsketches[qi], dbsketches[di]);
+            std::cout << qpaths[qi] << '\t' << dbpaths[di] << '\t' << d << "\n";
+        }
+    }
+}
+
 // 簡易オプションパーサ（--name=value 形式）
-static void parse_options(int argc, char** argv, std::string &mode) {
+static void parse_options(int argc, char** argv, std::string &mode, std::string &qlist_path, std::string &dblist_path) {
     if (argc < 2) {
         return;
     }
@@ -412,7 +475,11 @@ static void parse_options(int argc, char** argv, std::string &mode) {
         auto eq = a.find('=');
         std::string key = (eq == std::string::npos) ? a.substr(2) : a.substr(2, eq - 2);
         std::string val = (eq == std::string::npos) ? std::string() : a.substr(eq + 1);
-        if (key == "kmer" || key == "kmerlen") {
+        if (key == "qlist") {
+            qlist_path = val;
+        } else if (key == "dblist") {
+            dblist_path = val;
+        } else if (key == "kmer" || key == "kmerlen") {
             if (!val.empty()) {
                 try {
                     KMER = static_cast<size_t>(std::stoul(val));
@@ -529,23 +596,22 @@ static void load_config_from_file_if_exists() {
 
 int oddsketch_cli_main(int argc, char** argv) {
     std::string mode;
-    parse_options(argc, argv, mode);
+    std::string qlist_path;
+    std::string dblist_path;
+    parse_options(argc, argv, mode, qlist_path, dblist_path);
     if (mode != "sketch" && mode != "dist") {
-        std::cerr << "Usage: oddsketch {sketch|dist} [--kmer=N] [--sketch-size=M] [--canonical=0|1]\n";
+        std::cerr << "Usage: oddsketch {sketch|dist} [--kmer=N] [--sketch-size=M] [--canonical=0|1] [--qlist=queries.txt --dblist=db.txt]\n";
+        return 1;
+    }
+    if ((qlist_path.empty() && !dblist_path.empty()) || (!qlist_path.empty() && dblist_path.empty())) {
+        std::cerr << "Usage error: --qlist and --dblist must be specified together\n";
         return 1;
     }
     // 設定ファイルからのロード（CLI未指定時の補助）
     load_config_from_file_if_exists();
 
-    // 1行ずつ受け取ってベクタに貯める
-    std::vector<std::string> paths;
-    std::string line;
-    while (std::getline(std::cin, line)) {
-        if (line.empty()) continue;
-        paths.push_back(line);
-    }
-
     if (mode == "sketch") {
+        auto paths = read_paths_from_stdin();
         // デバッグ: スケッチサイズとバケット数、J0 を表示
         std::cerr << "[oddsketch] sketch: nbits=" << G_SKETCH_SIZE
                   << ", kbuckets=" << G_LAST_NUM_BUCKETS
@@ -562,21 +628,13 @@ int oddsketch_cli_main(int argc, char** argv) {
         }
     }
     else if (mode == "dist") {
-        // すべての .sketch を読み込んでメモリに展開
-        auto sketches = load_all_sketches(paths);
-        if (!sketches.empty()) {
-            const auto &s0 = sketches.front();
-            uint64_t nbits = s0.bit_size ? s0.bit_size : static_cast<uint64_t>(s0.words.size()*64);
-            std::cerr << "[oddsketch] dist: nbits=" << nbits
-                      << ", kbuckets(header)=" << s0.k_buckets
-                      << ", j0(current)=" << std::fixed << std::setprecision(6) << J0 << "\n";
-        }
-        // 二重ループで距離計算して stdout に TSV 出力
-        for (size_t i = 0; i < sketches.size(); ++i) {
-            for (size_t j = i + 1; j < sketches.size(); ++j) {
-                double d = jaccard_distance(sketches[i], sketches[j]);
-                std::cout << paths[i] << '\t' << paths[j] << '\t' << d << "\n";
-            }
+        if (!qlist_path.empty() && !dblist_path.empty()) {
+            auto qpaths = read_paths_from_list_file(qlist_path);
+            auto dbpaths = read_paths_from_list_file(dblist_path);
+            run_dist_bipartite(qpaths, dbpaths);
+        } else {
+            auto paths = read_paths_from_stdin();
+            run_dist_all_vs_all(paths);
         }
     }
     

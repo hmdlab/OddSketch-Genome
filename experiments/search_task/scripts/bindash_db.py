@@ -3,6 +3,7 @@
 import argparse
 import json
 import math
+import os
 import shlex
 import subprocess
 from pathlib import Path
@@ -32,6 +33,30 @@ def resolve_config_path(config_arg: str) -> Path:
         if candidate.exists():
             return candidate.resolve()
     return (task_root / "config.json").resolve()
+
+
+def resolve_bindash_bin(raw: str | None) -> str:
+    task_root = resolve_task_root()
+    repo_root = task_root.parents[1]
+    candidates = [
+        raw or "",
+        str(repo_root / "experiments" / "tools" / "bin" / "bindash"),
+        "bindash",
+    ]
+    for candidate in candidates:
+        if not candidate:
+            continue
+        path = Path(candidate)
+        if path.is_absolute():
+            if path.exists() and os.access(path, os.X_OK):
+                return str(path)
+            continue
+        repo_relative = (repo_root / candidate).resolve()
+        if repo_relative.exists() and os.access(repo_relative, os.X_OK):
+            return str(repo_relative)
+        if path.exists() and os.access(path, os.X_OK):
+            return str(path.resolve())
+    return raw or "bindash"
 
 
 def run_cmd(cmd: str, capture: bool = True) -> str:
@@ -76,7 +101,7 @@ def main() -> None:
         raise SystemExit(f"missing inputs: {db_list} / {q_list}")
 
     b = cfg.get("bindash", {})
-    binpath = b.get("bindash_bin", "bindash")
+    binpath = resolve_bindash_bin(b.get("bindash_bin"))
     k = int(b.get("kmerlen", 64))
     ss, _, bb = resolve_bindash_sketch_params(b)
     th = int(b.get("threads", 1))
