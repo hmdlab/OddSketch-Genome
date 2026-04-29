@@ -10,14 +10,28 @@ OddSketch itself lives under `src/` and can be built and used independently. Ben
 
 ## Requirements
 - C++17 compiler
-- Python 3.8+
+- Python 3.10+
 - `uv sync` recommended
 - BinDash only if you want comparison runs
+
+## BinDash Setup
+On Linux/HPC, this repository expects BinDash to live at `experiments/tools/bin/bindash`.
+The following script clones BinDash, checks out `v2.6`, builds it, and installs the binary there.
+
+```bash
+bash scripts/bootstrap.sh
+```
+
+You can override the tag if needed.
+
+```bash
+BINDASH_TAG=v2.6 bash scripts/bootstrap.sh
+```
 
 ## Build OddSketch
 ```bash
 cd src
-make
+make CXX=g++ LDFLAGS=-lstdc++fs
 ```
 
 This builds:
@@ -63,6 +77,8 @@ Generated files:
 Default outputs are written under `experiments/search_task/outputs/default/`. Override with `paths.outdir` in `experiments/search_task/config.json`.
 
 ```bash
+bash scripts/bootstrap.sh
+make -C src CXX=g++ LDFLAGS=-lstdc++fs
 cd experiments/search_task
 uv run python scripts/project_runner.py --config config.json
 ```

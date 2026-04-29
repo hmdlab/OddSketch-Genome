@@ -10,6 +10,8 @@
 
 ## 基本手順
 ```bash
+bash ../../scripts/bootstrap.sh
+bash -lc 'cd ../../src && make CXX=g++ LDFLAGS=-lstdc++fs'
 cd experiments/search_task
 uv run python scripts/project_runner.py --config config.json
 ```
@@ -60,6 +62,7 @@ uv run python scripts/repeat_runner.py --config config.json --runs 10 --seed-bas
   - OddSketch に渡す positional sampling mode です。
 - `bindash.bindash_bin`
   - BinDash 実行ファイルの名前またはパスです。
+  - 既定では `experiments/tools/bin/bindash` を優先して探し、なければ `PATH` 上の `bindash` を使います。
 - `bindash.enabled`
   - BinDash の検索と評価を実行するかどうかです。
   - `false` にすると OddSketch のみで実験します。
@@ -86,6 +89,7 @@ uv run python scripts/repeat_runner.py --config config.json --runs 10 --seed-bas
 - `data/manifests/db_genome_paths.txt`, `data/manifests/query_genome_paths.txt`
 - `data/manifests/cluster_map.tsv`, `data/manifests/genome_mutations.tsv`
 - `intermediate/oddsketch/`, `intermediate/bindash/`
+  - OddSketch では query / DB の sketch と、それぞれの path list を使って二部比較を 1 回実行します。
 - `results/truth/exact_query_db_jaccard.tsv`
 - `results/truth/exact_top1_neighbors.tsv`
 - `results/oddsketch/oddsketch_query_db_jaccard.tsv`

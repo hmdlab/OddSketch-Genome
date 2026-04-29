@@ -10,6 +10,8 @@ This task generates clustered synthetic genomes, builds a genome DB, and compare
 
 ## Quick Start
 ```bash
+bash ../../scripts/bootstrap.sh
+bash -lc 'cd ../../src && make CXX=g++ LDFLAGS=-lstdc++fs'
 cd experiments/search_task
 uv run python scripts/project_runner.py --config config.json
 ```
@@ -60,6 +62,7 @@ With the default config, the latest resolved config is also written to `outputs/
   - Positional sampling mode passed to OddSketch.
 - `bindash.bindash_bin`
   - BinDash executable name or path.
+  - By default, the workflow first looks for `experiments/tools/bin/bindash`, then falls back to `bindash` on `PATH`.
 - `bindash.enabled`
   - Whether BinDash search and evaluation are executed.
   - Set `false` to run OddSketch-only experiments.
@@ -86,6 +89,7 @@ Default root: `outputs/default/`
 - `data/manifests/db_genome_paths.txt`, `data/manifests/query_genome_paths.txt`
 - `data/manifests/cluster_map.tsv`, `data/manifests/genome_mutations.tsv`
 - `intermediate/oddsketch/`, `intermediate/bindash/`
+  - OddSketch runs one bipartite query-vs-DB comparison using the generated sketch files and their path lists.
 - `results/truth/exact_query_db_jaccard.tsv`
 - `results/truth/exact_top1_neighbors.tsv`
 - `results/oddsketch/oddsketch_query_db_jaccard.tsv`

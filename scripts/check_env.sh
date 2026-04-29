@@ -6,7 +6,12 @@ command -v uv >/dev/null
 uv --version
 
 echo "[check] bindash"
-if command -v bindash >/dev/null 2>&1; then
+REPO_ROOT=$(cd "$(dirname "$0")/.." && pwd)
+REPO_BINDASH="${REPO_ROOT}/experiments/tools/bin/bindash"
+if [[ -x "${REPO_BINDASH}" ]]; then
+  "${REPO_BINDASH}" --version >/dev/null 2>&1 || "${REPO_BINDASH}" --help >/dev/null 2>&1 || true
+  echo "bindash: ok (${REPO_BINDASH})"
+elif command -v bindash >/dev/null 2>&1; then
   bindash --version >/dev/null 2>&1 || bindash --help >/dev/null 2>&1 || true
   echo "bindash: ok"
 else
