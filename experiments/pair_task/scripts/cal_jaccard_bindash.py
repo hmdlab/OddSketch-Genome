@@ -82,17 +82,19 @@ def run_cmd(cmd: str, capture: bool = True) -> str:
     return process.stdout if capture else ""
 
 
-def resolve_bindash_sketch_params(cfg: dict) -> tuple[int, int]:
+def resolve_bindash_sketch_params(cfg: dict) -> tuple[int, int, int]:
     bbits = int(cfg.get("bbits", 16))
+    if bbits <= 0:
+        raise SystemExit("bindash.bbits must be positive")
     if "sketch_size" in cfg:
-        sketch_size = int(cfg["sketch_size"])
+        target_bits = int(cfg["sketch_size"])
     else:
-        sketch_size = 64 * int(cfg.get("sketchsize64", 32))
-    if sketch_size <= 0:
+        target_bits = 64 * int(cfg.get("sketchsize64", 32)) * bbits
+    if target_bits <= 0:
         raise SystemExit("bindash.sketch_size must be positive")
-    sketchsize64 = math.ceil(sketch_size / 64)
-    effective_sketch_size = 64 * sketchsize64
-    return effective_sketch_size, bbits
+    sketchsize64 = max(1, math.ceil(target_bits / (64 * bbits)))
+    effective_bits = 64 * sketchsize64 * bbits
+    return sketchsize64, effective_bits, bbits
 
 
 def main() -> None:
@@ -116,8 +118,7 @@ def main() -> None:
     threads = int(cfg.get("threads", 8))
     mode = cfg.get("mode", "sketch_dist")
     kmerlen = int(cfg.get("kmerlen", 64))
-    sketch_size, bbits = resolve_bindash_sketch_params(cfg)
-    sketchsize64 = math.ceil(sketch_size / 64)
+    sketchsize64, _, bbits = resolve_bindash_sketch_params(cfg)
     pair_cmd = cfg.get("pair_cmd", "{bin} exact --nthreads={threads} {f1} {f2}")
 
     pairs = read_pair_info(pair_info)

@@ -72,8 +72,8 @@ uv run python analysis/compute_rmse.py \
   - BinDash execution mode. The current default is `sketch_dist`.
 - `bindash.kmerlen`, `bindash.sketch_size`, `bindash.bbits`
   - Main BinDash sketch parameters.
-  - `sketch_size` is the requested number of bins.
-  - Internally the script converts this to BinDash's `--sketchsize64`, so the effective size is rounded up to a multiple of 64 bins.
+  - `sketch_size` is interpreted as the target total sketch size in bits.
+  - Internally the script converts this to BinDash's `--sketchsize64` by dividing by `64 * bbits`, so the effective memory is rounded up to the nearest `64 * bbits` bits.
 - `bindash.pair_cmd`
   - Command template used when evaluating one genome pair with BinDash.
 

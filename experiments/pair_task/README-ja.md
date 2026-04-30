@@ -72,8 +72,8 @@ uv run python analysis/compute_rmse.py \
   - BinDash の実行モードです。現在の既定値は `sketch_dist` です。
 - `bindash.kmerlen`, `bindash.sketch_size`, `bindash.bbits`
   - BinDash の主要な sketch パラメータです。
-  - `sketch_size` は指定したいビン数です。
-  - 内部では BinDash の `--sketchsize64` に変換するため、実効値は 64 ビン単位に切り上がります。
+  - `sketch_size` はスケッチ全体の目標 bit 数として解釈されます。
+  - 内部では `64 * bbits` で割って BinDash の `--sketchsize64` に変換するため、実効メモリは `64 * bbits` bit 単位に切り上がります。
 - `bindash.pair_cmd`
   - 1 ペア評価時に使う BinDash コマンドテンプレートです。
 

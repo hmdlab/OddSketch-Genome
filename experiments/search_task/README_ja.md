@@ -65,8 +65,8 @@ uv run python scripts/repeat_runner.py --config config.json --runs 10 --seed-bas
   - `false` にすると OddSketch のみで実験します。
 - `bindash.kmerlen`, `bindash.sketch_size`, `bindash.bbits`
   - BinDash の主要な sketch パラメータです。
-  - `sketch_size` は指定したいビン数です。
-  - 内部では BinDash の `--sketchsize64` に変換するため、実効値は 64 ビン単位に切り上がります。
+  - `sketch_size` はスケッチ全体の目標 bit 数として解釈されます。
+  - 内部では `64 * bbits` で割って BinDash の `--sketchsize64` に変換するため、実効メモリは `64 * bbits` bit 単位に切り上がります。
 - `bindash.threads`
   - BinDash のスレッド数です。
 

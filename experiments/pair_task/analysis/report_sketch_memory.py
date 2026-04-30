@@ -41,14 +41,18 @@ def human(num_bytes: int) -> str:
     return f"{value:.1f}TB"
 
 
-def resolve_bindash_sketch_size(bindash_cfg: dict) -> int:
-    if "sketch_size" in bindash_cfg:
-        sketch_size = int(bindash_cfg["sketch_size"])
-    else:
-        sketch_size = 64 * int(bindash_cfg.get("sketchsize64", 32))
-    if sketch_size <= 0:
+def resolve_bindash_total_bits(bindash_cfg: dict) -> int:
+    bbits = int(bindash_cfg.get("bbits", 16))
+    if bbits <= 0:
         return 0
-    return 64 * math.ceil(sketch_size / 64)
+    if "sketch_size" in bindash_cfg:
+        target_bits = int(bindash_cfg["sketch_size"])
+    else:
+        target_bits = 64 * int(bindash_cfg.get("sketchsize64", 32)) * bbits
+    if target_bits <= 0:
+        return 0
+    sketchsize64 = max(1, math.ceil(target_bits / (64 * bbits)))
+    return 64 * sketchsize64 * bbits
 
 
 def main() -> None:
@@ -64,8 +68,8 @@ def main() -> None:
     odd_total = sum(path.stat().st_size for path in odd_files)
 
     bindash_cfg = cfg.get("bindash", {})
-    n_hash = resolve_bindash_sketch_size(bindash_cfg)
-    bindash_theoretical = (n_hash * int(bindash_cfg.get("bbits", 16))) // 8
+    bindash_total_bits = resolve_bindash_total_bits(bindash_cfg)
+    bindash_theoretical = bindash_total_bits // 8
     bindash_files = sorted(results_dir.glob("bindash_sketch*"))
     bindash_total = sum(path.stat().st_size for path in bindash_files)
 
