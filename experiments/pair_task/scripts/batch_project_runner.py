@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 
+from __future__ import annotations
+
 import argparse
+import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 
@@ -68,11 +72,68 @@ def run(cmd: list[str]) -> int:
     return completed.returncode
 
 
+def resolve_jobs(raw_jobs: int | None) -> int:
+    if raw_jobs is not None:
+        return max(1, raw_jobs)
+    for name in ("PAIR_TASK_JOBS", "NSLOTS"):
+        raw = os.environ.get(name)
+        if not raw:
+            continue
+        try:
+            value = int(raw)
+        except ValueError:
+            continue
+        if value > 0:
+            return value
+    return 1
+
+
+def run_configs(
+    config_paths: list[Path],
+    project_runner: Path,
+    jobs: int,
+    continue_on_error: bool,
+) -> list[tuple[Path, int]]:
+    failures: list[tuple[Path, int]] = []
+    pending = list(enumerate(config_paths, start=1))
+    active: list[tuple[int, Path, subprocess.Popen]] = []
+    total = len(config_paths)
+
+    while pending or active:
+        while pending and len(active) < jobs:
+            index, config_path = pending.pop(0)
+            cmd = [sys.executable, str(project_runner), "--config", str(config_path)]
+            print(f"\n=== Config {index}/{total} ===")
+            print(f"[config] {display_path(config_path)}")
+            print("[run]", display_cmd(cmd))
+            active.append((index, config_path, subprocess.Popen(cmd)))
+
+        made_progress = False
+        for item in list(active):
+            index, config_path, process = item
+            exit_code = process.poll()
+            if exit_code is None:
+                continue
+            active.remove(item)
+            made_progress = True
+            print(f"[done] Config {index}/{total}: exit={exit_code} {display_path(config_path)}")
+            if exit_code != 0:
+                failures.append((config_path, exit_code))
+                if not continue_on_error:
+                    pending.clear()
+
+        if active and not made_progress:
+            time.sleep(0.5)
+
+    return failures
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("configs", nargs="*", help="Config JSON paths to run")
     ap.add_argument("--config-dir", default=None, help="Directory containing config JSON files")
     ap.add_argument("--pattern", default="*.json", help="Glob pattern used with --config-dir")
+    ap.add_argument("--jobs", type=int, default=None, help="Number of config runs to execute concurrently")
     ap.add_argument("--continue-on-error", action="store_true", help="Keep running later configs after a failure")
     args = ap.parse_args()
 
@@ -80,16 +141,10 @@ def main() -> None:
     scripts_dir = Path(__file__).resolve().parent
     project_runner = scripts_dir / "project_runner.py"
     config_paths = collect_config_paths(args.configs, args.config_dir, args.pattern)
+    jobs = min(resolve_jobs(args.jobs), len(config_paths))
 
-    failures: list[tuple[Path, int]] = []
-    for index, config_path in enumerate(config_paths, start=1):
-        print(f"\n=== Config {index}/{len(config_paths)} ===")
-        print(f"[config] {display_path(config_path)}")
-        exit_code = run([sys.executable, str(project_runner), "--config", str(config_path)])
-        if exit_code != 0:
-            failures.append((config_path, exit_code))
-            if not args.continue_on_error:
-                break
+    print(f"[batch] configs={len(config_paths)} jobs={jobs}")
+    failures = run_configs(config_paths, project_runner, jobs, args.continue_on_error)
 
     if failures:
         print("\n=== Failed Configs ===")

@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 
+from __future__ import annotations
+
 import argparse
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime
@@ -64,13 +67,16 @@ def resolve_output_root(task_root: Path, cfg: dict) -> Path:
 
 
 def allocate_run_dir(base_outdir: Path, prefix: str = "run") -> Path:
-    stamp = datetime.now().strftime(f"{prefix}_%Y%m%d_%H%M%S")
-    candidate = base_outdir / stamp
-    suffix = 1
-    while candidate.exists():
-        candidate = base_outdir / f"{stamp}_{suffix:02d}"
-        suffix += 1
-    return candidate
+    for attempt in range(1000):
+        stamp = datetime.now().strftime(f"{prefix}_%Y%m%d_%H%M%S_%f")
+        suffix = f"_{attempt:03d}" if attempt else ""
+        candidate = base_outdir / f"{stamp}_{os.getpid()}{suffix}"
+        try:
+            candidate.mkdir()
+            return candidate
+        except FileExistsError:
+            continue
+    raise SystemExit(f"could not allocate unique run directory under {base_outdir}")
 
 
 def prepare_run_config(cfg_path: Path) -> tuple[Path, Path]:
