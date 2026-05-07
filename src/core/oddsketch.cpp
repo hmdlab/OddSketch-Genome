@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -34,6 +35,7 @@ struct CliArgs {
     std::string mode;
     std::string qlist_path;
     std::string dblist_path;
+    std::string pairlist_path;
     OddsketchOptions options;
 };
 
@@ -63,6 +65,11 @@ struct Sketch {
     uint64_t bit_size = 0;
     uint64_t k_buckets = 0;
     double j0 = 0.75;
+};
+
+struct SketchPair {
+    std::string left;
+    std::string right;
 };
 
 struct UnivHash {
@@ -453,6 +460,36 @@ std::vector<std::string> read_paths_from_list_file(const std::string& list_path)
     return read_nonempty_lines(ifs);
 }
 
+std::vector<SketchPair> read_pairs_from_pairlist_file(const std::string& pairlist_path) {
+    std::ifstream ifs(pairlist_path);
+    if (!ifs) {
+        throw std::runtime_error("Cannot open pairlist file: " + pairlist_path);
+    }
+
+    std::vector<SketchPair> pairs;
+    std::string line;
+    size_t lineno = 0;
+    while (std::getline(ifs, line)) {
+        ++lineno;
+        if (line.empty()) {
+            continue;
+        }
+
+        const auto tab = line.find('\t');
+        if (tab == std::string::npos) {
+            throw std::runtime_error("Invalid pairlist line " + std::to_string(lineno) + ": expected two tab-separated paths");
+        }
+
+        const std::string left = line.substr(0, tab);
+        const std::string right = line.substr(tab + 1);
+        if (left.empty() || right.empty() || right.find('\t') != std::string::npos) {
+            throw std::runtime_error("Invalid pairlist line " + std::to_string(lineno) + ": expected exactly two tab-separated paths");
+        }
+        pairs.push_back({left, right});
+    }
+    return pairs;
+}
+
 const char* pos_mode_name(PosMode pos_mode) {
     switch (pos_mode) {
         case PosMode::Value:
@@ -503,6 +540,35 @@ void run_dist_bipartite(const std::vector<std::string>& qpaths,
             const double d = jaccard_distance(qsketches[qi], dbsketches[di], options);
             std::cout << qpaths[qi] << '\t' << dbpaths[di] << '\t' << d << "\n";
         }
+    }
+}
+
+void run_dist_pairlist(const std::vector<SketchPair>& pairs, const OddsketchOptions& options) {
+    std::unordered_map<std::string, Sketch> cache;
+    cache.reserve(pairs.size() * 2);
+
+    for (const auto& pair : pairs) {
+        if (cache.find(pair.left) == cache.end()) {
+            cache.emplace(pair.left, load_sketch(pair.left));
+        }
+        if (cache.find(pair.right) == cache.end()) {
+            cache.emplace(pair.right, load_sketch(pair.right));
+        }
+    }
+
+    if (!pairs.empty()) {
+        const auto& s0 = cache.at(pairs.front().left);
+        const uint64_t nbits = s0.bit_size ? s0.bit_size : static_cast<uint64_t>(s0.words.size() * 64);
+        std::cerr << "[oddsketch] dist(pairlist): nbits=" << nbits
+                  << ", pairs=" << pairs.size()
+                  << ", unique_sketches=" << cache.size()
+                  << ", kbuckets(header)=" << s0.k_buckets
+                  << ", j0(current)=" << std::fixed << std::setprecision(6) << options.j0 << "\n";
+    }
+
+    for (const auto& pair : pairs) {
+        const double d = jaccard_distance(cache.at(pair.left), cache.at(pair.right), options);
+        std::cout << pair.left << '\t' << pair.right << '\t' << d << "\n";
     }
 }
 
@@ -591,6 +657,8 @@ CliArgs parse_options(int argc, char** argv) {
             args.qlist_path = value;
         } else if (key == "dblist") {
             args.dblist_path = value;
+        } else if (key == "pairlist") {
+            args.pairlist_path = value;
         } else if (key == "kmer" || key == "kmerlen") {
             set_kmer(args.options, value);
         } else if (key == "sketch-size") {
@@ -619,12 +687,16 @@ int oddsketch_cli_main(int argc, char** argv) {
     }
 
     if (args.mode != "sketch" && args.mode != "dist") {
-        std::cerr << "Usage: oddsketch {sketch|dist} [--kmer=N] [--sketch-size=M] [--canonical=0|1] [--pos-mode=value|mix|stripe] [--j0=F] [--qlist=queries.txt --dblist=db.txt]\n";
+        std::cerr << "Usage: oddsketch {sketch|dist} [--kmer=N] [--sketch-size=M] [--canonical=0|1] [--pos-mode=value|mix|stripe] [--j0=F] [--qlist=queries.txt --dblist=db.txt] [--pairlist=pairs.tsv]\n";
         return 1;
     }
     if ((args.qlist_path.empty() && !args.dblist_path.empty()) ||
         (!args.qlist_path.empty() && args.dblist_path.empty())) {
         std::cerr << "Usage error: --qlist and --dblist must be specified together\n";
+        return 1;
+    }
+    if (!args.pairlist_path.empty() && (!args.qlist_path.empty() || !args.dblist_path.empty())) {
+        std::cerr << "Usage error: --pairlist cannot be combined with --qlist/--dblist\n";
         return 1;
     }
 
@@ -657,6 +729,8 @@ int oddsketch_cli_main(int argc, char** argv) {
                 read_paths_from_list_file(args.dblist_path),
                 args.options
             );
+        } else if (!args.pairlist_path.empty()) {
+            run_dist_pairlist(read_pairs_from_pairlist_file(args.pairlist_path), args.options);
         } else {
             run_dist_all_vs_all(read_paths_from_stdin(), args.options);
         }

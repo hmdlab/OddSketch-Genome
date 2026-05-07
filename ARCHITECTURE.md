@@ -12,13 +12,19 @@
 
 2) スケッチ生成（sketch）
 - 入力: `.fna/.fna.gz` のパスを列挙したリストファイル（標準入力）
-- 実行: `oddsketch sketch --threads N --out <prefix>`
-- 出力: `<prefix>` 配下または同ディレクトリにバイナリ `.sketch` 群
+- 実行: `oddsketch sketch`
+- 出力: 各入力パスに対応する `<input>.sketch`
 
 3) 距離計算（dist）
-- 入力: `.sketch` のパスを列挙したリストファイル（標準入力）
-- 実行: `oddsketch dist --threads N`
-- 出力: 標準出力に TSV（全ペアの距離/近似類似度）
+- 入力:
+  - all-to-all: `.sketch` のパスを列挙したリスト（標準入力）
+  - bipartite: `--qlist` と `--dblist`
+  - pairlist: 2 列 TSV の `--pairlist`
+- 実行:
+  - `oddsketch dist`
+  - `oddsketch dist --qlist queries.txt --dblist db.txt`
+  - `oddsketch dist --pairlist pairs.tsv`
+- 出力: 標準出力に TSV（`sketch1<TAB>sketch2<TAB>jaccard_estimate`）
 
 ```
 assembly_summary.txt ──> refgenomes.list ──> .sketch 群 ──> dist.tsv
@@ -32,15 +38,19 @@ assembly_summary.txt ──> refgenomes.list ──> .sketch 群 ──> dist.ts
 - 大容量データはコミットしない。パスは `.list`/`.sketch` で参照。
 
 ## 並列化と性能
-- `oddsketch` は OpenMP によりマルチスレッド化。`--threads` で制御。
+- 現在の `oddsketch` は単一スレッド実装。
+- `sketch` は入力ファイル単位、`dist` は query / pair 単位で並列化しやすい構造に整理している。
 - 再現性のため、比較時はスレッド数・CPU/メモリ・I/O 環境を PR 説明に明記。
 
 ## 入出力の要点
-- リスト形式: 1 行 1 パス（絶対/相対どちらも可）。標準入力で渡す。
+- リスト形式: 1 行 1 パス（絶対/相対どちらも可）。all-to-all / sketch では標準入力で渡す。
+- pairlist 形式: 1 行 2 パス、タブ区切り。
 - 出力 TSV: タブ区切り。必要に応じて先頭数行をサンプルとして共有。
 - 例:
-  - `cd src && ./oddpipe.py sketch --list refgenomes.list --threads 8 --out refgenomes.sketch`
-  - `cd src && ./oddpipe.py dist --list refgenomes.sketch --threads 8 > refgenomes.dist.tsv`
+  - `cat refgenomes.list | ./src/oddsketch sketch`
+  - `cat refgenomes.sketch.list | ./src/oddsketch dist > refgenomes.dist.tsv`
+  - `./src/oddsketch dist --qlist queries.sketch.list --dblist db.sketch.list > query_db.dist.tsv`
+  - `./src/oddsketch dist --pairlist pairs.tsv > pairwise.dist.tsv`
 
 ## 拡張ポイント
 - 前処理/取得: `download` 段階でフィルタやミラー取得スクリプトを差し替え可能。

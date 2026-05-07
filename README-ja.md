@@ -42,6 +42,16 @@ make CXX=g++ LDFLAGS=-lstdc++fs
 `experiments/tools/bin/true_jaccard` と `experiments/tools/bin/true_index_pairs` は実験ワークフロー用の補助バイナリであり、OddSketch 本体 CLI そのものではありません。
 ソースは `experiments/tools/src/` にあります。
 
+CLI の基本例:
+
+```bash
+printf '%s\n' genome_001.fna genome_002.fna | src/oddsketch sketch
+printf '%s\n' genome_001.fna.sketch genome_002.fna.sketch | src/oddsketch dist
+src/oddsketch dist --pairlist sketch_pairs.tsv
+```
+
+`--pairlist` は、1 行に 1 組の sketch path をタブ区切りで書いたファイルを受け取ります。
+
 ## pair_task
 既定では `experiments/pair_task/outputs/default/` 以下に入出力します。別の場所を使いたい場合は `experiments/pair_task/config.json` の `paths.outdir` を変更するか、生成ステップで `--outdir` を指定してください。
 

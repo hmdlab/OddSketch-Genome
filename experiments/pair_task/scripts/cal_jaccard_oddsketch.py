@@ -69,33 +69,31 @@ def resolve_oddsketch_bin() -> str:
     return "oddsketch"
 
 
-def run_oddsketch_sketch(genome_files: list[str], cfg: dict) -> list[str]:
+def build_oddsketch_base_cmd(subcommand: str, cfg: dict) -> list[str]:
     oddcfg = cfg.get("oddsketch", {}) if isinstance(cfg, dict) else {}
-    kmer = oddcfg.get("kmerlen", 64)
-    ssize = oddcfg.get("sketch_size", 8192)
-    j0 = oddcfg.get("j0", 0.75)
-    pos_mode = oddcfg.get("pos_mode", "mix")
+    cmd = [
+        resolve_oddsketch_bin(),
+        subcommand,
+        f"--kmer={oddcfg.get('kmerlen', 64)}",
+        f"--sketch-size={oddcfg.get('sketch_size', 8192)}",
+        f"--j0={oddcfg.get('j0', 0.75)}",
+        f"--pos-mode={oddcfg.get('pos_mode', 'mix')}",
+    ]
     canonical = oddcfg.get("canonical")
+    if canonical is not None:
+        cmd.append(f"--canonical={1 if canonical else 0}")
+    return cmd
 
+
+def run_oddsketch_sketch(genome_files: list[str], cfg: dict) -> list[str]:
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
         for genome_file in genome_files:
             f.write(f"{genome_file}\n")
         temp_path_file = f.name
 
-    cmd = [
-        resolve_oddsketch_bin(),
-        "sketch",
-        f"--kmer={kmer}",
-        f"--sketch-size={ssize}",
-        f"--j0={j0}",
-        f"--pos-mode={pos_mode}",
-    ]
-    if canonical is not None:
-        cmd.append(f"--canonical={1 if canonical else 0}")
-
     try:
         result = subprocess.run(
-            cmd,
+            build_oddsketch_base_cmd("sketch", cfg),
             stdin=open(temp_path_file, "r"),
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
@@ -109,54 +107,69 @@ def run_oddsketch_sketch(genome_files: list[str], cfg: dict) -> list[str]:
         os.unlink(temp_path_file)
 
 
-def run_oddsketch_dist(sketch_files: list[str], cfg: dict) -> list[dict]:
-    oddcfg = cfg.get("oddsketch", {}) if isinstance(cfg, dict) else {}
-    kmer = oddcfg.get("kmerlen", 64)
-    ssize = oddcfg.get("sketch_size", 8192)
-    j0 = oddcfg.get("j0", 0.75)
-    pos_mode = oddcfg.get("pos_mode", "mix")
-    canonical = oddcfg.get("canonical")
-
-    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
-        for sketch_file in sketch_files:
-            f.write(f"{sketch_file}\n")
-        temp_sketch_file = f.name
-
-    cmd = [
-        resolve_oddsketch_bin(),
-        "dist",
-        f"--kmer={kmer}",
-        f"--sketch-size={ssize}",
-        f"--j0={j0}",
-        f"--pos-mode={pos_mode}",
-    ]
-    if canonical is not None:
-        cmd.append(f"--canonical={1 if canonical else 0}")
+def run_oddsketch_dist_pairlist(pairlist_path: Path, cfg: dict) -> list[dict]:
+    cmd = build_oddsketch_base_cmd("dist", cfg)
+    cmd.append(f"--pairlist={pairlist_path}")
 
     try:
         result = subprocess.run(
             cmd,
-            stdin=open(temp_sketch_file, "r"),
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
             check=True,
         )
-        distances = []
-        for line in result.stdout.splitlines():
-            parts = line.strip().split("\t")
-            if len(parts) == 3:
-                file1, file2, jaccard_dist = parts
-                distances.append({
-                    "file1": file1,
-                    "file2": file2,
-                    "jaccard_estimate": float(jaccard_dist),
-                })
-        return distances
     except subprocess.CalledProcessError:
         return []
-    finally:
-        os.unlink(temp_sketch_file)
+
+    distances = []
+    for line in result.stdout.splitlines():
+        parts = line.strip().split("\t")
+        if len(parts) == 3:
+            file1, file2, jaccard_dist = parts
+            distances.append({
+                "file1": file1,
+                "file2": file2,
+                "jaccard_estimate": float(jaccard_dist),
+            })
+    return distances
+
+
+def read_pair_info(pair_info_file: Path) -> list[dict]:
+    pairs = []
+    with pair_info_file.open("r") as f:
+        next(f, None)
+        for line in f:
+            parts = line.strip().split("\t")
+            if len(parts) != 5:
+                continue
+            pair_id, file1, file2, mutation_count, genome_length = parts
+            pairs.append({
+                "pair_id": int(pair_id),
+                "file1": file1,
+                "file2": file2,
+                "mutation_count": int(mutation_count),
+                "genome_length": int(genome_length),
+            })
+    return pairs
+
+
+def unique_genome_files(pairs: list[dict]) -> list[str]:
+    seen = set()
+    genomes = []
+    for pair in pairs:
+        for key in ("file1", "file2"):
+            path = pair[key]
+            if path not in seen:
+                seen.add(path)
+                genomes.append(path)
+    return genomes
+
+
+def write_pairlist_file(pairlist_path: Path, pairs: list[dict], sketch_map: dict[str, str]) -> None:
+    with pairlist_path.open("w") as f:
+        for pair in pairs:
+            f.write(f"{sketch_map[pair['file1']]}\t{sketch_map[pair['file2']]}\n")
 
 
 def main() -> None:
@@ -182,31 +195,40 @@ def main() -> None:
     print(f"入力: {pair_info_file}")
     print(f"結果出力: {output_file}")
 
+    pairs = read_pair_info(pair_info_file)
+    genome_files = unique_genome_files(pairs)
+    sketch_files = run_oddsketch_sketch(genome_files, cfg)
+    if len(sketch_files) != len(genome_files):
+        raise SystemExit(
+            f"oddsketch sketch failed or returned an unexpected number of files: "
+            f"expected {len(genome_files)}, got {len(sketch_files)}"
+        )
+
+    sketch_map = dict(zip(genome_files, sketch_files))
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".tsv") as f:
+        pairlist_path = Path(f.name)
+    try:
+        write_pairlist_file(pairlist_path, pairs, sketch_map)
+        distances = run_oddsketch_dist_pairlist(pairlist_path, cfg)
+    finally:
+        os.unlink(pairlist_path)
+
+    if len(distances) != len(pairs):
+        raise SystemExit(
+            f"oddsketch dist failed or returned an unexpected number of rows: "
+            f"expected {len(pairs)}, got {len(distances)}"
+        )
+
     results = []
-    with pair_info_file.open("r") as f:
-        next(f, None)
-        for line in f:
-            parts = line.strip().split("\t")
-            if len(parts) != 5:
-                continue
-            pair_id, file1, file2, mutation_count, genome_length = parts
-            try:
-                sketch_files = run_oddsketch_sketch([file1, file2], cfg)
-                if len(sketch_files) != 2:
-                    continue
-                distances = run_oddsketch_dist(sketch_files, cfg)
-                if len(distances) != 1:
-                    continue
-                results.append({
-                    "pair_id": int(pair_id),
-                    "mutation_count": int(mutation_count),
-                    "genome_length": int(genome_length),
-                    "jaccard_estimate": distances[0]["jaccard_estimate"],
-                    "sketch_file1": sketch_files[0],
-                    "sketch_file2": sketch_files[1],
-                })
-            except Exception:
-                continue
+    for pair, distance in zip(pairs, distances):
+        results.append({
+            "pair_id": pair["pair_id"],
+            "mutation_count": pair["mutation_count"],
+            "genome_length": pair["genome_length"],
+            "jaccard_estimate": distance["jaccard_estimate"],
+            "sketch_file1": distance["file1"],
+            "sketch_file2": distance["file2"],
+        })
 
     with output_file.open("w") as f:
         f.write("pair_id\tmutation_count\tgenome_length\tjaccard_estimate\tsketch_file1\tsketch_file2\n")
@@ -239,13 +261,6 @@ def main() -> None:
                         truth["jaccard_true"],
                         result["jaccard_estimate"],
                     ])
-        print(f"比較CSVを書き出しました: {out_csv}")
-    else:
-        print(f"注意: 真値ファイルが見つからないため比較CSVを生成しません: {true_path}")
-
-    print("\n計算完了!")
-    print(f"処理ペア数: {len(results)}")
-    print(f"結果ファイル: {output_file}")
 
 
 if __name__ == "__main__":

@@ -42,6 +42,16 @@ This builds:
 `experiments/tools/bin/true_jaccard` and `experiments/tools/bin/true_index_pairs` are experimental helper binaries used by the benchmark workflows, not part of the core OddSketch CLI surface.
 Their source files live in `experiments/tools/src/`.
 
+Core CLI examples:
+
+```bash
+printf '%s\n' genome_001.fna genome_002.fna | src/oddsketch sketch
+printf '%s\n' genome_001.fna.sketch genome_002.fna.sketch | src/oddsketch dist
+src/oddsketch dist --pairlist sketch_pairs.tsv
+```
+
+`--pairlist` expects a tab-separated file with one sketch pair per line.
+
 ## Pairwise Benchmark
 Default outputs are written under `experiments/pair_task/outputs/default/`. You can override the root output directory in `experiments/pair_task/config.json` via `paths.outdir`, or pass `--outdir` to the genome generation step.
 

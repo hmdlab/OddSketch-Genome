@@ -26,6 +26,10 @@ uv run python scripts/cal_jaccard_bindash.py --config config.json
 `project_runner.py` creates a unique run directory under the configured output root, saves the resolved config to `<run>/metadata/used_config.json`, and generates figures for that run.
 When you use the default config, it also updates `outputs/default/latest_used_config.json` so you can easily inspect the latest resolved config.
 
+OddSketch in this task now runs in batch mode:
+- `sketch`: one `oddsketch sketch` invocation over all unique genomes in `pair_info.txt`
+- `dist`: one `oddsketch dist --pairlist=...` invocation over the generated sketch pairs
+
 RMSE summary:
 
 ```bash
@@ -61,6 +65,7 @@ uv run python analysis/compute_rmse.py \
   - Positional sampling mode passed to OddSketch.
 - `oddsketch.canonical`
   - Whether canonical k-mers are used.
+  - The pair-task OddSketch script sketches each unique genome once and then evaluates only the requested pairs via `dist --pairlist`.
 - `bindash.bindash_bin`
   - BinDash executable name or path.
 - `bindash.enabled`

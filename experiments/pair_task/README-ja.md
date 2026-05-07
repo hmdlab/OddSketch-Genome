@@ -26,6 +26,10 @@ uv run python scripts/cal_jaccard_bindash.py --config config.json
 `project_runner.py` は、設定された出力ルート配下に run ごとのディレクトリを作り、その run で使った設定を `<run>/metadata/used_config.json` に保存し、図生成まで行います。
 既定設定では、最新の解決済み設定を `outputs/default/latest_used_config.json` にも保存します。
 
+この task の OddSketch は現在、次の一括処理で動きます。
+- `sketch`: `pair_info.txt` に含まれるユニークな genome 全体を 1 回の `oddsketch sketch` で sketch 化
+- `dist`: 生成された sketch pair を `oddsketch dist --pairlist=...` で一括評価
+
 RMSE 集計:
 
 ```bash
@@ -61,6 +65,7 @@ uv run python analysis/compute_rmse.py \
   - OddSketch に渡す positional sampling mode です。
 - `oddsketch.canonical`
   - canonical k-mer を使うかどうかです。
+  - pair_task の OddSketch script では、各 genome を 1 回だけ sketch し、必要な pair だけを `dist --pairlist` で評価します。
 - `bindash.bindash_bin`
   - BinDash 実行ファイルの名前またはパスです。
 - `bindash.enabled`
