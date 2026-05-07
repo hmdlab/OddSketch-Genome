@@ -45,9 +45,9 @@ make CXX=g++ LDFLAGS=-lstdc++fs
 CLI の基本例:
 
 ```bash
-printf '%s\n' genome_001.fna genome_002.fna | src/oddsketch sketch
-printf '%s\n' genome_001.fna.sketch genome_002.fna.sketch | src/oddsketch dist
-src/oddsketch dist --pairlist sketch_pairs.tsv
+printf '%s\n' genome_001.fna genome_002.fna | src/oddsketch sketch --threads=8
+printf '%s\n' genome_001.fna.sketch genome_002.fna.sketch | src/oddsketch dist --threads=8
+src/oddsketch dist --threads=8 --pairlist sketch_pairs.tsv
 ```
 
 `--pairlist` は、1 行に 1 組の sketch path をタブ区切りで書いたファイルを受け取ります。

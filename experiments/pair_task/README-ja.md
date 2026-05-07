@@ -57,6 +57,8 @@ uv run python analysis/compute_rmse.py \
   - 真値 Jaccard 計算で使う `k` です。
 - `oddsketch.kmerlen`
   - OddSketch で使う `k` です。
+- `oddsketch.threads`
+  - OddSketch の `sketch` / `dist` で使うスレッド数です。
 - `oddsketch.sketch_size`
   - OddSketch の sketch size です。
 - `oddsketch.j0`

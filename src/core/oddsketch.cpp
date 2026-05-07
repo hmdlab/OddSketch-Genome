@@ -2,17 +2,23 @@
 #include "third_party/xxhash.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <exception>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <mutex>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -29,6 +35,7 @@ struct OddsketchOptions {
     bool canonical = true;
     double j0 = 0.75;
     PosMode pos_mode = PosMode::Value;
+    size_t threads = 1;
 };
 
 struct CliArgs {
@@ -70,6 +77,11 @@ struct Sketch {
 struct SketchPair {
     std::string left;
     std::string right;
+};
+
+struct PairlistGroup {
+    std::string left;
+    std::vector<size_t> pair_indices;
 };
 
 struct UnivHash {
@@ -151,6 +163,64 @@ size_t compute_num_buckets(const OddsketchOptions& options) {
         ? static_cast<size_t>(std::max(1.0, std::round(static_cast<double>(options.sketch_size) / denom)))
         : options.sketch_size;
     return std::max<size_t>(1, floor_pow2(desired));
+}
+
+size_t normalize_thread_count(size_t requested_threads, size_t task_count) {
+    const size_t safe_threads = std::max<size_t>(1, requested_threads);
+    return task_count == 0 ? 1 : std::min(safe_threads, task_count);
+}
+
+template <typename Func>
+void run_in_parallel(size_t task_count, size_t requested_threads, Func&& func) {
+    const size_t worker_count = normalize_thread_count(requested_threads, task_count);
+    if (task_count == 0) {
+        return;
+    }
+    if (worker_count == 1) {
+        for (size_t i = 0; i < task_count; ++i) {
+            func(i);
+        }
+        return;
+    }
+
+    std::atomic<size_t> next_index{0};
+    std::atomic<bool> failed{false};
+    std::exception_ptr first_error;
+    std::mutex error_mutex;
+    std::vector<std::thread> workers;
+    workers.reserve(worker_count);
+
+    auto worker = [&]() {
+        while (!failed.load(std::memory_order_relaxed)) {
+            const size_t idx = next_index.fetch_add(1, std::memory_order_relaxed);
+            if (idx >= task_count) {
+                break;
+            }
+            try {
+                func(idx);
+            } catch (...) {
+                {
+                    std::lock_guard<std::mutex> lock(error_mutex);
+                    if (!first_error) {
+                        first_error = std::current_exception();
+                    }
+                }
+                failed.store(true, std::memory_order_relaxed);
+                break;
+            }
+        }
+    };
+
+    for (size_t i = 0; i < worker_count; ++i) {
+        workers.emplace_back(worker);
+    }
+    for (auto& thread : workers) {
+        thread.join();
+    }
+
+    if (first_error) {
+        std::rethrow_exception(first_error);
+    }
 }
 
 uint64_t pack_pair(uint32_t i, uint32_t attempt) {
@@ -490,6 +560,25 @@ std::vector<SketchPair> read_pairs_from_pairlist_file(const std::string& pairlis
     return pairs;
 }
 
+std::vector<PairlistGroup> group_pairs_by_left(const std::vector<SketchPair>& pairs) {
+    std::unordered_map<std::string, size_t> group_index_by_left;
+    std::vector<PairlistGroup> groups;
+    groups.reserve(pairs.size());
+
+    for (size_t i = 0; i < pairs.size(); ++i) {
+        const auto& left = pairs[i].left;
+        const auto found = group_index_by_left.find(left);
+        if (found == group_index_by_left.end()) {
+            const size_t new_group_index = groups.size();
+            group_index_by_left.emplace(left, new_group_index);
+            groups.push_back({left, {i}});
+        } else {
+            groups[found->second].pair_indices.push_back(i);
+        }
+    }
+    return groups;
+}
+
 const char* pos_mode_name(PosMode pos_mode) {
     switch (pos_mode) {
         case PosMode::Value:
@@ -508,16 +597,24 @@ void run_dist_all_vs_all(const std::vector<std::string>& paths, const OddsketchO
         const auto& s0 = sketches.front();
         const uint64_t nbits = s0.bit_size ? s0.bit_size : static_cast<uint64_t>(s0.words.size() * 64);
         std::cerr << "[oddsketch] dist(all-vs-all): nbits=" << nbits
+                  << ", threads=" << normalize_thread_count(options.threads, sketches.size())
                   << ", kbuckets(header)=" << s0.k_buckets
                   << ", j0(current)=" << std::fixed << std::setprecision(6) << options.j0 << "\n";
     }
 
-    for (size_t i = 0; i < sketches.size(); ++i) {
+    std::mutex output_mutex;
+    run_in_parallel(sketches.size(), options.threads, [&](size_t i) {
+        std::ostringstream chunk;
         for (size_t j = i + 1; j < sketches.size(); ++j) {
             const double d = jaccard_distance(sketches[i], sketches[j], options);
-            std::cout << paths[i] << '\t' << paths[j] << '\t' << d << "\n";
+            chunk << paths[i] << '\t' << paths[j] << '\t' << d << "\n";
         }
-    }
+        const std::string text = chunk.str();
+        if (!text.empty()) {
+            std::lock_guard<std::mutex> lock(output_mutex);
+            std::cout << text;
+        }
+    });
 }
 
 void run_dist_bipartite(const std::vector<std::string>& qpaths,
@@ -531,16 +628,24 @@ void run_dist_bipartite(const std::vector<std::string>& qpaths,
         std::cerr << "[oddsketch] dist(bipartite): nbits=" << nbits
                   << ", queries=" << qsketches.size()
                   << ", db=" << dbsketches.size()
+                  << ", threads=" << normalize_thread_count(options.threads, qsketches.size())
                   << ", kbuckets(header)=" << s0.k_buckets
                   << ", j0(current)=" << std::fixed << std::setprecision(6) << options.j0 << "\n";
     }
 
-    for (size_t qi = 0; qi < qsketches.size(); ++qi) {
+    std::mutex output_mutex;
+    run_in_parallel(qsketches.size(), options.threads, [&](size_t qi) {
+        std::ostringstream chunk;
         for (size_t di = 0; di < dbsketches.size(); ++di) {
             const double d = jaccard_distance(qsketches[qi], dbsketches[di], options);
-            std::cout << qpaths[qi] << '\t' << dbpaths[di] << '\t' << d << "\n";
+            chunk << qpaths[qi] << '\t' << dbpaths[di] << '\t' << d << "\n";
         }
-    }
+        const std::string text = chunk.str();
+        if (!text.empty()) {
+            std::lock_guard<std::mutex> lock(output_mutex);
+            std::cout << text;
+        }
+    });
 }
 
 void run_dist_pairlist(const std::vector<SketchPair>& pairs, const OddsketchOptions& options) {
@@ -556,19 +661,31 @@ void run_dist_pairlist(const std::vector<SketchPair>& pairs, const OddsketchOpti
         }
     }
 
+    const auto groups = group_pairs_by_left(pairs);
+
     if (!pairs.empty()) {
         const auto& s0 = cache.at(pairs.front().left);
         const uint64_t nbits = s0.bit_size ? s0.bit_size : static_cast<uint64_t>(s0.words.size() * 64);
         std::cerr << "[oddsketch] dist(pairlist): nbits=" << nbits
                   << ", pairs=" << pairs.size()
+                  << ", query_groups=" << groups.size()
+                  << ", threads=" << normalize_thread_count(options.threads, groups.size())
                   << ", unique_sketches=" << cache.size()
                   << ", kbuckets(header)=" << s0.k_buckets
                   << ", j0(current)=" << std::fixed << std::setprecision(6) << options.j0 << "\n";
     }
 
-    for (const auto& pair : pairs) {
-        const double d = jaccard_distance(cache.at(pair.left), cache.at(pair.right), options);
-        std::cout << pair.left << '\t' << pair.right << '\t' << d << "\n";
+    std::vector<double> results(pairs.size(), 0.0);
+    run_in_parallel(groups.size(), options.threads, [&](size_t group_index) {
+        const auto& group = groups[group_index];
+        const auto& left = cache.at(group.left);
+        for (const size_t pair_index : group.pair_indices) {
+            results[pair_index] = jaccard_distance(left, cache.at(pairs[pair_index].right), options);
+        }
+    });
+
+    for (size_t i = 0; i < pairs.size(); ++i) {
+        std::cout << pairs[i].left << '\t' << pairs[i].right << '\t' << results[i] << "\n";
     }
 }
 
@@ -635,6 +752,18 @@ void set_canonical(OddsketchOptions& options, const std::string& value) {
     }
 }
 
+void set_threads(OddsketchOptions& options, const std::string& value) {
+    if (value.empty()) {
+        return;
+    }
+
+    const size_t threads = static_cast<size_t>(std::stoul(value));
+    if (threads == 0) {
+        throw std::runtime_error("threads must be positive");
+    }
+    options.threads = threads;
+}
+
 CliArgs parse_options(int argc, char** argv) {
     CliArgs args;
     if (argc < 2) {
@@ -669,6 +798,8 @@ CliArgs parse_options(int argc, char** argv) {
             set_pos_mode(args.options, value);
         } else if (key == "canonical") {
             set_canonical(args.options, value);
+        } else if (key == "threads") {
+            set_threads(args.options, value);
         }
     }
 
@@ -687,7 +818,7 @@ int oddsketch_cli_main(int argc, char** argv) {
     }
 
     if (args.mode != "sketch" && args.mode != "dist") {
-        std::cerr << "Usage: oddsketch {sketch|dist} [--kmer=N] [--sketch-size=M] [--canonical=0|1] [--pos-mode=value|mix|stripe] [--j0=F] [--qlist=queries.txt --dblist=db.txt] [--pairlist=pairs.tsv]\n";
+        std::cerr << "Usage: oddsketch {sketch|dist} [--kmer=N] [--sketch-size=M] [--canonical=0|1] [--pos-mode=value|mix|stripe] [--j0=F] [--threads=N] [--qlist=queries.txt --dblist=db.txt] [--pairlist=pairs.tsv]\n";
         return 1;
     }
     if ((args.qlist_path.empty() && !args.dblist_path.empty()) ||
@@ -705,22 +836,28 @@ int oddsketch_cli_main(int argc, char** argv) {
             const auto paths = read_paths_from_stdin();
             std::cerr << "[oddsketch] sketch: nbits=" << args.options.sketch_size
                       << ", kbuckets=" << compute_num_buckets(args.options)
+                      << ", threads=" << normalize_thread_count(args.options.threads, paths.size())
                       << ", j0=" << std::fixed << std::setprecision(6) << args.options.j0
                       << ", canonical=" << (args.options.canonical ? "true" : "false")
                       << ", pos-mode=" << pos_mode_name(args.options.pos_mode)
                       << "\n";
 
             // sketch は 1 行 1 FASTA パスを stdin から受け取り、同名 .sketch を出力する。
-            for (const auto& path : paths) {
-                const SketchBuildResult sketch = make_odd_sketch_from_fasta(path, args.options);
+            std::vector<std::string> output_paths(paths.size());
+            run_in_parallel(paths.size(), args.options.threads, [&](size_t i) {
+                const SketchBuildResult sketch = make_odd_sketch_from_fasta(paths[i], args.options);
                 write_sketch_binary(
                     sketch.words,
-                    path + ".sketch",
+                    paths[i] + ".sketch",
                     static_cast<uint64_t>(args.options.sketch_size),
                     static_cast<uint64_t>(sketch.num_buckets),
                     args.options.j0
                 );
-                std::cout << path << ".sketch\n";
+                output_paths[i] = paths[i] + ".sketch";
+            });
+
+            for (const auto& output_path : output_paths) {
+                std::cout << output_path << "\n";
             }
         } else if (!args.qlist_path.empty()) {
             // qlist/dblist があれば二部比較、それ以外は stdin から全 pair 比較。

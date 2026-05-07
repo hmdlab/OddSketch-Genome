@@ -73,6 +73,8 @@ uv run python scripts/repeat_runner.py --config config.json --runs 10 --seed-bas
   - `cluster_local` では各クラスタごとに DB / query を分けて独立に検索し、最後に各クラスタ結果を縦結合して評価します。
 - `oddsketch.kmerlen`
   - OddSketch で使う `k` です。
+- `oddsketch.threads`
+  - OddSketch の sketch 生成と query-vs-DB 距離計算で使うスレッド数です。
 - `oddsketch.sketch_size`
   - OddSketch 検索で使う sketch size です。
 - `oddsketch.j0`

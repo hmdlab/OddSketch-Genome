@@ -73,6 +73,8 @@ The default `search_scope` is `cluster_local`, which treats each cluster as an i
   - `cluster_local` splits DB/query search by cluster, runs each cluster independently, and then concatenates cluster outputs for evaluation.
 - `oddsketch.kmerlen`
   - `k` used by OddSketch.
+- `oddsketch.threads`
+  - Number of threads used by OddSketch for sketch generation and query-vs-DB distance calculation.
 - `oddsketch.sketch_size`
   - Sketch size for OddSketch search.
 - `oddsketch.j0`

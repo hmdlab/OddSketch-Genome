@@ -16,6 +16,7 @@
     "outdir": "outputs/default"
   },
   "oddsketch": {
+    "threads": 8,
     "kmerlen": 64,
     "sketch_size": 8192,
     "j0": 0.90,

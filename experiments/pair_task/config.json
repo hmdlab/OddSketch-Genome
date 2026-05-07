@@ -13,6 +13,7 @@
     "kmerlen": 64
   },
   "oddsketch": {
+    "threads": 8,
     "kmerlen": 64,
     "sketch_size": 2048,
     "j0": 0.9,

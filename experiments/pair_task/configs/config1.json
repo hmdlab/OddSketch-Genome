@@ -4,7 +4,7 @@
   },
   "make_genomes": {
     "genome_length": 1000000,
-    "num_pairs": 1000,
+    "num_pairs": 100,
     "mutation_min": 10,
     "mutation_max": 5000,
     "seed_base": 2000
@@ -13,6 +13,7 @@
     "kmerlen": 64
   },
   "oddsketch": {
+    "threads": 8,
     "kmerlen": 64,
     "sketch_size": 2048,
     "j0": 0.9,
@@ -26,7 +27,7 @@
     "mode": "sketch_dist",
     "kmerlen": 64,
     "sketch_size": 2048,
-    "bbits": 16,
+    "bbits": 2,
     "pair_cmd": "{bin} exact --nthreads={threads} {f1} {f2}"
   }
 }

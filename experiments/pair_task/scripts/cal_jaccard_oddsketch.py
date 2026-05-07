@@ -78,6 +78,7 @@ def build_oddsketch_base_cmd(subcommand: str, cfg: dict) -> list[str]:
         f"--sketch-size={oddcfg.get('sketch_size', 8192)}",
         f"--j0={oddcfg.get('j0', 0.75)}",
         f"--pos-mode={oddcfg.get('pos_mode', 'mix')}",
+        f"--threads={oddcfg.get('threads', 1)}",
     ]
     canonical = oddcfg.get("canonical")
     if canonical is not None:

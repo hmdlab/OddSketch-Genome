@@ -45,9 +45,9 @@ Their source files live in `experiments/tools/src/`.
 Core CLI examples:
 
 ```bash
-printf '%s\n' genome_001.fna genome_002.fna | src/oddsketch sketch
-printf '%s\n' genome_001.fna.sketch genome_002.fna.sketch | src/oddsketch dist
-src/oddsketch dist --pairlist sketch_pairs.tsv
+printf '%s\n' genome_001.fna genome_002.fna | src/oddsketch sketch --threads=8
+printf '%s\n' genome_001.fna.sketch genome_002.fna.sketch | src/oddsketch dist --threads=8
+src/oddsketch dist --threads=8 --pairlist sketch_pairs.tsv
 ```
 
 `--pairlist` expects a tab-separated file with one sketch pair per line.

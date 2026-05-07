@@ -67,6 +67,7 @@ def run_oddsketch_sketch(list_path: Path, cfg: dict) -> list[str]:
         f"--sketch-size={odd.get('sketch_size', 2048)}",
         f"--j0={odd.get('j0', 0.90)}",
         f"--pos-mode={odd.get('pos_mode', 'mix')}",
+        f"--threads={odd.get('threads', 1)}",
     ]
     p = subprocess.run(cmd, stdin=open(list_path, "r"), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=True)
     return [line.strip() for line in p.stdout.splitlines() if line.strip()]
@@ -88,6 +89,7 @@ def run_oddsketch_dist_bipartite(query_list_path: Path, db_list_path: Path, cfg:
         f"--sketch-size={odd.get('sketch_size', 2048)}",
         f"--j0={odd.get('j0', 0.90)}",
         f"--pos-mode={odd.get('pos_mode', 'mix')}",
+        f"--threads={odd.get('threads', 1)}",
     ]
     p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=True)
     return [line for line in p.stdout.splitlines() if line.strip()]

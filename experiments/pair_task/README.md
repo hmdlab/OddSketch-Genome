@@ -57,6 +57,8 @@ uv run python analysis/compute_rmse.py \
   - `k` used for exact Jaccard calculation.
 - `oddsketch.kmerlen`
   - `k` used by OddSketch.
+- `oddsketch.threads`
+  - Number of threads used by OddSketch for both `sketch` and `dist`.
 - `oddsketch.sketch_size`
   - Sketch size for OddSketch estimation.
 - `oddsketch.j0`
