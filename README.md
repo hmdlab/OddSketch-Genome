@@ -6,6 +6,7 @@ OddSketch itself lives under `src/` and can be built and used independently. Ben
 - `src/`, `include/`: OddSketch implementation and CLI
 - `experiments/pair_task`: pairwise Jaccard benchmark on synthetic genome pairs
 - `experiments/search_task`: database search benchmark on clustered synthetic genomes
+- `experiments/refseq_sketch_task`: real RefSeq OddSketch database build benchmark
 - `experiments/tools/src/`, `experiments/tools/bin/`: experimental helper tools used by benchmarks
 
 ## Requirements
@@ -93,4 +94,26 @@ cd experiments/search_task
 uv run python scripts/project_runner.py --config config.json
 ```
 
-See `experiments/README.md`, `experiments/pair_task/README.md`, and `experiments/search_task/README.md` for task-specific details.
+## RefSeq Sketch Benchmark
+This task sketches real genomes with OddSketch and stores database size, build time, peak memory, RefSeq version/fetch metadata, and `assembly_summary_refseq.txt` under `/data`.
+
+To download every assembly listed in `experiments/refseq_sketch_task/data/refseq_bacteria/assembly_summary.txt` first:
+
+```bash
+qsub experiments/refseq_sketch_task/jobs/qsub_download_refseq_assemblies.sh
+```
+
+Submit it from the repository root:
+
+```bash
+make -C src CXX=g++ LDFLAGS=-lstdc++fs
+qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh
+```
+
+With an explicit config:
+
+```bash
+qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh experiments/refseq_sketch_task/config.json
+```
+
+See `experiments/README.md`, `experiments/pair_task/README.md`, `experiments/search_task/README.md`, and `experiments/refseq_sketch_task/README.md` for task-specific details.

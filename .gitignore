@@ -25,6 +25,10 @@ external/
 src/project/data/
 experiments/pair_task/outputs/
 experiments/search_task/outputs/
+experiments/refseq_sketch_task/outputs/
+experiments/refseq_sketch_task/data/assembly/
+experiments/refseq_sketch_task/data
+experiments/refseq_sketch_task/data.bak
 
 # Object files
 src/*.o

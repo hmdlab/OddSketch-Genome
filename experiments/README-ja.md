@@ -5,6 +5,7 @@
 ## 構成
 - `pair_task/`: 合成ゲノムペアに対する Jaccard 比較
 - `search_task/`: クラスタ化合成ゲノムに対する最近傍検索比較
+- `refseq_sketch_task/`: 実 RefSeq ゲノムの OddSketch DB 構築時間・メモリ・サイズ計測
 - `tools/`: 実験ワークフロー専用の C++ 補助ツールと外部ツール準備スクリプト
 - `env/Dockerfile`: 実験用コンテナ環境
 
@@ -27,6 +28,12 @@ uv run python scripts/project_runner.py --config config.json
 ```bash
 cd experiments/search_task
 uv run python scripts/project_runner.py --config config.json
+```
+
+実 RefSeq ゲノムのスケッチ構築ベンチは root ディレクトリから `qsub` します。
+
+```bash
+qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh
 ```
 
 ## メモ
