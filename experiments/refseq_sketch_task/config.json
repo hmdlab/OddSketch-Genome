@@ -1,6 +1,6 @@
 {
   "paths": {
-    "data_root": "/data/genome-oddsketch/refseq_sketch_task",
+    "data_root": "data/sketch_runs",
     "assembly_summary": "data/refseq_bacteria/assembly_summary.txt",
     "local_genome_list": "data/assembly/manifests/gzip_paths.txt"
   },

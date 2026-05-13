@@ -26,7 +26,7 @@ qsub experiments/refseq_sketch_task/jobs/qsub_download_refseq_assemblies.sh
 `download_metadata.json` にはバージョンラベル、取得開始・終了日時、保存した `assembly_summary.txt` の SHA-256、総件数、成功件数、失敗件数を保存します。途中で止まっても、既にある `.fna.gz` は再利用します。`download.decompress=true` にした場合だけ `fasta/` と `fasta_paths.txt` も使います。
 
 ## 出力
-既定では `/data/genome-oddsketch/refseq_sketch_task/runs/<run_id>/` に保存します。
+既定では `experiments/refseq_sketch_task/data/sketch_runs/runs/<run_id>/` に保存します。この環境では `experiments/refseq_sketch_task/data` が `/data1/...` への symlink なので、大きな出力は `/data1` 側に入ります。
 
 - `metadata/used_config.json`
 - `metadata/run_metadata.json`
@@ -60,7 +60,7 @@ qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh experiments/refse
 ```json
 {
   "paths": {
-    "data_root": "/data/genome-oddsketch/refseq_sketch_task",
+    "data_root": "data/sketch_runs",
     "assembly_summary": "/data/refseq/assembly_summary_refseq.txt",
     "local_genome_list": "/data/refseq/gzip_paths.txt"
   }
