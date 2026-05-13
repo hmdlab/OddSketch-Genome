@@ -1,0 +1,32 @@
+{
+  "paths": {
+    "outdir": "/home/kikutakyohei/genome-oddsketch/experiments/pair_task/outputs/default/run_20260505_135849_517871_2750632"
+  },
+  "make_genomes": {
+    "genome_length": 1000000,
+    "num_pairs": 1000,
+    "mutation_min": 10,
+    "mutation_max": 5000,
+    "seed_base": 2000
+  },
+  "true_jaccard": {
+    "kmerlen": 64
+  },
+  "oddsketch": {
+    "kmerlen": 64,
+    "sketch_size": 32768,
+    "j0": 0.9,
+    "pos_mode": "mix",
+    "canonical": true
+  },
+  "bindash": {
+    "enabled": true,
+    "bindash_bin": "bindash",
+    "threads": 1,
+    "mode": "sketch_dist",
+    "kmerlen": 64,
+    "sketch_size": 32768,
+    "bbits": 16,
+    "pair_cmd": "{bin} exact --nthreads={threads} {f1} {f2}"
+  }
+}
