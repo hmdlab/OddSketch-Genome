@@ -97,7 +97,7 @@ uv run python scripts/project_runner.py --config config.json
 ## refseq_sketch_task
 実ゲノムを OddSketch でスケッチ化し、DB サイズ、構築時間、最大メモリ使用量を `/data` 配下に保存します。RefSeq のバージョン・取得日・`assembly_summary_refseq.txt` も run ごとの `metadata/` に保存します。
 
-先に `experiments/refseq_sketch_task/data/refseq_bacteria/assembly_summary.txt` から全アセンブリを取得する場合:
+先に `experiments/refseq_sketch_task/data/refseq_bacteria/assembly_summary.txt` から全アセンブリを取得する場合。既定では `.fna.gz` のみ保存します。
 
 ```bash
 qsub experiments/refseq_sketch_task/jobs/qsub_download_refseq_assemblies.sh

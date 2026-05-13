@@ -259,6 +259,7 @@ def main() -> None:
     )
 
     manifest_path = manifests_dir / "assembly_download_manifest.tsv"
+    gzip_list_path = manifests_dir / "gzip_paths.txt"
     fasta_list_path = manifests_dir / "fasta_paths.txt"
     failed_path = manifests_dir / "failed_assemblies.tsv"
     fieldnames = [
@@ -329,6 +330,12 @@ def main() -> None:
                         continue
                     pending.add(executor.submit(materialize_one, row, gzip_dir, fasta_dir, retries, timeout, decompress, args.dry_run))
 
+    if not args.dry_run:
+        gzip_paths = sorted(path for path in gzip_dir.glob("*.gz") if path.stat().st_size > 0)
+        gzip_list_path.write_text("".join(f"{path.resolve()}\n" for path in gzip_paths))
+    else:
+        gzip_list_path.write_text("")
+
     if decompress and not args.dry_run:
         fasta_paths = sorted(path for path in fasta_dir.glob("*.fna") if path.stat().st_size > 0)
         fasta_list_path.write_text("".join(f"{path.resolve()}\n" for path in fasta_paths))
@@ -357,6 +364,7 @@ def main() -> None:
             "outdir": str(outdir),
             "manifest": str(manifest_path),
             "failed_manifest": str(failed_path),
+            "gzip_list": str(gzip_list_path),
             "fasta_list": str(fasta_list_path),
             "threads": threads,
             "retries": retries,
@@ -367,6 +375,7 @@ def main() -> None:
     )
     print(f"[download] done ok={ok} failed={failed}")
     print(f"[download] manifest={manifest_path}")
+    print(f"[download] gzip_list={gzip_list_path}")
     print(f"[download] fasta_list={fasta_list_path}")
     if failed:
         raise SystemExit(2)

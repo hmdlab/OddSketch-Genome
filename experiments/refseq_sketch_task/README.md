@@ -8,7 +8,7 @@ To download all assemblies listed in `data/refseq_bacteria/assembly_summary.txt`
 qsub experiments/refseq_sketch_task/jobs/qsub_download_refseq_assemblies.sh
 ```
 
-The downloader writes `.fna.gz` files to `data/assembly/gzip/`, decompressed `.fna` files to `data/assembly/fasta/`, and saves version/fetch metadata plus a copied `assembly_summary.txt` under `data/assembly/metadata/`.
+The downloader writes `.fna.gz` files to `data/assembly/gzip/` and saves version/fetch metadata plus a copied `assembly_summary.txt` under `data/assembly/metadata/`. By default it does not keep decompressed FASTA files; the sketch runner temporarily decompresses `.fna.gz` inputs in batches and deletes those FASTA files after each batch.
 
 ```bash
 make -C src CXX=g++ LDFLAGS=-lstdc++fs

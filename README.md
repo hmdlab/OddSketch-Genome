@@ -97,7 +97,7 @@ uv run python scripts/project_runner.py --config config.json
 ## RefSeq Sketch Benchmark
 This task sketches real genomes with OddSketch and stores database size, build time, peak memory, RefSeq version/fetch metadata, and `assembly_summary_refseq.txt` under `/data`.
 
-To download every assembly listed in `experiments/refseq_sketch_task/data/refseq_bacteria/assembly_summary.txt` first:
+To download every assembly listed in `experiments/refseq_sketch_task/data/refseq_bacteria/assembly_summary.txt` first. By default this keeps only `.fna.gz` files:
 
 ```bash
 qsub experiments/refseq_sketch_task/jobs/qsub_download_refseq_assemblies.sh
