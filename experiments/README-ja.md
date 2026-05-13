@@ -7,7 +7,7 @@
 - `search_task/`: クラスタ化合成ゲノムに対する最近傍検索比較
 - `refseq_sketch_task/`: 実 RefSeq ゲノムの OddSketch DB 構築時間・メモリ・サイズ計測
 - `tools/`: 実験ワークフロー専用の C++ 補助ツールと外部ツール準備スクリプト
-- `env/Dockerfile`: 実験用コンテナ環境
+- リポジトリ root の `Dockerfile` / `docker-compose.yml`: `pair_task` と OddSketch CLI 用のコンテナ環境
 
 各 task はそれぞれ次を持ちます。
 - 設定: `<task>/config.json`
@@ -34,6 +34,20 @@ uv run python scripts/project_runner.py --config config.json
 
 ```bash
 qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh
+コンテナ実行はリポジトリ root で行います:
+
+```bash
+docker compose build
+docker compose run --rm pair-task
+```
+
+リポジトリ root の `docker-data/` 配下のファイルに対して OddSketch CLI を直接使う例:
+
+```bash
+printf '%s\n' /data/genome_001.fna /data/genome_002.fna | docker compose run --rm -T oddsketch sketch --threads=8
+printf '%s\n' /data/genome_001.fna.sketch /data/genome_002.fna.sketch | docker compose run --rm -T oddsketch dist --all-to-all --threads=8
+docker compose run --rm oddsketch dist --bipartite --qlist /data/queries.sketch.list --dblist /data/db.sketch.list --threads=8
+docker compose run --rm oddsketch dist --pairlist /data/sketch_pairs.tsv --threads=8
 ```
 
 ## メモ

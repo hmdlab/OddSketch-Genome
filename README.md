@@ -47,11 +47,50 @@ Core CLI examples:
 
 ```bash
 printf '%s\n' genome_001.fna genome_002.fna | src/oddsketch sketch --threads=8
-printf '%s\n' genome_001.fna.sketch genome_002.fna.sketch | src/oddsketch dist --threads=8
-src/oddsketch dist --threads=8 --pairlist sketch_pairs.tsv
+printf '%s\n' genome_001.fna.sketch genome_002.fna.sketch | src/oddsketch dist --all-to-all --threads=8
+src/oddsketch dist --bipartite --qlist queries.sketch.list --dblist db.sketch.list --threads=8
+src/oddsketch dist --pairlist sketch_pairs.tsv --threads=8
 ```
 
+`dist` supports three explicit modes:
+- `--all-to-all` (or `--alltoall`): compare all sketches listed on stdin
+- `--bipartite --qlist ... --dblist ...`: compare every query sketch against every database sketch
+- `--pairlist ...`: compare only the two-column TSV pairs in the pairlist
+
 `--pairlist` expects a tab-separated file with one sketch pair per line.
+
+## Docker
+The repository root now contains a `Dockerfile` and `docker-compose.yml` that build one image with:
+- Python dependencies installed via `uv sync`
+- `src/oddsketch` built
+- BinDash installed into `experiments/tools/bin/bindash`
+
+Build once:
+
+```bash
+docker compose build
+```
+
+Run the pairwise batch benchmark:
+
+```bash
+docker compose run --rm pair-task
+```
+
+Use the OddSketch CLI directly against files under `./docker-data`:
+
+```bash
+printf '%s\n' /data/genome_001.fna /data/genome_002.fna | docker compose run --rm -T oddsketch sketch --threads=8
+printf '%s\n' /data/genome_001.fna.sketch /data/genome_002.fna.sketch | docker compose run --rm -T oddsketch dist --all-to-all --threads=8
+docker compose run --rm oddsketch dist --bipartite --qlist /data/queries.sketch.list --dblist /data/db.sketch.list --threads=8
+docker compose run --rm oddsketch dist --pairlist /data/sketch_pairs.tsv --threads=8
+```
+
+Notes:
+- `pair-task` writes to `./experiments/pair_task/outputs`
+- the default container command runs `experiments/pair_task/scripts/batch_project_runner.py --config-dir experiments/pair_task/configs`
+- `oddsketch` mounts `./docker-data` at `/data`
+- override the BinDash version at build time with `BINDASH_TAG=... docker compose build`
 
 ## Pairwise Benchmark
 Default outputs are written under `experiments/pair_task/outputs/default/`. You can override the root output directory in `experiments/pair_task/config.json` via `paths.outdir`, or pass `--outdir` to the genome generation step.

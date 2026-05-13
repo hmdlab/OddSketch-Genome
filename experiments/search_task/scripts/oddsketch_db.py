@@ -83,6 +83,7 @@ def run_oddsketch_dist_bipartite(query_list_path: Path, db_list_path: Path, cfg:
     cmd = [
         resolve_oddsketch_bin(),
         "dist",
+        "--bipartite",
         f"--qlist={query_list_path}",
         f"--dblist={db_list_path}",
         f"--kmer={odd.get('kmerlen', 64)}",

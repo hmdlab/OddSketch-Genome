@@ -43,6 +43,8 @@ struct CliArgs {
     std::string qlist_path;
     std::string dblist_path;
     std::string pairlist_path;
+    bool explicit_all_to_all = false;
+    bool explicit_bipartite = false;
     OddsketchOptions options;
 };
 
@@ -596,7 +598,7 @@ void run_dist_all_vs_all(const std::vector<std::string>& paths, const OddsketchO
     if (!sketches.empty()) {
         const auto& s0 = sketches.front();
         const uint64_t nbits = s0.bit_size ? s0.bit_size : static_cast<uint64_t>(s0.words.size() * 64);
-        std::cerr << "[oddsketch] dist(all-vs-all): nbits=" << nbits
+        std::cerr << "[oddsketch] dist(all-to-all): nbits=" << nbits
                   << ", threads=" << normalize_thread_count(options.threads, sketches.size())
                   << ", kbuckets(header)=" << s0.k_buckets
                   << ", j0(current)=" << std::fixed << std::setprecision(6) << options.j0 << "\n";
@@ -764,6 +766,26 @@ void set_threads(OddsketchOptions& options, const std::string& value) {
     options.threads = threads;
 }
 
+bool option_requires_value(const std::string& key) {
+    return key == "qlist" ||
+           key == "dblist" ||
+           key == "pairlist" ||
+           key == "kmer" ||
+           key == "kmerlen" ||
+           key == "sketch-size" ||
+           key == "j0" ||
+           key == "j-threshold" ||
+           key == "pos-mode" ||
+           key == "canonical" ||
+           key == "threads";
+}
+
+void require_value(const std::string& key, const std::string& value) {
+    if (value.empty()) {
+        throw std::runtime_error("--" + key + " requires a value");
+    }
+}
+
 CliArgs parse_options(int argc, char** argv) {
     CliArgs args;
     if (argc < 2) {
@@ -771,7 +793,10 @@ CliArgs parse_options(int argc, char** argv) {
     }
 
     args.mode = argv[1];
-    // 簡易 parser: --name=value 形式のみを受け付ける。
+    if (args.mode == "--help" || args.mode == "-h") {
+        return args;
+    }
+
     for (int i = 2; i < argc; ++i) {
         const std::string arg = argv[i];
         if (arg.rfind("--", 0) != 0) {
@@ -780,14 +805,32 @@ CliArgs parse_options(int argc, char** argv) {
 
         const auto eq = arg.find('=');
         const std::string key = (eq == std::string::npos) ? arg.substr(2) : arg.substr(2, eq - 2);
-        const std::string value = (eq == std::string::npos) ? std::string() : arg.substr(eq + 1);
+        std::string value = (eq == std::string::npos) ? std::string() : arg.substr(eq + 1);
+
+        if (eq == std::string::npos && option_requires_value(key)) {
+            if (i + 1 < argc) {
+                const std::string next = argv[i + 1];
+                if (next.rfind("--", 0) != 0) {
+                    value = next;
+                    ++i;
+                }
+            }
+            require_value(key, value);
+        }
 
         if (key == "qlist") {
+            require_value(key, value);
             args.qlist_path = value;
         } else if (key == "dblist") {
+            require_value(key, value);
             args.dblist_path = value;
         } else if (key == "pairlist") {
+            require_value(key, value);
             args.pairlist_path = value;
+        } else if (key == "all-to-all" || key == "alltoall") {
+            args.explicit_all_to_all = true;
+        } else if (key == "bipartite") {
+            args.explicit_bipartite = true;
         } else if (key == "kmer" || key == "kmerlen") {
             set_kmer(args.options, value);
         } else if (key == "sketch-size") {
@@ -800,6 +843,8 @@ CliArgs parse_options(int argc, char** argv) {
             set_canonical(args.options, value);
         } else if (key == "threads") {
             set_threads(args.options, value);
+        } else {
+            throw std::runtime_error("unknown option: --" + key);
         }
     }
 
@@ -807,6 +852,27 @@ CliArgs parse_options(int argc, char** argv) {
 }
 
 }  // namespace
+
+void print_usage() {
+    std::cerr
+        << "Usage:\n"
+        << "  oddsketch sketch [options] < paths.list\n"
+        << "  oddsketch dist --all-to-all [options] < sketches.list\n"
+        << "  oddsketch dist --bipartite --qlist queries.list --dblist db.list [options]\n"
+        << "  oddsketch dist --pairlist pairs.tsv [options]\n"
+        << "\n"
+        << "Options:\n"
+        << "  --kmer=N, --kmerlen=N\n"
+        << "  --sketch-size=M\n"
+        << "  --canonical=0|1\n"
+        << "  --pos-mode=value|mix|stripe\n"
+        << "  --j0=F\n"
+        << "  --threads=N\n"
+        << "\n"
+        << "Compatibility:\n"
+        << "  oddsketch dist < sketches.list still runs all-to-all.\n"
+        << "  --name=value and --name value are both accepted for value options.\n";
+}
 
 int oddsketch_cli_main(int argc, char** argv) {
     CliArgs args;
@@ -817,8 +883,13 @@ int oddsketch_cli_main(int argc, char** argv) {
         return 1;
     }
 
+    if (args.mode == "--help" || args.mode == "-h") {
+        print_usage();
+        return 0;
+    }
+
     if (args.mode != "sketch" && args.mode != "dist") {
-        std::cerr << "Usage: oddsketch {sketch|dist} [--kmer=N] [--sketch-size=M] [--canonical=0|1] [--pos-mode=value|mix|stripe] [--j0=F] [--threads=N] [--qlist=queries.txt --dblist=db.txt] [--pairlist=pairs.tsv]\n";
+        print_usage();
         return 1;
     }
     if ((args.qlist_path.empty() && !args.dblist_path.empty()) ||
@@ -826,8 +897,18 @@ int oddsketch_cli_main(int argc, char** argv) {
         std::cerr << "Usage error: --qlist and --dblist must be specified together\n";
         return 1;
     }
-    if (!args.pairlist_path.empty() && (!args.qlist_path.empty() || !args.dblist_path.empty())) {
-        std::cerr << "Usage error: --pairlist cannot be combined with --qlist/--dblist\n";
+
+    const bool pairlist_mode = !args.pairlist_path.empty();
+    const bool bipartite_mode = args.explicit_bipartite || !args.qlist_path.empty();
+    const bool all_to_all_mode = args.explicit_all_to_all;
+    const int dist_mode_count = (pairlist_mode ? 1 : 0) + (bipartite_mode ? 1 : 0) + (all_to_all_mode ? 1 : 0);
+
+    if (args.mode == "dist" && dist_mode_count > 1) {
+        std::cerr << "Usage error: choose only one dist mode: --all-to-all, --bipartite, or --pairlist\n";
+        return 1;
+    }
+    if (args.explicit_bipartite && (args.qlist_path.empty() || args.dblist_path.empty())) {
+        std::cerr << "Usage error: --bipartite requires --qlist and --dblist\n";
         return 1;
     }
 
@@ -859,14 +940,13 @@ int oddsketch_cli_main(int argc, char** argv) {
             for (const auto& output_path : output_paths) {
                 std::cout << output_path << "\n";
             }
-        } else if (!args.qlist_path.empty()) {
-            // qlist/dblist があれば二部比較、それ以外は stdin から全 pair 比較。
+        } else if (bipartite_mode) {
             run_dist_bipartite(
                 read_paths_from_list_file(args.qlist_path),
                 read_paths_from_list_file(args.dblist_path),
                 args.options
             );
-        } else if (!args.pairlist_path.empty()) {
+        } else if (pairlist_mode) {
             run_dist_pairlist(read_pairs_from_pairlist_file(args.pairlist_path), args.options);
         } else {
             run_dist_all_vs_all(read_paths_from_stdin(), args.options);

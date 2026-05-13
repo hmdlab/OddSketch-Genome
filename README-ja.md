@@ -47,11 +47,50 @@ CLI の基本例:
 
 ```bash
 printf '%s\n' genome_001.fna genome_002.fna | src/oddsketch sketch --threads=8
-printf '%s\n' genome_001.fna.sketch genome_002.fna.sketch | src/oddsketch dist --threads=8
-src/oddsketch dist --threads=8 --pairlist sketch_pairs.tsv
+printf '%s\n' genome_001.fna.sketch genome_002.fna.sketch | src/oddsketch dist --all-to-all --threads=8
+src/oddsketch dist --bipartite --qlist queries.sketch.list --dblist db.sketch.list --threads=8
+src/oddsketch dist --pairlist sketch_pairs.tsv --threads=8
 ```
 
+`dist` は 3 つの明示的な mode を持ちます。
+- `--all-to-all` または `--alltoall`: 標準入力で受け取った sketch list を all-to-all 比較
+- `--bipartite --qlist ... --dblist ...`: query sketch 全体と database sketch 全体を二部比較
+- `--pairlist ...`: 2 列 TSV の pairlist に書かれた pair だけを比較
+
 `--pairlist` は、1 行に 1 組の sketch path をタブ区切りで書いたファイルを受け取ります。
+
+## Docker
+リポジトリ root に `Dockerfile` と `docker-compose.yml` を追加し、1 つの image で次をまとめて build できるようにしています。
+- `uv sync` による Python 依存の導入
+- `src/oddsketch` の build
+- `experiments/tools/bin/bindash` への BinDash install
+
+まず build:
+
+```bash
+docker compose build
+```
+
+pair_task の batch 実行:
+
+```bash
+docker compose run --rm pair-task
+```
+
+`./docker-data` 配下のファイルに対して OddSketch CLI を直接使う例:
+
+```bash
+printf '%s\n' /data/genome_001.fna /data/genome_002.fna | docker compose run --rm -T oddsketch sketch --threads=8
+printf '%s\n' /data/genome_001.fna.sketch /data/genome_002.fna.sketch | docker compose run --rm -T oddsketch dist --all-to-all --threads=8
+docker compose run --rm oddsketch dist --bipartite --qlist /data/queries.sketch.list --dblist /data/db.sketch.list --threads=8
+docker compose run --rm oddsketch dist --pairlist /data/sketch_pairs.tsv --threads=8
+```
+
+補足:
+- `pair-task` の出力先は `./experiments/pair_task/outputs`
+- container の既定コマンドは `experiments/pair_task/scripts/batch_project_runner.py --config-dir experiments/pair_task/configs`
+- `oddsketch` service では `./docker-data` を `/data` に mount
+- BinDash version は `BINDASH_TAG=... docker compose build` で上書きできます
 
 ## pair_task
 既定では `experiments/pair_task/outputs/default/` 以下に入出力します。別の場所を使いたい場合は `experiments/pair_task/config.json` の `paths.outdir` を変更するか、生成ステップで `--outdir` を指定してください。

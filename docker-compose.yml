@@ -1,0 +1,29 @@
+services:
+  pair-task:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BINDASH_TAG: ${BINDASH_TAG:-v2.6}
+    image: genome-oddsketch:latest
+    working_dir: /workspace
+    environment:
+      ODDSKETCH_BIN: /workspace/src/oddsketch
+    volumes:
+      - ./experiments/pair_task/outputs:/workspace/experiments/pair_task/outputs
+      - ./docker-data:/data
+
+  oddsketch:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BINDASH_TAG: ${BINDASH_TAG:-v2.6}
+    image: genome-oddsketch:latest
+    working_dir: /data
+    entrypoint: ["oddsketch"]
+    command: ["--help"]
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./docker-data:/data

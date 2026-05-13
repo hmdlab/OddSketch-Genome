@@ -7,7 +7,7 @@ This directory contains benchmark workflows built around the standalone OddSketc
 - `search_task/`: nearest-neighbor search benchmark on clustered synthetic genomes
 - `refseq_sketch_task/`: real RefSeq OddSketch database build timing, memory, and size benchmark
 - `tools/`: C++ helper tools and external-tool setup scripts used only by experiment workflows
-- `env/Dockerfile`: container environment
+- repository-root `Dockerfile` / `docker-compose.yml`: container environment for `pair_task` and the OddSketch CLI
 
 Each task keeps its own defaults:
 - config: `<task>/config.json`
@@ -34,6 +34,20 @@ The real RefSeq sketch-build benchmark is submitted from the repository root:
 
 ```bash
 qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh
+Containerized run from the repository root:
+
+```bash
+docker compose build
+docker compose run --rm pair-task
+```
+
+OddSketch CLI examples against files under repository-root `docker-data/`:
+
+```bash
+printf '%s\n' /data/genome_001.fna /data/genome_002.fna | docker compose run --rm -T oddsketch sketch --threads=8
+printf '%s\n' /data/genome_001.fna.sketch /data/genome_002.fna.sketch | docker compose run --rm -T oddsketch dist --all-to-all --threads=8
+docker compose run --rm oddsketch dist --bipartite --qlist /data/queries.sketch.list --dblist /data/db.sketch.list --threads=8
+docker compose run --rm oddsketch dist --pairlist /data/sketch_pairs.tsv --threads=8
 ```
 
 ## Notes

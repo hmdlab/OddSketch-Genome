@@ -14,6 +14,12 @@ cd experiments/pair_task
 uv run python scripts/batch_project_runner.py --config config.json
 ```
 
+configs/の複数configでバッチ実行:
+```bash
+uv run python scripts/batch_project_runner.py --config-dir configs/
+```
+
+
 個別実行:
 
 ```bash
