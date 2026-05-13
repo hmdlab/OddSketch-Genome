@@ -28,4 +28,4 @@ RUN bash experiments/tools/scripts/build_tools.sh --method source --ref ${BINDAS
 ENV PATH="/workspace/experiments/tools/bin:${PATH}"
 ENV ODDSKETCH_BIN="/workspace/src/oddsketch"
 
-CMD ["uv", "run", "python", "experiments/pair_task/scripts/project_runner.py", "--config", "experiments/pair_task/config.json"]
+CMD ["uv", "run", "python", "experiments/pair_task/scripts/batch_project_runner.py", "--config", "experiments/pair_task/config.json"]

@@ -58,7 +58,7 @@ src/oddsketch dist --threads=8 --pairlist sketch_pairs.tsv
 
 ```bash
 cd experiments/pair_task
-uv run python scripts/project_runner.py --config config.json
+uv run python scripts/batch_project_runner.py --config config.json
 ```
 
 個別実行:
@@ -74,15 +74,15 @@ RMSE 集計:
 
 ```bash
 uv run python analysis/compute_rmse.py \
-  --csv outputs/default/results/comparison_results_oddsketch.csv \
-  --csv outputs/default/results/comparison_results_bindash.csv
+  --csv outputs/default/<run>/results/comparison_results_oddsketch.csv \
+  --csv outputs/default/<run>/results/comparison_results_bindash.csv
 ```
 
 生成物:
-- FASTA ペア: `experiments/pair_task/outputs/default/genomes/`
-- ペア情報: `experiments/pair_task/outputs/default/pair_info.txt`
-- 結果テーブル: `experiments/pair_task/outputs/default/results/`
-- 図: `experiments/pair_task/outputs/default/figures/`
+- FASTA ペア: `experiments/pair_task/outputs/default/<run>/genomes/`
+- ペア情報: `experiments/pair_task/outputs/default/<run>/pair_info.txt`
+- 結果テーブル: `experiments/pair_task/outputs/default/<run>/results/`
+- 図: `experiments/pair_task/outputs/default/<run>/figures/`
 
 ## search_task
 既定の出力先は `experiments/search_task/outputs/default/` です。必要なら `experiments/search_task/config.json` の `paths.outdir` を変更してください。

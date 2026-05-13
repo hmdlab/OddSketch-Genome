@@ -20,7 +20,7 @@ Run each task from its own directory:
 ```bash
 uv sync
 cd experiments/pair_task
-uv run python scripts/project_runner.py --config config.json
+uv run python scripts/batch_project_runner.py --config config.json
 ```
 
 Or:
@@ -40,5 +40,5 @@ qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh
 - To use a specific OddSketch binary, set `ODDSKETCH_BIN`.
 - BinDash is external and is not vendored in this repository.
 - Task-local `config.json` files define the default output roots via `paths.outdir`.
-- `project_runner.py` creates a unique run directory under `paths.outdir` and saves the resolved config to `<run>/metadata/used_config.json`.
+- `pair_task/scripts/batch_project_runner.py` creates a unique run directory under `paths.outdir` for each config and saves the resolved config to `<run>/metadata/used_config.json`.
 - Exact-Jaccard helper binaries are built from `experiments/tools/src/` into `experiments/tools/bin/` by `make -C src`.

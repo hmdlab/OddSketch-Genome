@@ -58,7 +58,7 @@ Default outputs are written under `experiments/pair_task/outputs/default/`. You 
 
 ```bash
 cd experiments/pair_task
-uv run python scripts/project_runner.py --config config.json
+uv run python scripts/batch_project_runner.py --config config.json
 ```
 
 Step-by-step:
@@ -74,15 +74,15 @@ RMSE summary:
 
 ```bash
 uv run python analysis/compute_rmse.py \
-  --csv outputs/default/results/comparison_results_oddsketch.csv \
-  --csv outputs/default/results/comparison_results_bindash.csv
+  --csv outputs/default/<run>/results/comparison_results_oddsketch.csv \
+  --csv outputs/default/<run>/results/comparison_results_bindash.csv
 ```
 
 Generated files:
-- FASTA pairs: `experiments/pair_task/outputs/default/genomes/`
-- Pair metadata: `experiments/pair_task/outputs/default/pair_info.txt`
-- Result tables: `experiments/pair_task/outputs/default/results/`
-- Figures: `experiments/pair_task/outputs/default/figures/`
+- FASTA pairs: `experiments/pair_task/outputs/default/<run>/genomes/`
+- Pair metadata: `experiments/pair_task/outputs/default/<run>/pair_info.txt`
+- Result tables: `experiments/pair_task/outputs/default/<run>/results/`
+- Figures: `experiments/pair_task/outputs/default/<run>/figures/`
 
 ## Search Benchmark
 Default outputs are written under `experiments/search_task/outputs/default/`. Override with `paths.outdir` in `experiments/search_task/config.json`.

@@ -11,7 +11,7 @@ This task generates synthetic genome pairs and compares exact Jaccard, OddSketch
 ## Quick Start
 ```bash
 cd experiments/pair_task
-uv run python scripts/project_runner.py --config config.json
+uv run python scripts/batch_project_runner.py --config config.json
 ```
 
 Step-by-step:
@@ -23,7 +23,7 @@ uv run python scripts/cal_jaccard_oddsketch.py --config config.json
 uv run python scripts/cal_jaccard_bindash.py --config config.json
 ```
 
-`project_runner.py` creates a unique run directory under the configured output root, saves the resolved config to `<run>/metadata/used_config.json`, and generates figures for that run.
+`batch_project_runner.py` creates a unique run directory under the configured output root for each config, saves the resolved config to `<run>/metadata/used_config.json`, and generates figures for that run.
 When you use the default config, it also updates `outputs/default/latest_used_config.json` so you can easily inspect the latest resolved config.
 
 OddSketch in this task now runs in batch mode:
@@ -34,8 +34,8 @@ RMSE summary:
 
 ```bash
 uv run python analysis/compute_rmse.py \
-  --csv outputs/default/results/comparison_results_oddsketch.csv \
-  --csv outputs/default/results/comparison_results_bindash.csv
+  --csv outputs/default/<run>/results/comparison_results_oddsketch.csv \
+  --csv outputs/default/<run>/results/comparison_results_bindash.csv
 ```
 
 ## Config
@@ -94,7 +94,7 @@ Common edits:
   - change `oddsketch.sketch_size`, `oddsketch.j0`, or `bindash.sketch_size`
 
 ## Outputs
-Default root: `outputs/default/`
+Default root: `outputs/default/<run>/`
 
 - `genomes/`
 - `pair_info.txt`, `genome_paths.txt`

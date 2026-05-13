@@ -45,3 +45,4 @@ experiments/**/*.fasta.gz
 experiments/**/*.sketch
 *.o*
 *.e*
+.codex

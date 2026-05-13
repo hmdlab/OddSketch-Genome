@@ -11,7 +11,7 @@
 ## 基本手順
 ```bash
 cd experiments/pair_task
-uv run python scripts/project_runner.py --config config.json
+uv run python scripts/batch_project_runner.py --config config.json
 ```
 
 個別実行:
@@ -23,7 +23,7 @@ uv run python scripts/cal_jaccard_oddsketch.py --config config.json
 uv run python scripts/cal_jaccard_bindash.py --config config.json
 ```
 
-`project_runner.py` は、設定された出力ルート配下に run ごとのディレクトリを作り、その run で使った設定を `<run>/metadata/used_config.json` に保存し、図生成まで行います。
+`batch_project_runner.py` は、config ごとに設定された出力ルート配下へ run ディレクトリを作り、その run で使った設定を `<run>/metadata/used_config.json` に保存し、図生成まで行います。
 既定設定では、最新の解決済み設定を `outputs/default/latest_used_config.json` にも保存します。
 
 この task の OddSketch は現在、次の一括処理で動きます。
@@ -34,8 +34,8 @@ RMSE 集計:
 
 ```bash
 uv run python analysis/compute_rmse.py \
-  --csv outputs/default/results/comparison_results_oddsketch.csv \
-  --csv outputs/default/results/comparison_results_bindash.csv
+  --csv outputs/default/<run>/results/comparison_results_oddsketch.csv \
+  --csv outputs/default/<run>/results/comparison_results_bindash.csv
 ```
 
 ## config.json の説明
@@ -94,7 +94,7 @@ uv run python analysis/compute_rmse.py \
   - `oddsketch.sketch_size`, `oddsketch.j0`, `bindash.sketch_size` などを変更
 
 ## 出力
-既定の出力ルートは `outputs/default/` です。
+既定の出力ルートは `outputs/default/<run>/` です。
 
 - `genomes/`
 - `pair_info.txt`, `genome_paths.txt`

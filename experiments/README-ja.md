@@ -20,7 +20,7 @@
 ```bash
 uv sync
 cd experiments/pair_task
-uv run python scripts/project_runner.py --config config.json
+uv run python scripts/batch_project_runner.py --config config.json
 ```
 
 または:
@@ -40,5 +40,5 @@ qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh
 - 特定の OddSketch バイナリを使う場合は `ODDSKETCH_BIN` を設定してください。
 - BinDash は外部ツールであり、このリポジトリには同梱していません。
 - 各 task の既定出力先は `config.json` の `paths.outdir` で定義しています。
-- `project_runner.py` は `paths.outdir` 配下に run ごとのディレクトリを作り、その run で使った設定を `<run>/metadata/used_config.json` に保存します。
+- `pair_task/scripts/batch_project_runner.py` は config ごとに `paths.outdir` 配下へ run ディレクトリを作り、その run で使った設定を `<run>/metadata/used_config.json` に保存します。
 - 厳密 Jaccard 計算用の補助バイナリは `experiments/tools/src/` から `make -C src` で `experiments/tools/bin/` に生成されます。
