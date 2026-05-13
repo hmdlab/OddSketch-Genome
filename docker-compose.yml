@@ -9,6 +9,59 @@ services:
     working_dir: /workspace
     environment:
       ODDSKETCH_BIN: /workspace/src/oddsketch
+    command:
+      - uv
+      - run
+      - python
+      - experiments/pair_task/scripts/batch_project_runner.py
+      - --config
+      - experiments/pair_task/config.json
+    volumes:
+      - ./experiments/pair_task/outputs:/workspace/experiments/pair_task/outputs
+      - ./docker-data:/data
+
+  pair-task-sketchsize:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BINDASH_TAG: ${BINDASH_TAG:-v2.6}
+    image: genome-oddsketch:latest
+    working_dir: /workspace
+    environment:
+      ODDSKETCH_BIN: /workspace/src/oddsketch
+    command:
+      - uv
+      - run
+      - python
+      - experiments/pair_task/scripts/batch_project_runner.py
+      - --config-dir
+      - experiments/pair_task/configs_sketchsize
+      - --jobs
+      - ${PAIR_TASK_JOBS:-1}
+    volumes:
+      - ./experiments/pair_task/outputs:/workspace/experiments/pair_task/outputs
+      - ./docker-data:/data
+
+  pair-task-bbits:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BINDASH_TAG: ${BINDASH_TAG:-v2.6}
+    image: genome-oddsketch:latest
+    working_dir: /workspace
+    environment:
+      ODDSKETCH_BIN: /workspace/src/oddsketch
+    command:
+      - uv
+      - run
+      - python
+      - experiments/pair_task/scripts/batch_project_runner.py
+      - --config-dir
+      - experiments/pair_task/configs_bbits
+      - --jobs
+      - ${PAIR_TASK_JOBS:-1}
     volumes:
       - ./experiments/pair_task/outputs:/workspace/experiments/pair_task/outputs
       - ./docker-data:/data

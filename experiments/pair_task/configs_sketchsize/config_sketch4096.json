@@ -1,6 +1,6 @@
 {
   "paths": {
-    "outdir": "/home/kikutakyohei/genome-oddsketch/experiments/pair_task/outputs/default/run_20260505_132756_796502_2740597"
+    "outdir": "outputs/sketchsize"
   },
   "make_genomes": {
     "genome_length": 1000000,

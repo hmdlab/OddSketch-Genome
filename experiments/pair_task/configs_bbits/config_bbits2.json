@@ -1,6 +1,6 @@
 {
   "paths": {
-    "outdir": "outputs/default"
+    "outdir": "outputs/bbits"
   },
   "make_genomes": {
     "genome_length": 1000000,

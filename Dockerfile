@@ -29,4 +29,4 @@ RUN ln -sf /workspace/src/oddsketch /usr/local/bin/oddsketch
 ENV PATH="/workspace/.venv/bin:/workspace/experiments/tools/bin:${PATH}"
 ENV ODDSKETCH_BIN="/workspace/src/oddsketch"
 
-CMD ["uv", "run", "python", "experiments/pair_task/scripts/batch_project_runner.py", "--config", "experiments/pair_task/config.json"]
+CMD ["oddsketch", "--help"]

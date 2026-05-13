@@ -71,11 +71,49 @@ Build once:
 docker compose build
 ```
 
-Run the pairwise batch benchmark:
+Show the OddSketch CLI help:
+
+```bash
+docker run --rm genome-oddsketch
+docker compose run --rm oddsketch --help
+```
+
+Run the default pairwise benchmark:
 
 ```bash
 docker compose run --rm pair-task
 ```
+
+Run the reproducibility sweeps currently used for `pair_task`:
+
+```bash
+docker compose run --rm pair-task-sketchsize
+docker compose run --rm pair-task-bbits
+```
+
+To run those sweeps in parallel, set `PAIR_TASK_JOBS`:
+
+```bash
+PAIR_TASK_JOBS=4 docker compose run --rm pair-task-sketchsize
+PAIR_TASK_JOBS=4 docker compose run --rm pair-task-bbits
+```
+
+Local output mounts:
+- Docker containers have their own filesystem. Files written only inside a container disappear when the container is removed.
+- This `docker-compose.yml` mounts the local directory `./experiments/pair_task/outputs` into the container at `/workspace/experiments/pair_task/outputs`.
+- Because of that mount, pair-task results created in Docker are visible on your host machine under `experiments/pair_task/outputs/`.
+- The local directory `./docker-data` is mounted at `/data` for OddSketch CLI input files.
+
+Create the local directories before running Docker if they do not exist:
+
+```bash
+mkdir -p experiments/pair_task/outputs docker-data
+```
+
+Output locations:
+- default run: `experiments/pair_task/outputs/default/`
+- sketch-size sweep: `experiments/pair_task/outputs/sketchsize/`
+- b-bits sweep: `experiments/pair_task/outputs/bbits/`
 
 Use the OddSketch CLI directly against files under `./docker-data`:
 
@@ -88,7 +126,10 @@ docker compose run --rm oddsketch dist --pairlist /data/sketch_pairs.tsv --threa
 
 Notes:
 - `pair-task` writes to `./experiments/pair_task/outputs`
-- the default container command runs `experiments/pair_task/scripts/batch_project_runner.py --config-dir experiments/pair_task/configs`
+- the Docker image default command is `oddsketch --help`
+- `pair-task` runs `experiments/pair_task/scripts/batch_project_runner.py --config experiments/pair_task/config.json`
+- `pair-task-sketchsize` runs all configs under `experiments/pair_task/configs_sketchsize`
+- `pair-task-bbits` runs all configs under `experiments/pair_task/configs_bbits`
 - `oddsketch` mounts `./docker-data` at `/data`
 - override the BinDash version at build time with `BINDASH_TAG=... docker compose build`
 
