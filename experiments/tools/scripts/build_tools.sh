@@ -2,7 +2,7 @@
 set -euo pipefail
 
 METHOD="auto"
-BINDASH_REF="v2.2.0"
+BINDASH_REF="v2.6"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
