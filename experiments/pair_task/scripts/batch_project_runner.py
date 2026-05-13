@@ -9,27 +9,16 @@ import sys
 import time
 from pathlib import Path
 
-
-def resolve_task_root() -> Path:
-    return Path(__file__).resolve().parents[1]
-
-
-def resolve_repo_root() -> Path:
-    return resolve_task_root().parents[1]
-
-
-def display_path(raw: str | Path) -> str:
-    path = Path(raw).expanduser()
-    if not path.is_absolute():
-        return str(path)
-    try:
-        return str(path.resolve().relative_to(resolve_repo_root()))
-    except Exception:
-        return str(path)
-
-
-def display_cmd(cmd: list[str]) -> str:
-    return " ".join(display_path(part) for part in cmd)
+from common import (
+    bindash_enabled,
+    display_cmd,
+    display_path,
+    load_config,
+    prepare_run_config,
+    resolve_config_path,
+    resolve_output_root,
+    resolve_task_root,
+)
 
 
 def collect_config_paths(config_args: list[str], config_dir: str | None, pattern: str) -> list[Path]:
@@ -37,9 +26,7 @@ def collect_config_paths(config_args: list[str], config_dir: str | None, pattern
     task_root = resolve_task_root()
 
     for raw in config_args:
-        path = Path(raw)
-        if not path.is_absolute():
-            path = (task_root / raw).resolve()
+        path = resolve_config_path(raw)
         if not path.exists():
             raise SystemExit(f"config not found: {path}")
         paths.append(path)
@@ -66,10 +53,9 @@ def collect_config_paths(config_args: list[str], config_dir: str | None, pattern
     return deduped
 
 
-def run(cmd: list[str]) -> int:
+def run(cmd: list[str]) -> None:
     print("[run]", display_cmd(cmd))
-    completed = subprocess.run(cmd)
-    return completed.returncode
+    subprocess.run(cmd, check=True)
 
 
 def resolve_jobs(raw_jobs: int | None) -> int:
@@ -88,21 +74,82 @@ def resolve_jobs(raw_jobs: int | None) -> int:
     return 1
 
 
-def run_configs(
-    config_paths: list[Path],
-    project_runner: Path,
-    jobs: int,
-    continue_on_error: bool,
-) -> list[tuple[Path, int]]:
+def generate_figures(used_config_path: Path) -> None:
+    task_root = resolve_task_root()
+    analysis_dir = task_root / "analysis"
+    out_dir = resolve_output_root(task_root, load_config(used_config_path))
+    results_dir = out_dir / "results"
+    figures_dir = out_dir / "figures"
+    figures_dir.mkdir(parents=True, exist_ok=True)
+
+    odd_csv = results_dir / "comparison_results_oddsketch.csv"
+    bindash_csv = results_dir / "comparison_results_bindash.csv"
+
+    if odd_csv.exists():
+        run([
+            sys.executable,
+            str(analysis_dir / "plot_true_vs_oddsketch.py"),
+            "--csv",
+            str(odd_csv),
+            "--out",
+            str(figures_dir / "oddsketch_true_vs_estimate.png"),
+        ])
+
+    if bindash_csv.exists():
+        run([
+            sys.executable,
+            str(analysis_dir / "plot_true_vs_bindash.py"),
+            "--csv",
+            str(bindash_csv),
+            "--out",
+            str(figures_dir / "bindash_true_vs_estimate.png"),
+        ])
+
+    if odd_csv.exists() and bindash_csv.exists():
+        rmse = subprocess.run(
+            [
+                sys.executable,
+                str(analysis_dir / "compute_rmse.py"),
+                "--csv",
+                str(odd_csv),
+                "--csv",
+                str(bindash_csv),
+            ],
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        (figures_dir / "rmse_summary.txt").write_text(rmse.stdout)
+
+
+def run_one_config(config_path: Path) -> None:
+    scripts_dir = Path(__file__).resolve().parent
+    run_dir, used_config_path = prepare_run_config(config_path)
+    use_bindash = bindash_enabled(used_config_path)
+
+    print("[run-dir]", display_path(run_dir))
+    print("[used-config]", display_path(used_config_path))
+
+    run([sys.executable, str(scripts_dir / "make_genomes.py"), "--config", str(used_config_path)])
+    run([sys.executable, str(scripts_dir / "cal_jaccard_true.py"), "--config", str(used_config_path)])
+    run([sys.executable, str(scripts_dir / "cal_jaccard_oddsketch.py"), "--config", str(used_config_path)])
+    if use_bindash:
+        run([sys.executable, str(scripts_dir / "cal_jaccard_bindash.py"), "--config", str(used_config_path)])
+    generate_figures(used_config_path)
+
+
+def run_configs(config_paths: list[Path], jobs: int, continue_on_error: bool) -> list[tuple[Path, int]]:
     failures: list[tuple[Path, int]] = []
     pending = list(enumerate(config_paths, start=1))
     active: list[tuple[int, Path, subprocess.Popen]] = []
     total = len(config_paths)
+    runner = Path(__file__).resolve()
 
     while pending or active:
         while pending and len(active) < jobs:
             index, config_path = pending.pop(0)
-            cmd = [sys.executable, str(project_runner), "--config", str(config_path)]
+            cmd = [sys.executable, str(runner), "--single-config", str(config_path)]
             print(f"\n=== Config {index}/{total} ===")
             print(f"[config] {display_path(config_path)}")
             print("[run]", display_cmd(cmd))
@@ -131,20 +178,26 @@ def run_configs(
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("configs", nargs="*", help="Config JSON paths to run")
+    ap.add_argument("--config", action="append", default=[], help="Config JSON path to run; may be repeated")
     ap.add_argument("--config-dir", default=None, help="Directory containing config JSON files")
     ap.add_argument("--pattern", default="*.json", help="Glob pattern used with --config-dir")
     ap.add_argument("--jobs", type=int, default=None, help="Number of config runs to execute concurrently")
     ap.add_argument("--continue-on-error", action="store_true", help="Keep running later configs after a failure")
+    ap.add_argument("--single-config", default=None, help=argparse.SUPPRESS)
     args = ap.parse_args()
 
     task_root = resolve_task_root()
-    scripts_dir = Path(__file__).resolve().parent
-    project_runner = scripts_dir / "project_runner.py"
-    config_paths = collect_config_paths(args.configs, args.config_dir, args.pattern)
+
+    if args.single_config:
+        run_one_config(resolve_config_path(args.single_config))
+        return
+
+    config_args = [*args.config, *args.configs]
+    config_paths = collect_config_paths(config_args, args.config_dir, args.pattern)
     jobs = min(resolve_jobs(args.jobs), len(config_paths))
 
     print(f"[batch] configs={len(config_paths)} jobs={jobs}")
-    failures = run_configs(config_paths, project_runner, jobs, args.continue_on_error)
+    failures = run_configs(config_paths, jobs, args.continue_on_error)
 
     if failures:
         print("\n=== Failed Configs ===")

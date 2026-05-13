@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
-import json
+import sys
 from pathlib import Path
 
 import matplotlib
@@ -9,35 +9,17 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
-
-def resolve_task_root() -> Path:
-    return Path(__file__).resolve().parents[1]
-
-
-def resolve_path(base: Path, raw: str | None) -> Path | None:
-    if not raw:
-        return None
-    path = Path(raw)
-    return path if path.is_absolute() else (base / path).resolve()
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from common import load_config as load_config_file, resolve_output_root, resolve_task_root
 
 
 def load_config() -> dict:
-    config_path = resolve_task_root() / "config.json"
-    try:
-        return json.loads(config_path.read_text())
-    except Exception:
-        return {}
-
-
-def resolve_output_root(cfg: dict) -> Path:
-    task_root = resolve_task_root()
-    outdir = cfg.get("paths", {}).get("outdir", "outputs/default")
-    return resolve_path(task_root, outdir)
+    return load_config_file(resolve_task_root() / "config.json")
 
 
 def main() -> None:
     cfg = load_config()
-    output_root = resolve_output_root(cfg)
+    output_root = resolve_output_root(resolve_task_root(), cfg)
     results_dir = output_root / "results"
     figures_dir = output_root / "figures"
     figures_dir.mkdir(parents=True, exist_ok=True)

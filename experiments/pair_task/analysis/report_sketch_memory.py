@@ -1,26 +1,15 @@
 #!/usr/bin/env python3
 
-import json
 import math
+import sys
 from pathlib import Path
 
-
-def resolve_task_root() -> Path:
-    return Path(__file__).resolve().parents[1]
-
-
-def resolve_output_root(cfg: dict) -> Path:
-    outdir = cfg.get("paths", {}).get("outdir", "outputs/default")
-    path = Path(outdir)
-    return path if path.is_absolute() else (resolve_task_root() / path).resolve()
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from common import load_config as load_config_file, resolve_output_root, resolve_task_root
 
 
 def load_config() -> dict:
-    config_path = resolve_task_root() / "config.json"
-    try:
-        return json.loads(config_path.read_text())
-    except Exception:
-        return {}
+    return load_config_file(resolve_task_root() / "config.json")
 
 
 def count_genomes(base: Path) -> int:
@@ -57,7 +46,7 @@ def resolve_bindash_total_bits(bindash_cfg: dict) -> int:
 
 def main() -> None:
     cfg = load_config()
-    output_root = resolve_output_root(cfg)
+    output_root = resolve_output_root(resolve_task_root(), cfg)
     results_dir = output_root / "results"
     genomes_dir = output_root / "genomes"
     n_genomes = count_genomes(output_root)

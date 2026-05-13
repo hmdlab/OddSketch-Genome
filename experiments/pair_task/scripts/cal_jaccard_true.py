@@ -1,53 +1,10 @@
 #!/usr/bin/env python3
 
 import argparse
-import json
 import os
 import subprocess
-from pathlib import Path
 
-
-def resolve_task_root() -> Path:
-    return Path(__file__).resolve().parents[1]
-
-
-def resolve_path(base: Path, raw: str | None) -> Path | None:
-    if not raw:
-        return None
-    path = Path(raw)
-    return path if path.is_absolute() else (base / path).resolve()
-
-
-def resolve_config_path(config_arg: str) -> Path:
-    task_root = resolve_task_root()
-    candidates = [
-        Path(config_arg),
-        task_root / config_arg,
-        Path(__file__).resolve().parent / config_arg,
-        task_root / "config.json",
-    ]
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate.resolve()
-    return (task_root / "config.json").resolve()
-
-
-def load_cfg(cpath: Path) -> dict:
-    try:
-        return json.loads(cpath.read_text())
-    except Exception:
-        return {}
-
-
-def resolve_output_root(task_root: Path, cfg: dict) -> Path:
-    paths = cfg.get("paths", {}) if isinstance(cfg, dict) else {}
-    if isinstance(paths, dict) and paths.get("outdir"):
-        return resolve_path(task_root, paths["outdir"])
-    legacy = cfg.get("make_genomes", {}).get("outdir") if isinstance(cfg, dict) else None
-    if legacy:
-        legacy_path = resolve_path(task_root, legacy)
-        return legacy_path.parent if legacy_path.name == "genomes" else legacy_path
-    return (task_root / "outputs" / "default").resolve()
+from common import load_config, resolve_config_path, resolve_output_root, resolve_task_root
 
 
 def read_fasta(filename: str) -> str:
@@ -91,7 +48,7 @@ def main() -> None:
 
     task_root = resolve_task_root()
     config_path = resolve_config_path(args.config)
-    cfg = load_cfg(config_path)
+    cfg = load_config(config_path)
     output_root = resolve_output_root(task_root, cfg)
     pair_info_file = output_root / "pair_info.txt"
     results_dir = output_root / "results"

@@ -33,7 +33,8 @@ static inline string read_fasta_concat(const string &path) {
 }
 
 static inline size_t kmer_count_possible(size_t L, size_t k) {
-  if (L < k) return 0; return L - k + 1;
+  if (L < k) return 0;
+  return L - k + 1;
 }
 
 static inline char comp_base(char c) {
@@ -114,8 +115,8 @@ int main(int argc, char** argv) {
   // Defaults
   int kmer = 64;
   // sequential execution only
-  string pair_info = "data/test_genomes/pair_info.txt"; // relative to working dir
-  string out_path = "data/test_genomes/jaccard_true_results.txt";
+  string pair_info = "outputs/default/pair_info.txt"; // relative to experiments/pair_task
+  string out_path = "outputs/default/results/jaccard_true_results.txt";
   string cfg_path = ""; // optional
 
   vector<string> args; args.reserve(argc);
@@ -136,7 +137,12 @@ int main(int argc, char** argv) {
     apply_config(cfg_path);
   } else {
     // try default config locations relative to working dir
-    const vector<string> cands = {"pipeline_config.json", string("..")+"/pipeline_config.json", string("../..")+"/test/pipeline_config.json"};
+    const vector<string> cands = {
+      "config.json",
+      string("experiments")+"/pair_task/config.json",
+      string("..")+"/pair_task/config.json",
+      string("..")+"/config.json"
+    };
     for (auto &c : cands) { apply_config(c); }
   }
 

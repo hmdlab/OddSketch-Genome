@@ -1,58 +1,13 @@
 #!/usr/bin/env python3
 
 import argparse
-import json
 import random
 from pathlib import Path
 
+from common import load_config, resolve_config_path, resolve_output_root, resolve_task_root
+
 
 ATGC = ["A", "T", "G", "C"]
-
-
-def resolve_task_root() -> Path:
-    return Path(__file__).resolve().parents[1]
-
-
-def resolve_path(base: Path, raw: str | None) -> Path | None:
-    if not raw:
-        return None
-    path = Path(raw)
-    return path if path.is_absolute() else (base / path).resolve()
-
-
-def resolve_config_path(config_arg: str) -> Path:
-    task_root = resolve_task_root()
-    candidates = [
-        Path(config_arg),
-        task_root / config_arg,
-        Path(__file__).resolve().parent / config_arg,
-        task_root / "config.json",
-    ]
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate.resolve()
-    return (task_root / "config.json").resolve()
-
-
-def load_config(config_path: Path) -> dict:
-    try:
-        return json.loads(config_path.read_text())
-    except Exception:
-        return {}
-
-
-def resolve_output_root(task_root: Path, cfg: dict, cli_outdir: str | None) -> Path:
-    if cli_outdir:
-        return Path(cli_outdir).resolve()
-    paths = cfg.get("paths", {}) if isinstance(cfg, dict) else {}
-    if isinstance(paths, dict) and paths.get("outdir"):
-        return resolve_path(task_root, paths["outdir"])
-
-    legacy = cfg.get("make_genomes", {}).get("outdir") if isinstance(cfg, dict) else None
-    if legacy:
-        legacy_path = resolve_path(task_root, legacy)
-        return legacy_path.parent if legacy_path.name == "genomes" else legacy_path
-    return (task_root / "outputs" / "default").resolve()
 
 
 def write_fasta(seq_list: list[str], filename: Path, header: str) -> None:
