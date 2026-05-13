@@ -2,6 +2,21 @@
 
 OddSketch itself lives under `src/` and can be built and used independently. Benchmark and comparison workflows live under `experiments/`.
 
+## Overview
+This repository provides the OddSketch CLI and reproducible workflows for evaluating genome Jaccard similarity estimation.
+
+OddSketch can:
+- `sketch`: build sketches from genome FASTA files listed on stdin.
+- `dist`: estimate Jaccard similarity between sketches using one of three explicit modes:
+  - `--all-to-all` / `--alltoall`: compare all sketches listed on stdin.
+  - `--bipartite --qlist ... --dblist ...`: compare every query sketch against every database sketch.
+  - `--pairlist ...`: compare only sketch pairs listed in a two-column TSV.
+
+Reproducible experiment workflows are under `experiments/`:
+- `pair_task`: synthetic genome-pair benchmarks for exact Jaccard, OddSketch, and BinDash.
+- `search_task`: clustered synthetic-genome search benchmarks.
+- `refseq_sketch_task`: real RefSeq genome sketch-build benchmarks.
+
 ## Layout
 - `src/`, `include/`: OddSketch implementation and CLI
 - `experiments/pair_task`: pairwise Jaccard benchmark on synthetic genome pairs
@@ -10,10 +25,17 @@ OddSketch itself lives under `src/` and can be built and used independently. Ben
 - `experiments/tools/src/`, `experiments/tools/bin/`: experimental helper tools used by benchmarks
 
 ## Requirements
+Use either the local `uv` workflow or Docker.
+
+Local workflow:
 - C++17 compiler
 - Python 3.10+
-- `uv sync` recommended
+- `uv sync`
 - BinDash only if you want comparison runs
+
+Docker workflow:
+- Docker with Compose
+- See [`README-docker.md`](README-docker.md)
 
 ## BinDash Setup
 On Linux/HPC, this repository expects BinDash to live at `experiments/tools/bin/bindash`.

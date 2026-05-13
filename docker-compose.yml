@@ -17,8 +17,7 @@ services:
       - --config
       - experiments/pair_task/config.json
     volumes:
-      - ./experiments:/workspace/experiments/pair_task
-      - ./experiments:/workspace/experiments/search_task
+      - ./experiments/pair_task:/workspace/experiments/pair_task
       - ./docker-data:/data
 
   pair-task-sketchsize:
@@ -41,7 +40,7 @@ services:
       - --jobs
       - ${PAIR_TASK_JOBS:-1}
     volumes:
-      - ./experiments/pair_task/outputs:/workspace/experiments/pair_task/outputs
+      - ./experiments/pair_task:/workspace/experiments/pair_task
       - ./docker-data:/data
 
   pair-task-bbits:
@@ -64,7 +63,7 @@ services:
       - --jobs
       - ${PAIR_TASK_JOBS:-1}
     volumes:
-      - ./experiments/pair_task/outputs:/workspace/experiments/pair_task/outputs
+      - ./experiments/pair_task:/workspace/experiments/pair_task
       - ./docker-data:/data
 
   oddsketch:

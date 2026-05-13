@@ -32,23 +32,39 @@ BINDASH_TAG=v2.6 docker compose build
 
 ## ローカル出力 mount
 
-Docker container には container 内だけの filesystem があります。
-container 内だけに書いたファイルは、`--rm` で container を消すと一緒に消えます。
+Docker container の中は、ホストとは別の filesystem です。
+何も mount せずに container 内へ結果を書くと、`--rm` で container を消したときに結果も消えます。
 
-このリポジトリでは、実験結果を手元に残すために `docker-compose.yml` で次の mount を設定しています。
+このリポジトリでは、ホスト側のディレクトリを container 内の以下の場所にマウントしています。
+
 
 | ローカル | container 内 | 用途 |
 | --- | --- | --- |
-| `./experiments/pair_task/outputs` | `/workspace/experiments/pair_task/outputs` | pair_task の結果保存 |
-| `./docker-data` | `/data` | OddSketch CLI に渡す入力 FASTA / sketch / list |
+| `./experiments/pair_task` | `/workspace/experiments/pair_task` | pair_task の config、script、出力 |
+| `./docker-data` | `/data` | OddSketch CLI に渡す FASTA、sketch、list |
 
-必要なら先に作成します。
+
+初回だけ、必要ならローカルディレクトリを作成します。
 
 ```bash
 mkdir -p experiments/pair_task/outputs docker-data
 ```
 
-実験結果はローカルの `experiments/pair_task/outputs/` に残ります。
+`docker-data/` は OddSketch CLI に自分の FASTA や list を渡すための置き場です。
+例えばホスト側の:
+
+```text
+./docker-data/genome_001.fna
+```
+
+は container 内では:
+
+```text
+/data/genome_001.fna
+```
+
+として見えます。
+
 
 ## OddSketch CLI
 
@@ -106,7 +122,7 @@ docker compose run --rm pair-task
 experiments/pair_task/outputs/default/
 ```
 
-## sketch size sweep
+## pair_task 実験再現: sketchsize
 
 `experiments/pair_task/configs_sketchsize/` の config 群を実行します。
 
@@ -126,7 +142,7 @@ PAIR_TASK_JOBS=4 docker compose run --rm pair-task-sketchsize
 experiments/pair_task/outputs/sketchsize/
 ```
 
-## b-bits sweep
+## pair_task実験再現：b-bits
 
 `experiments/pair_task/configs_bbits/` の config 群を実行します。
 
