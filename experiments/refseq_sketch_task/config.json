@@ -1,0 +1,37 @@
+{
+  "paths": {
+    "data_root": "/data/genome-oddsketch/refseq_sketch_task",
+    "assembly_summary": "data/refseq_bacteria/assembly_summary.txt",
+    "local_genome_list": "data/assembly/manifests/fasta_paths.txt"
+  },
+  "download": {
+    "assembly_summary": "data/refseq_bacteria/assembly_summary.txt",
+    "outdir": "data/assembly",
+    "version_label": "RefSeq bacteria assembly_summary.txt",
+    "threads": 4,
+    "retries": 3,
+    "timeout_sec": 120,
+    "decompress": true,
+    "limit": null
+  },
+  "refseq": {
+    "assembly_summary_url": "https://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt",
+    "version_label": "RefSeq assembly_summary_refseq.txt",
+    "download_assembly_summary": true,
+    "download_genomes": true,
+    "limit": 1000,
+    "filters": {
+      "taxid": null,
+      "assembly_level": [],
+      "refseq_category": []
+    }
+  },
+  "oddsketch": {
+    "threads": 8,
+    "kmerlen": 64,
+    "sketch_size": 8192,
+    "j0": 0.9,
+    "pos_mode": "mix",
+    "canonical": true
+  }
+}
