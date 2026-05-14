@@ -36,7 +36,7 @@ services:
       - python
       - experiments/pair_task/scripts/batch_project_runner.py
       - --config-dir
-      - configs_sketchsize
+      - configs/sketchsize
       - --jobs
       - ${PAIR_TASK_JOBS:-1}
     volumes:
@@ -59,7 +59,7 @@ services:
       - python
       - experiments/pair_task/scripts/batch_project_runner.py
       - --config-dir
-      - configs_bbits
+      - configs/bbits
       - --jobs
       - ${PAIR_TASK_JOBS:-1}
     volumes:

@@ -13,8 +13,8 @@
 | `docker run --rm genome-oddsketch` | image の既定動作。`oddsketch --help` を表示 |
 | `oddsketch` | OddSketch CLI を直接使う compose service |
 | `pair-task` | `experiments/pair_task/config.json` で pair_task を 1 run 実行 |
-| `pair-task-sketchsize` | `experiments/pair_task/configs_sketchsize/` の config 群を実行 |
-| `pair-task-bbits` | `experiments/pair_task/configs_bbits/` の config 群を実行 |
+| `pair-task-sketchsize` | `experiments/pair_task/configs/sketchsize/` の config 群を実行 |
+| `pair-task-bbits` | `experiments/pair_task/configs/bbits/` の config 群を実行 |
 
 ## Build
 
@@ -124,7 +124,7 @@ experiments/pair_task/outputs/default/
 
 ## pair_task 実験再現: sketchsize
 
-`experiments/pair_task/configs_sketchsize/` の config 群を実行します。
+`experiments/pair_task/configs/sketchsize/` の config 群を実行します。
 
 ```bash
 docker compose run --rm pair-task-sketchsize
@@ -144,7 +144,7 @@ experiments/pair_task/outputs/sketchsize/
 
 ## pair_task実験再現：b-bits
 
-`experiments/pair_task/configs_bbits/` の config 群を実行します。
+`experiments/pair_task/configs/bbits/` の config 群を実行します。
 
 ```bash
 docker compose run --rm pair-task-bbits

@@ -55,7 +55,7 @@ if [[ $# -gt 0 ]]; then
   BATCH_ARGS=("$@")
 else
   CONFIG_JOBS=${PAIR_TASK_JOBS:-${NSLOTS:-1}}
-  BATCH_ARGS=(--config-dir configs --jobs "${CONFIG_JOBS}")
+  BATCH_ARGS=(--config-dir configs/default --jobs "${CONFIG_JOBS}")
 fi
 
 echo "[job] host=$(hostname)"

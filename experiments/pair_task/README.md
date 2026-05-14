@@ -14,6 +14,14 @@ cd experiments/pair_task
 uv run python scripts/batch_project_runner.py --config config.json
 ```
 
+Batch runs over config groups:
+
+```bash
+uv run python scripts/batch_project_runner.py --config-dir configs/default
+uv run python scripts/batch_project_runner.py --config-dir configs/sketchsize
+uv run python scripts/batch_project_runner.py --config-dir configs/bbits
+```
+
 Step-by-step:
 
 ```bash
