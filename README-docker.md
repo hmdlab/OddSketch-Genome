@@ -80,8 +80,8 @@ docker compose run --rm oddsketch --help
 sketch:
 
 ```bash
-printf '%s\n' /data/genome_001.fna /data/genome_002.fna | \
-docker compose run --rm -T oddsketch sketch --threads=8
+printf '/data/genome_001.fna\tgenome_001\t1\n/data/genome_002.fna\tgenome_002\t1\n' > docker-data/genomes.tsv
+docker compose run --rm oddsketch sketch --listfname /data/genomes.tsv --threads=8
 ```
 
 dist all-to-all:

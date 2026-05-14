@@ -68,10 +68,17 @@ Their source files live in `experiments/tools/src/`.
 Core CLI examples:
 
 ```bash
-printf '%s\n' genome_001.fna genome_002.fna | src/oddsketch sketch --threads=8
+printf 'genome_001.fna\tgenome_001\t1\ngenome_002.fna\tgenome_002\t1\n' > genomes.tsv
+src/oddsketch sketch --listfname genomes.tsv --threads=8
 printf '%s\n' genome_001.fna.sketch genome_002.fna.sketch | src/oddsketch dist --all-to-all --threads=8
 src/oddsketch dist --bipartite --qlist queries.sketch.list --dblist db.sketch.list --threads=8
 src/oddsketch dist --pairlist sketch_pairs.tsv --threads=8
+```
+
+`--listfname` expects a tab-separated file:
+
+```text
+Path-to-sequence-file<TAB>genome-name<TAB>number-of-consecutive-sequences
 ```
 
 `dist` supports three explicit modes:

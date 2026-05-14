@@ -40,12 +40,19 @@ struct OddsketchOptions {
 
 struct CliArgs {
     std::string mode;
+    std::string listfname_path;
     std::string qlist_path;
     std::string dblist_path;
     std::string pairlist_path;
     bool explicit_all_to_all = false;
     bool explicit_bipartite = false;
     OddsketchOptions options;
+};
+
+struct SketchInput {
+    std::string sequence_path;
+    std::string genome_name;
+    size_t consecutive_sequences = 1;
 };
 
 // OPH で得た稠密 MinHash と、そのとき実際に使ったバケット数。
@@ -532,6 +539,65 @@ std::vector<std::string> read_paths_from_list_file(const std::string& list_path)
     return read_nonempty_lines(ifs);
 }
 
+std::vector<SketchInput> read_sketch_inputs_from_stdin() {
+    const auto paths = read_paths_from_stdin();
+    std::vector<SketchInput> inputs;
+    inputs.reserve(paths.size());
+    for (const auto& path : paths) {
+        inputs.push_back({path, "", 1});
+    }
+    return inputs;
+}
+
+std::vector<SketchInput> read_sketch_inputs_from_listfname_file(const std::string& listfname_path) {
+    std::ifstream ifs(listfname_path);
+    if (!ifs) {
+        throw std::runtime_error("Cannot open listfname file: " + listfname_path);
+    }
+
+    std::vector<SketchInput> inputs;
+    std::string line;
+    size_t lineno = 0;
+    while (std::getline(ifs, line)) {
+        ++lineno;
+        if (line.empty()) {
+            continue;
+        }
+
+        const auto first_tab = line.find('\t');
+        const auto second_tab = (first_tab == std::string::npos) ? std::string::npos : line.find('\t', first_tab + 1);
+        if (first_tab == std::string::npos || second_tab == std::string::npos) {
+            throw std::runtime_error(
+                "Invalid listfname line " + std::to_string(lineno) +
+                ": expected Path-to-sequence-file<TAB>genome-name<TAB>number-of-consecutive-sequences"
+            );
+        }
+
+        const std::string path = line.substr(0, first_tab);
+        const std::string genome_name = line.substr(first_tab + 1, second_tab - first_tab - 1);
+        const std::string consecutive_raw = line.substr(second_tab + 1);
+        if (path.empty() || genome_name.empty() || consecutive_raw.empty() || consecutive_raw.find('\t') != std::string::npos) {
+            throw std::runtime_error(
+                "Invalid listfname line " + std::to_string(lineno) +
+                ": expected exactly three non-empty tab-separated fields"
+            );
+        }
+
+        size_t consecutive_sequences = 0;
+        try {
+            consecutive_sequences = static_cast<size_t>(std::stoul(consecutive_raw));
+        } catch (...) {
+            throw std::runtime_error("Invalid listfname line " + std::to_string(lineno) + ": consecutive sequence count must be a positive integer");
+        }
+        if (consecutive_sequences == 0) {
+            throw std::runtime_error("Invalid listfname line " + std::to_string(lineno) + ": consecutive sequence count must be positive");
+        }
+
+        inputs.push_back({path, genome_name, consecutive_sequences});
+    }
+    return inputs;
+}
+
 std::vector<SketchPair> read_pairs_from_pairlist_file(const std::string& pairlist_path) {
     std::ifstream ifs(pairlist_path);
     if (!ifs) {
@@ -767,7 +833,8 @@ void set_threads(OddsketchOptions& options, const std::string& value) {
 }
 
 bool option_requires_value(const std::string& key) {
-    return key == "qlist" ||
+    return key == "listfname" ||
+           key == "qlist" ||
            key == "dblist" ||
            key == "pairlist" ||
            key == "kmer" ||
@@ -818,7 +885,10 @@ CliArgs parse_options(int argc, char** argv) {
             require_value(key, value);
         }
 
-        if (key == "qlist") {
+        if (key == "listfname") {
+            require_value(key, value);
+            args.listfname_path = value;
+        } else if (key == "qlist") {
             require_value(key, value);
             args.qlist_path = value;
         } else if (key == "dblist") {
@@ -856,12 +926,13 @@ CliArgs parse_options(int argc, char** argv) {
 void print_usage() {
     std::cerr
         << "Usage:\n"
-        << "  oddsketch sketch [options] < paths.list\n"
+        << "  oddsketch sketch --listfname genomes.tsv [options]\n"
         << "  oddsketch dist --all-to-all [options] < sketches.list\n"
         << "  oddsketch dist --bipartite --qlist queries.list --dblist db.list [options]\n"
         << "  oddsketch dist --pairlist pairs.tsv [options]\n"
         << "\n"
         << "Options:\n"
+        << "  --listfname=genomes.tsv\n"
         << "  --kmer=N, --kmerlen=N\n"
         << "  --sketch-size=M\n"
         << "  --canonical=0|1\n"
@@ -870,6 +941,7 @@ void print_usage() {
         << "  --threads=N\n"
         << "\n"
         << "Compatibility:\n"
+        << "  oddsketch sketch < paths.list still accepts one FASTA path per line.\n"
         << "  oddsketch dist < sketches.list still runs all-to-all.\n"
         << "  --name=value and --name value are both accepted for value options.\n";
 }
@@ -907,6 +979,10 @@ int oddsketch_cli_main(int argc, char** argv) {
         std::cerr << "Usage error: choose only one dist mode: --all-to-all, --bipartite, or --pairlist\n";
         return 1;
     }
+    if (args.mode == "dist" && !args.listfname_path.empty()) {
+        std::cerr << "Usage error: --listfname is only valid for sketch\n";
+        return 1;
+    }
     if (args.explicit_bipartite && (args.qlist_path.empty() || args.dblist_path.empty())) {
         std::cerr << "Usage error: --bipartite requires --qlist and --dblist\n";
         return 1;
@@ -914,27 +990,32 @@ int oddsketch_cli_main(int argc, char** argv) {
 
     try {
         if (args.mode == "sketch") {
-            const auto paths = read_paths_from_stdin();
+            const auto inputs = args.listfname_path.empty()
+                ? read_sketch_inputs_from_stdin()
+                : read_sketch_inputs_from_listfname_file(args.listfname_path);
             std::cerr << "[oddsketch] sketch: nbits=" << args.options.sketch_size
                       << ", kbuckets=" << compute_num_buckets(args.options)
-                      << ", threads=" << normalize_thread_count(args.options.threads, paths.size())
+                      << ", inputs=" << inputs.size()
+                      << ", threads=" << normalize_thread_count(args.options.threads, inputs.size())
                       << ", j0=" << std::fixed << std::setprecision(6) << args.options.j0
                       << ", canonical=" << (args.options.canonical ? "true" : "false")
                       << ", pos-mode=" << pos_mode_name(args.options.pos_mode)
                       << "\n";
 
-            // sketch は 1 行 1 FASTA パスを stdin から受け取り、同名 .sketch を出力する。
-            std::vector<std::string> output_paths(paths.size());
-            run_in_parallel(paths.size(), args.options.threads, [&](size_t i) {
-                const SketchBuildResult sketch = make_odd_sketch_from_fasta(paths[i], args.options);
+            // sketch writes one output per input FASTA, preserving the historical <input>.sketch name.
+            std::vector<std::string> output_paths(inputs.size());
+            run_in_parallel(inputs.size(), args.options.threads, [&](size_t i) {
+                const auto& input = inputs[i];
+                const std::string output_path = input.sequence_path + ".sketch";
+                const SketchBuildResult sketch = make_odd_sketch_from_fasta(input.sequence_path, args.options);
                 write_sketch_binary(
                     sketch.words,
-                    paths[i] + ".sketch",
+                    output_path,
                     static_cast<uint64_t>(args.options.sketch_size),
                     static_cast<uint64_t>(sketch.num_buckets),
                     args.options.j0
                 );
-                output_paths[i] = paths[i] + ".sketch";
+                output_paths[i] = output_path;
             });
 
             for (const auto& output_path : output_paths) {

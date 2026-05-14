@@ -45,15 +45,17 @@ def build_oddsketch_base_cmd(subcommand: str, cfg: dict) -> list[str]:
 
 
 def run_oddsketch_sketch(genome_files: list[str], cfg: dict) -> list[str]:
-    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
-        for genome_file in genome_files:
-            f.write(f"{genome_file}\n")
-        temp_path_file = f.name
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".tsv") as f:
+        for index, genome_file in enumerate(genome_files, start=1):
+            genome_name = Path(genome_file).stem.replace("\t", "_") or f"genome_{index}"
+            f.write(f"{genome_file}\t{genome_name}\t1\n")
+        temp_listfname = f.name
 
     try:
+        cmd = build_oddsketch_base_cmd("sketch", cfg)
+        cmd.append(f"--listfname={temp_listfname}")
         result = subprocess.run(
-            build_oddsketch_base_cmd("sketch", cfg),
-            stdin=open(temp_path_file, "r"),
+            cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
@@ -63,7 +65,7 @@ def run_oddsketch_sketch(genome_files: list[str], cfg: dict) -> list[str]:
     except subprocess.CalledProcessError:
         return []
     finally:
-        os.unlink(temp_path_file)
+        os.unlink(temp_listfname)
 
 
 def run_oddsketch_dist_pairlist(pairlist_path: Path, cfg: dict) -> list[dict]:

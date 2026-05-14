@@ -18,7 +18,7 @@ services:
       - experiments/pair_task/config.json
     volumes:
       - ./experiments/pair_task:/workspace/experiments/pair_task
-      - ./docker-data:/data
+      - ./data:/data
 
   pair-task-sketchsize:
     build:

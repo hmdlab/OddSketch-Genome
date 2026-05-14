@@ -68,10 +68,17 @@ make CXX=g++ LDFLAGS=-lstdc++fs
 CLI の基本例:
 
 ```bash
-printf '%s\n' genome_001.fna genome_002.fna | src/oddsketch sketch --threads=8
+printf 'genome_001.fna\tgenome_001\t1\ngenome_002.fna\tgenome_002\t1\n' > genomes.tsv
+src/oddsketch sketch --listfname genomes.tsv --threads=8
 printf '%s\n' genome_001.fna.sketch genome_002.fna.sketch | src/oddsketch dist --all-to-all --threads=8
 src/oddsketch dist --bipartite --qlist queries.sketch.list --dblist db.sketch.list --threads=8
 src/oddsketch dist --pairlist sketch_pairs.tsv --threads=8
+```
+
+`--listfname` は次のタブ区切りファイルを受け取ります。
+
+```text
+Path-to-sequence-file<TAB>genome-name<TAB>number-of-consecutive-sequences
 ```
 
 `dist` は 3 つの明示的な mode を持ちます。
