@@ -37,7 +37,7 @@ Docker workflow:
 - Docker Compose が使える Docker 環境
 - 詳細は [`README-docker.md`](README-docker.md)
 
-## BinDash セットアップ
+### BinDash セットアップ
 Linux/HPC では、BinDash をこのリポジトリの `experiments/tools/bin/bindash` に配置する運用を想定しています。
 次のスクリプトで、BinDash を `git clone` して `v2.6` をビルドし、その場所に自動配置できます。
 
@@ -51,7 +51,7 @@ bash scripts/bootstrap.sh
 BINDASH_TAG=v2.6 bash scripts/bootstrap.sh
 ```
 
-## OddSketch のビルド
+### OddSketch のビルド
 ```bash
 cd src
 make CXX=g++ LDFLAGS=-lstdc++fs
@@ -68,11 +68,15 @@ make CXX=g++ LDFLAGS=-lstdc++fs
 CLI の基本例:
 
 ```bash
-printf 'genome_001.fna\tgenome_001\t1\ngenome_002.fna\tgenome_002\t1\n' > genomes.tsv
-src/oddsketch sketch --listfname genomes.tsv --threads=8
-printf '%s\n' genome_001.fna.sketch genome_002.fna.sketch | src/oddsketch dist --all-to-all --threads=8
-src/oddsketch dist --bipartite --qlist queries.sketch.list --dblist db.sketch.list --threads=8
-src/oddsketch dist --pairlist sketch_pairs.tsv --threads=8
+src/oddsketch sketch --listfname data/oddsketch_cli_sample/lists/sample_genomes.tsv --threads=8
+src/oddsketch dist --all-to-all --threads=8 < data/oddsketch_cli_sample/lists/sample_sketches.list
+src/oddsketch dist --bipartite \
+  --qlist data/oddsketch_cli_sample/lists/sample_queries.sketch.list \
+  --dblist data/oddsketch_cli_sample/lists/sample_db.sketch.list \
+  --threads=8
+src/oddsketch dist \
+  --pairlist data/oddsketch_cli_sample/lists/sample_sketch_pairs.tsv \
+  --threads=8
 ```
 
 `--listfname` は次のタブ区切りファイルを受け取ります。
@@ -80,6 +84,9 @@ src/oddsketch dist --pairlist sketch_pairs.tsv --threads=8
 ```text
 Path-to-sequence-file<TAB>genome-name<TAB>number-of-consecutive-sequences
 ```
+
+上の例では、`data/oddsketch_cli_sample/fastas/` にある小さな FASTA サンプルを使います。
+`sketch` 実行後、同じディレクトリに `*.sketch` が生成されます。
 
 `dist` は 3 つの明示的な mode を持ちます。
 - `--all-to-all` または `--alltoall`: 標準入力で受け取った sketch list を all-to-all 比較

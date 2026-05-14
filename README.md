@@ -68,11 +68,15 @@ Their source files live in `experiments/tools/src/`.
 Core CLI examples:
 
 ```bash
-printf 'genome_001.fna\tgenome_001\t1\ngenome_002.fna\tgenome_002\t1\n' > genomes.tsv
-src/oddsketch sketch --listfname genomes.tsv --threads=8
-printf '%s\n' genome_001.fna.sketch genome_002.fna.sketch | src/oddsketch dist --all-to-all --threads=8
-src/oddsketch dist --bipartite --qlist queries.sketch.list --dblist db.sketch.list --threads=8
-src/oddsketch dist --pairlist sketch_pairs.tsv --threads=8
+src/oddsketch sketch --listfname data/oddsketch_cli_sample/lists/sample_genomes.tsv --threads=8
+src/oddsketch dist --all-to-all --threads=8 < data/oddsketch_cli_sample/lists/sample_sketches.list
+src/oddsketch dist --bipartite \
+  --qlist data/oddsketch_cli_sample/lists/sample_queries.sketch.list \
+  --dblist data/oddsketch_cli_sample/lists/sample_db.sketch.list \
+  --threads=8
+src/oddsketch dist \
+  --pairlist data/oddsketch_cli_sample/lists/sample_sketch_pairs.tsv \
+  --threads=8
 ```
 
 `--listfname` expects a tab-separated file:
@@ -80,6 +84,9 @@ src/oddsketch dist --pairlist sketch_pairs.tsv --threads=8
 ```text
 Path-to-sequence-file<TAB>genome-name<TAB>number-of-consecutive-sequences
 ```
+
+The examples above use the small FASTA samples under `data/oddsketch_cli_sample/fastas/`.
+After `sketch`, generated `*.sketch` files are written next to those FASTA files.
 
 `dist` supports three explicit modes:
 - `--all-to-all` (or `--alltoall`): compare all sketches listed on stdin
