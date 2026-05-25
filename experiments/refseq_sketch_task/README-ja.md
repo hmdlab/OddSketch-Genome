@@ -100,37 +100,3 @@ qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh \
 RefSeq から assembly summary と genome FASTA を取得する場合は、`refseq.download_assembly_summary` と `refseq.download_genomes` を `true` にします。大規模実行の前に `refseq.limit` と `refseq.filters` で小さく試してください。
 
 先に `qsub_download_refseq_assemblies.sh` で取得した `.fna.gz` を OddSketch に使う場合は、`paths.local_genome_list` に `data/assembly/manifests/gzip_paths.txt` を指定してください。
-
-## 1024 genome の thread sweep
-OddSketch 本体のスレッドスケーリングを見るための小規模実験です。gzip 展開時間を混ぜないよう、まず固定 seed で 1024 genome を選び、一度だけ `.fna` に展開してから、その同じ FASTA 群を `threads=1,2,4,8,16` で順に sketch 化します。
-
-root ディレクトリから実行します。
-
-```bash
-qsub experiments/refseq_sketch_task/jobs/qsub_refseq_thread_sweep_1024.sh
-```
-
-手元で段階的に実行する場合:
-
-```bash
-uv run python experiments/refseq_sketch_task/scripts/prepare_thread_sweep_subset.py
-uv run python experiments/refseq_sketch_task/scripts/run_thread_sweep.py
-```
-
-入力 subset:
-- `data/thread_sweep_1024/manifests/gzip_paths.txt`
-- `data/thread_sweep_1024/manifests/fasta_paths.txt`
-- `data/thread_sweep_1024/metadata/subset_metadata.json`
-
-各 thread 条件の config:
-- `configs/thread_sweep_1024/config_threads1.json`
-- `configs/thread_sweep_1024/config_threads2.json`
-- `configs/thread_sweep_1024/config_threads4.json`
-- `configs/thread_sweep_1024/config_threads8.json`
-- `configs/thread_sweep_1024/config_threads16.json`
-
-集計:
-- `data/thread_sweep_1024/results/thread_sweep_1024_<timestamp>.tsv`
-- `data/thread_sweep_1024/results/thread_sweep_1024_latest.tsv`
-
-集計 TSV には各条件の `elapsed_sec`, `max_rss_kbytes`, `total_sketch_bytes` に加え、`threads=1` 基準の `speedup_vs_t1` と `parallel_efficiency` を保存します。

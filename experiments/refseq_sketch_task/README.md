@@ -42,37 +42,3 @@ qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh \
 ```
 
 Use a fresh run without `--resume` when you want a new end-to-end build-time measurement.
-
-## 1024-genome thread sweep
-This small experiment measures OddSketch thread scaling while keeping the genome set fixed. To avoid mixing gzip decompression into the thread-scaling result, it first selects 1024 genomes with a fixed seed, materializes them once as `.fna`, and then sketches the same FASTA set with `threads=1,2,4,8,16`.
-
-From the repository root:
-
-```bash
-qsub experiments/refseq_sketch_task/jobs/qsub_refseq_thread_sweep_1024.sh
-```
-
-To run the two stages manually:
-
-```bash
-uv run python experiments/refseq_sketch_task/scripts/prepare_thread_sweep_subset.py
-uv run python experiments/refseq_sketch_task/scripts/run_thread_sweep.py
-```
-
-Inputs:
-- `data/thread_sweep_1024/manifests/gzip_paths.txt`
-- `data/thread_sweep_1024/manifests/fasta_paths.txt`
-- `data/thread_sweep_1024/metadata/subset_metadata.json`
-
-Per-thread configs:
-- `configs/thread_sweep_1024/config_threads1.json`
-- `configs/thread_sweep_1024/config_threads2.json`
-- `configs/thread_sweep_1024/config_threads4.json`
-- `configs/thread_sweep_1024/config_threads8.json`
-- `configs/thread_sweep_1024/config_threads16.json`
-
-Summaries:
-- `data/thread_sweep_1024/results/thread_sweep_1024_<timestamp>.tsv`
-- `data/thread_sweep_1024/results/thread_sweep_1024_latest.tsv`
-
-The summary TSV stores `elapsed_sec`, `max_rss_kbytes`, `total_sketch_bytes`, plus `speedup_vs_t1` and `parallel_efficiency` relative to the one-thread run.
