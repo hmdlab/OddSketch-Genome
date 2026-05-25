@@ -130,11 +130,6 @@ uv run python scripts/make_genomes.py --config config.json
 uv run python scripts/cal_jaccard_true.py --config config.json
 uv run python scripts/cal_jaccard_oddsketch.py --config config.json
 uv run python scripts/cal_jaccard_bindash.py --config config.json
-```
-
-RMSE 集計:
-
-```bash
 uv run python analysis/compute_rmse.py \
   --csv outputs/default/<run>/results/comparison_results_oddsketch.csv \
   --csv outputs/default/<run>/results/comparison_results_bindash.csv
@@ -147,6 +142,7 @@ uv run python analysis/compute_rmse.py \
 - 図: `experiments/pair_task/outputs/default/<run>/figures/`
 
 ## search_task
+この task は探索的な search-style benchmark です。主論文の結果には含めませんが、初期評価ワークフローの記録と、将来的な検索・DB照合実験の土台として残しています。
 既定の出力先は `experiments/search_task/outputs/default/` です。必要なら `experiments/search_task/config.json` の `paths.outdir` を変更してください。
 
 ```bash
@@ -157,25 +153,36 @@ uv run python scripts/project_runner.py --config config.json
 ```
 
 ## refseq_sketch_task
-実ゲノムを OddSketch でスケッチ化し、DB サイズ、構築時間、最大メモリ使用量を `/data` 配下に保存します。RefSeq のバージョン・取得日・`assembly_summary_refseq.txt` も run ごとの `metadata/` に保存します。
+実ゲノムを OddSketch でスケッチ化し、DB サイズ、構築時間、最大メモリ使用量を計測する workflow です。RefSeq のバージョン・取得日・`assembly_summary_refseq.txt` も run ごとの `metadata/` に保存します。
 
-先に `experiments/refseq_sketch_task/data/refseq_bacteria/assembly_summary.txt` から全アセンブリを取得する場合。既定では `.fna.gz` のみ保存します。
-
-```bash
-qsub experiments/refseq_sketch_task/jobs/qsub_download_refseq_assemblies.sh
-```
-
-root ディレクトリから実行します。
+通常は root ディレクトリから runner を直接実行します。
 
 ```bash
 make -C src CXX=g++ LDFLAGS=-lstdc++fs
+uv run python experiments/refseq_sketch_task/scripts/refseq_sketch_runner.py \
+  --config experiments/refseq_sketch_task/config.json
+```
+
+設定ファイルの `paths.local_genome_list` に取得済みの `.fna` / `.fna.gz` の list を指定できます。`.fna.gz` を指定した場合は、実行中に一時展開して sketch 後に削除します。
+
+実行準備だけ確認したい場合:
+
+```bash
+uv run python experiments/refseq_sketch_task/scripts/refseq_sketch_runner.py \
+  --config experiments/refseq_sketch_task/config.json \
+  --prepare-only
+```
+
+HPC / Grid Engine 環境では qsub wrapper も使えます。
+
+```bash
 qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh
 ```
 
-設定ファイルを指定する場合:
+先に RefSeq assembly をまとめて取得する場合:
 
 ```bash
-qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh experiments/refseq_sketch_task/config.json
+qsub experiments/refseq_sketch_task/jobs/qsub_download_refseq_assemblies.sh
 ```
 
 詳細は `experiments/README-ja.md`, `experiments/pair_task/README-ja.md`, `experiments/search_task/README_ja.md`, `experiments/refseq_sketch_task/README-ja.md` を参照してください。

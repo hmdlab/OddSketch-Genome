@@ -147,6 +147,7 @@ Generated files:
 - Figures: `experiments/pair_task/outputs/default/<run>/figures/`
 
 ## Search Benchmark
+This task is an exploratory search-style benchmark. It is not included in the main manuscript results, but is kept to document early evaluation workflows and to support future search/database experiments.
 Default outputs are written under `experiments/search_task/outputs/default/`. Override with `paths.outdir` in `experiments/search_task/config.json`.
 
 ```bash
@@ -157,25 +158,36 @@ uv run python scripts/project_runner.py --config config.json
 ```
 
 ## RefSeq Sketch Benchmark
-This task sketches real genomes with OddSketch and stores database size, build time, peak memory, RefSeq version/fetch metadata, and `assembly_summary_refseq.txt` under `/data`.
+This workflow sketches real genomes with OddSketch and records database size, build time, peak memory, RefSeq version/fetch metadata, and the saved `assembly_summary_refseq.txt`.
 
-To download every assembly listed in `experiments/refseq_sketch_task/data/refseq_bacteria/assembly_summary.txt` first. By default this keeps only `.fna.gz` files:
-
-```bash
-qsub experiments/refseq_sketch_task/jobs/qsub_download_refseq_assemblies.sh
-```
-
-Submit it from the repository root:
+Run the Python runner directly from the repository root:
 
 ```bash
 make -C src CXX=g++ LDFLAGS=-lstdc++fs
+uv run python experiments/refseq_sketch_task/scripts/refseq_sketch_runner.py \
+  --config experiments/refseq_sketch_task/config.json
+```
+
+Set `paths.local_genome_list` in the config to use existing `.fna` / `.fna.gz` files. `.fna.gz` inputs are temporarily decompressed in batches and removed after sketching.
+
+To check preparation without sketching:
+
+```bash
+uv run python experiments/refseq_sketch_task/scripts/refseq_sketch_runner.py \
+  --config experiments/refseq_sketch_task/config.json \
+  --prepare-only
+```
+
+On HPC / Grid Engine, use the qsub wrapper:
+
+```bash
 qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh
 ```
 
-With an explicit config:
+To pre-download RefSeq assemblies listed by the task config:
 
 ```bash
-qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh experiments/refseq_sketch_task/config.json
+qsub experiments/refseq_sketch_task/jobs/qsub_download_refseq_assemblies.sh
 ```
 
 See `experiments/README.md`, `experiments/pair_task/README.md`, `experiments/search_task/README.md`, and `experiments/refseq_sketch_task/README.md` for task-specific details.

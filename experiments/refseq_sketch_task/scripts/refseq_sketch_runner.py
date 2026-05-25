@@ -78,6 +78,25 @@ def allocate_run_dir(data_root: Path, run_id: str | None) -> Path:
     return candidate
 
 
+def parse_elapsed_wall_seconds(path: Path) -> float:
+    raw = ""
+    if path.exists():
+        for line in path.read_text(errors="replace").splitlines():
+            stripped = line.strip()
+            if stripped.startswith("Elapsed (wall clock) time"):
+                raw = stripped.rsplit(": ", 1)[-1]
+                break
+    parts = raw.split(":")
+    try:
+        if len(parts) == 3:
+            return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
+        if len(parts) == 2:
+            return int(parts[0]) * 60 + float(parts[1])
+    except ValueError:
+        return 0.0
+    return 0.0
+
+
 def download_file(url: str, out_path: Path) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     tmp = out_path.with_suffix(out_path.suffix + ".tmp")
@@ -358,12 +377,14 @@ def run_sketch_with_temporary_inputs(
     logs_dir: Path,
     sketches_dir: Path,
     cfg: dict,
+    resume: bool = False,
 ) -> tuple[float, dict[str, str], list[Path], int]:
     odd = cfg.get("oddsketch", {})
     threads = int(odd.get("threads", 1))
     batch_size = max(1, int(odd.get("gzip_batch_size", max(1, threads * 16))))
 
     total_elapsed = 0.0
+    total_decompression_elapsed = 0.0
     max_rss = 0
     user_sec = 0.0
     system_sec = 0.0
@@ -373,10 +394,34 @@ def run_sketch_with_temporary_inputs(
     for batch_start in range(0, len(genomes), batch_size):
         batch_count += 1
         batch = genomes[batch_start : batch_start + batch_size]
+        expected_sketches: list[Path] = []
+        for offset, (name, source) in enumerate(batch):
+            idx = batch_start + offset + 1
+            if is_gzip_path(source):
+                target_name = f"{idx:08d}_{safe_name(ungzip_name(source))}"
+            else:
+                suffix = "".join(source.suffixes) or ".fna"
+                target_name = f"{idx:08d}_{safe_name(name)}{suffix}"
+            expected_sketches.append(sketches_dir / f"{target_name}.sketch")
+
+        batch_input_list = manifests_dir / f"genome_paths_batch_{batch_count:06d}.txt"
+        batch_stdout = logs_dir / f"oddsketch_sketch_stdout_batch_{batch_count:06d}.txt"
+        batch_time = logs_dir / f"oddsketch_sketch_time_batch_{batch_count:06d}.txt"
+        if resume and batch_stdout.exists() and batch_time.exists() and all(path.exists() for path in expected_sketches):
+            metrics = parse_time_v(batch_time)
+            total_elapsed += parse_elapsed_wall_seconds(batch_time)
+            max_rss = max(max_rss, metric_int(metrics, "Maximum resident set size (kbytes)"))
+            user_sec += metric_float(metrics, "User time (seconds)")
+            system_sec += metric_float(metrics, "System time (seconds)")
+            relocated_all.extend(path.resolve() for path in expected_sketches)
+            print(f"[resume] batch {batch_count}: {len(batch)} genomes")
+            continue
+
         batch_dir = temp_root / f"batch_{batch_count:06d}"
         batch_dir.mkdir(parents=True, exist_ok=True)
         batch_inputs: list[Path] = []
         try:
+            decompress_t0 = perf_counter()
             for offset, (name, source) in enumerate(batch):
                 idx = batch_start + offset + 1
                 if is_gzip_path(source):
@@ -390,10 +435,8 @@ def run_sketch_with_temporary_inputs(
                         target.unlink()
                     target.symlink_to(source)
                 batch_inputs.append(target)
+            total_decompression_elapsed += perf_counter() - decompress_t0
 
-            batch_input_list = manifests_dir / f"genome_paths_batch_{batch_count:06d}.txt"
-            batch_stdout = logs_dir / f"oddsketch_sketch_stdout_batch_{batch_count:06d}.txt"
-            batch_time = logs_dir / f"oddsketch_sketch_time_batch_{batch_count:06d}.txt"
             write_list(batch_input_list, batch_inputs)
             elapsed, metrics = run_sketch(batch_input_list, batch_stdout, batch_time, cfg)
             total_elapsed += elapsed
@@ -411,6 +454,7 @@ def run_sketch_with_temporary_inputs(
         "System time (seconds)": f"{system_sec:.2f}",
         "Percent of CPU this job got": "",
         "Exit status": "0",
+        "Temporary decompression time (seconds)": f"{total_decompression_elapsed:.6f}",
     }
     return total_elapsed, time_metrics, relocated_all, batch_count
 
@@ -428,12 +472,19 @@ def main() -> None:
     ap.add_argument("--config", default="config.json")
     ap.add_argument("--run-id", default=None)
     ap.add_argument("--prepare-only", action="store_true")
+    ap.add_argument("--resume", action="store_true", help="Resume an existing --run-id from completed batches.")
     args = ap.parse_args()
 
     cfg_path = resolve_config(args.config)
     cfg = json.loads(cfg_path.read_text())
     data_root = resolve_path(task_root(), cfg.get("paths", {}).get("data_root")) or (task_root() / "outputs")
+    if args.resume and not args.run_id:
+        raise SystemExit("--resume requires --run-id")
     run_dir = allocate_run_dir(data_root, args.run_id)
+    if args.resume and not run_dir.exists():
+        raise SystemExit(f"resume run not found: {run_dir}")
+    if not args.resume and args.run_id and run_dir.exists():
+        raise SystemExit(f"run already exists: {run_dir}")
     metadata_dir = run_dir / "metadata"
     manifests_dir = run_dir / "manifests"
     input_dir = run_dir / "genome_inputs"
@@ -491,6 +542,7 @@ def main() -> None:
         print(f"[prepare] run_dir={run_dir}")
         return
 
+    workflow_t0 = perf_counter()
     if uses_gzip_inputs:
         elapsed_sec, time_metrics, relocated, batch_count = run_sketch_with_temporary_inputs(
             genomes,
@@ -499,6 +551,7 @@ def main() -> None:
             logs_dir,
             sketches_dir,
             cfg,
+            resume=args.resume,
         )
     else:
         stdout_path = logs_dir / "oddsketch_sketch_stdout.txt"
@@ -506,12 +559,15 @@ def main() -> None:
         elapsed_sec, time_metrics = run_sketch(input_list, stdout_path, time_path, cfg)
         relocated = relocate_sketches(stdout_path, sketches_dir)
         batch_count = 1
+    workflow_elapsed_sec = perf_counter() - workflow_t0
     sketch_list = manifests_dir / "sketch_paths.txt"
     write_list(sketch_list, relocated)
 
     total_sketch_bytes = sum(path.stat().st_size for path in relocated)
     timing = {
         "elapsed_sec": f"{elapsed_sec:.6f}",
+        "workflow_elapsed_sec": f"{workflow_elapsed_sec:.6f}",
+        "temporary_decompression_sec": time_metrics.get("Temporary decompression time (seconds)", ""),
         "max_rss_kbytes": time_metrics.get("Maximum resident set size (kbytes)", ""),
         "user_sec": time_metrics.get("User time (seconds)", ""),
         "system_sec": time_metrics.get("System time (seconds)", ""),
