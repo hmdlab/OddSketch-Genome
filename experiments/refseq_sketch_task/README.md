@@ -8,6 +8,8 @@ To download all assemblies listed in `data/refseq_bacteria/assembly_summary.txt`
 qsub experiments/refseq_sketch_task/jobs/qsub_download_refseq_assemblies.sh
 ```
 
+The download job uses the `download` section in `experiments/refseq_sketch_task/config.json` by default.
+
 The downloader writes `.fna.gz` files to `data/assembly/gzip/` and saves version/fetch metadata plus a copied `assembly_summary.txt` under `data/assembly/metadata/`. By default it does not keep decompressed FASTA files; OddSketch reads `.fna.gz` inputs directly during sketching.
 
 Before a large sketch run, validate downloaded gzip files and redownload only corrupt ones:
@@ -31,7 +33,7 @@ Outputs are written under `experiments/refseq_sketch_task/data/sketch_runs/runs/
 
 In `oddsketch_sketch_metrics.tsv`, `elapsed_sec` is the OddSketch runtime, while `workflow_elapsed_sec` includes runner-side setup and manifest handling.
 
-Use `paths.local_genome_list` for already-downloaded FASTA files. Set `refseq.download_assembly_summary=true` and `refseq.download_genomes=true` only when the job should fetch RefSeq files itself.
+Use `paths.local_genome_list` in `config.json` for already-downloaded FASTA or `.fna.gz` files. Downloading RefSeq assemblies is handled by the separate download job/config.
 
 To resume an interrupted run:
 

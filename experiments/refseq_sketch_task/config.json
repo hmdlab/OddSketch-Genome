@@ -14,17 +14,9 @@
     "decompress": false,
     "limit": null
   },
-  "refseq": {
-    "assembly_summary_url": "https://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt",
+  "refseq_sketch": {
     "version_label": "RefSeq assembly_summary_refseq.txt",
-    "download_assembly_summary": false,
-    "download_genomes": false,
-    "limit": null,
-    "filters": {
-      "taxid": null,
-      "assembly_level": [],
-      "refseq_category": []
-    }
+    "limit": null
   },
   "oddsketch": {
     "threads": 16,

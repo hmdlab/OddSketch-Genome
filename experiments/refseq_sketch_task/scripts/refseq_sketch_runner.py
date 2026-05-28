@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import argparse
 import csv
-import gzip
 import hashlib
 import json
 import os
 import shutil
 import subprocess
-import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
@@ -77,32 +75,17 @@ def allocate_run_dir(data_root: Path, run_id: str | None) -> Path:
     return candidate
 
 
-def download_file(url: str, out_path: Path) -> None:
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = out_path.with_suffix(out_path.suffix + ".tmp")
-    print(f"[download] {url} -> {out_path}")
-    urllib.request.urlretrieve(url, tmp)
-    tmp.replace(out_path)
+def refseq_sketch_cfg(cfg: dict) -> dict:
+    return cfg.get("refseq_sketch", {})
 
 
-def copy_or_download_assembly_summary(cfg: dict, metadata_dir: Path) -> Path:
+def copy_assembly_summary(cfg: dict, metadata_dir: Path) -> Path:
     paths = cfg.get("paths", {})
-    refseq = cfg.get("refseq", {})
     source = resolve_path(task_root(), paths.get("assembly_summary"))
     saved = metadata_dir / "assembly_summary_refseq.txt"
 
-    if refseq.get("download_assembly_summary", False):
-        url = refseq.get("assembly_summary_url")
-        if not url:
-            raise SystemExit("refseq.assembly_summary_url is required when download_assembly_summary=true")
-        download_file(url, saved)
-        return saved
-
     if not source or not source.exists():
-        raise SystemExit(
-            "assembly_summary not found. Set paths.assembly_summary, or set "
-            "refseq.download_assembly_summary=true."
-        )
+        raise SystemExit("assembly_summary not found. Set paths.assembly_summary.")
     shutil.copy2(source, saved)
     return saved
 
@@ -131,71 +114,16 @@ def read_assembly_summary(path: Path) -> list[dict[str, str]]:
     return rows
 
 
-def passes_filters(row: dict[str, str], filters: dict) -> bool:
-    taxid = filters.get("taxid")
-    if taxid is not None and str(row.get("taxid", "")) != str(taxid):
-        return False
-
-    for key in ("assembly_level", "refseq_category"):
-        allowed = filters.get(key) or []
-        if allowed and row.get(key, "") not in set(map(str, allowed)):
-            return False
-
-    return row.get("ftp_path", "") not in ("", "na")
-
-
 def select_assemblies(summary_path: Path, cfg: dict) -> list[dict[str, str]]:
-    refseq = cfg.get("refseq", {})
-    filters = refseq.get("filters", {})
-    limit = refseq.get("limit")
-    rows = [row for row in read_assembly_summary(summary_path) if passes_filters(row, filters)]
+    limit = refseq_sketch_cfg(cfg).get("limit")
+    rows = [row for row in read_assembly_summary(summary_path) if row.get("ftp_path", "") not in ("", "na")]
     if limit is not None:
         rows = rows[: int(limit)]
     return rows
 
 
-def genomic_fna_url(ftp_path: str) -> str:
-    base = ftp_path.rstrip("/").split("/")[-1]
-    url = ftp_path.rstrip("/") + f"/{base}_genomic.fna.gz"
-    if url.startswith("ftp://"):
-        url = "https://" + url[len("ftp://") :]
-    return url
-
-
-def decompress_gzip(gz_path: Path, out_path: Path) -> None:
-    if out_path.exists() and out_path.stat().st_size > 0:
-        return
-    tmp = out_path.with_suffix(out_path.suffix + ".tmp")
-    with gzip.open(gz_path, "rb") as inf, tmp.open("wb") as outf:
-        shutil.copyfileobj(inf, outf)
-    tmp.replace(out_path)
-
-
 def safe_name(value: str) -> str:
     return "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in value)
-
-
-def materialize_refseq_genomes(rows: list[dict[str, str]], cfg: dict, genomes_dir: Path) -> list[tuple[str, Path]]:
-    if not cfg.get("refseq", {}).get("download_genomes", False):
-        raise SystemExit(
-            "RefSeq assemblies were selected, but refseq.download_genomes=false. "
-            "Enable it, or provide paths.local_genome_list."
-        )
-
-    downloads_dir = genomes_dir / "downloads"
-    fasta_dir = genomes_dir / "fasta"
-    fasta_dir.mkdir(parents=True, exist_ok=True)
-    result: list[tuple[str, Path]] = []
-    for row in rows:
-        accession = row["assembly_accession"]
-        url = genomic_fna_url(row["ftp_path"])
-        gz_path = downloads_dir / Path(url).name
-        fna_path = fasta_dir / f"{safe_name(accession)}.fna"
-        if not gz_path.exists():
-            download_file(url, gz_path)
-        decompress_gzip(gz_path, fna_path)
-        result.append((accession, fna_path))
-    return result
 
 
 def read_local_genome_list(list_path: Path) -> list[tuple[str, Path]]:
@@ -379,24 +307,25 @@ def main() -> None:
     metadata_dir = run_dir / "metadata"
     manifests_dir = run_dir / "manifests"
     input_dir = run_dir / "genome_inputs"
-    genomes_dir = run_dir / "genomes"
     sketches_dir = run_dir / "sketches"
     logs_dir = run_dir / "logs"
-    for d in (metadata_dir, manifests_dir, input_dir, genomes_dir, sketches_dir, logs_dir):
+    for d in (metadata_dir, manifests_dir, input_dir, sketches_dir, logs_dir):
         d.mkdir(parents=True, exist_ok=True)
 
     used_config = metadata_dir / "used_config.json"
     used_config.write_text(json.dumps(cfg, indent=2) + "\n")
 
-    summary_path = copy_or_download_assembly_summary(cfg, metadata_dir)
+    summary_path = copy_assembly_summary(cfg, metadata_dir)
     selected_rows = select_assemblies(summary_path, cfg)
     write_tsv(metadata_dir / "selected_assemblies.tsv", selected_rows, ASSEMBLY_COLUMNS)
 
     local_list = resolve_path(task_root(), cfg.get("paths", {}).get("local_genome_list"))
-    if local_list:
-        genomes = read_local_genome_list(local_list)
-    else:
-        genomes = materialize_refseq_genomes(selected_rows, cfg, genomes_dir)
+    if not local_list:
+        raise SystemExit("paths.local_genome_list is required for sketch. Run the download job first.")
+    genomes = read_local_genome_list(local_list)
+    limit = refseq_sketch_cfg(cfg).get("limit")
+    if limit is not None:
+        genomes = genomes[: int(limit)]
 
     input_list = manifests_dir / "genome_paths.txt"
     original_inputs = [path for _, path in genomes]
@@ -407,9 +336,8 @@ def main() -> None:
     metadata = {
         "run_dir": str(run_dir),
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
-        "refseq_version_label": cfg.get("refseq", {}).get("version_label"),
+        "refseq_sketch_version_label": refseq_sketch_cfg(cfg).get("version_label"),
         "assembly_summary_source": cfg.get("paths", {}).get("assembly_summary"),
-        "assembly_summary_url": cfg.get("refseq", {}).get("assembly_summary_url"),
         "assembly_summary_saved": str(summary_path),
         "assembly_summary_comments": assembly_comments(summary_path),
         "selected_assemblies": len(selected_rows),
