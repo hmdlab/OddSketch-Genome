@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdint>
 #include <exception>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -21,7 +22,11 @@
 #include <utility>
 #include <vector>
 
+#include <zlib.h>
+
 namespace {
+
+namespace fs = std::filesystem;
 
 constexpr uint64_t kHashSeed = 0x9E3779B97F4A7C15ULL;
 constexpr uint64_t kEmptyBucket = std::numeric_limits<uint64_t>::max();
@@ -40,19 +45,20 @@ struct OddsketchOptions {
 
 struct CliArgs {
     std::string mode;
-    std::string listfname_path;
+    std::string input_paths_path;
     std::string qlist_path;
     std::string dblist_path;
     std::string pairlist_path;
+    std::string out_dir;
+    std::string manifest_path;
     bool explicit_all_to_all = false;
     bool explicit_bipartite = false;
+    bool skip_existing = false;
     OddsketchOptions options;
 };
 
 struct SketchInput {
     std::string sequence_path;
-    std::string genome_name;
-    size_t consecutive_sequences = 1;
 };
 
 // OPH で得た稠密 MinHash と、そのとき実際に使ったバケット数。
@@ -162,6 +168,11 @@ size_t floor_pow2(size_t x) {
         p <<= 1;
     }
     return p;
+}
+
+bool ends_with(const std::string& value, const std::string& suffix) {
+    return value.size() >= suffix.size() &&
+           value.compare(value.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
 
 size_t compute_num_buckets(const OddsketchOptions& options) {
@@ -338,7 +349,7 @@ size_t map_position(uint32_t idx, uint64_t hv, size_t nbits, size_t kbuckets, Po
     return static_cast<size_t>(mixed % nbits);
 }
 
-SketchBuildResult make_odd_sketch_from_fasta(const std::string& fname, const OddsketchOptions& options) {
+std::string read_plain_fasta_sequence(const std::string& fname) {
     std::ifstream ifs(fname);
     if (!ifs) {
         throw std::runtime_error("Cannot open " + fname);
@@ -346,13 +357,70 @@ SketchBuildResult make_odd_sketch_from_fasta(const std::string& fname, const Odd
 
     std::string line;
     std::string seq;
-    // 現在は FASTA を単純に 1 本の塩基列として連結して扱う。
     while (std::getline(ifs, line)) {
         if (line.empty() || line[0] == '>') {
             continue;
         }
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
         seq += line;
     }
+    return seq;
+}
+
+std::string read_gzip_fasta_sequence(const std::string& fname) {
+    gzFile file = gzopen(fname.c_str(), "rb");
+    if (file == nullptr) {
+        throw std::runtime_error("Cannot open gzip FASTA: " + fname);
+    }
+
+    std::string seq;
+    std::vector<char> buffer(1024 * 1024);
+    bool at_line_start = true;
+    bool skipping_header = false;
+    while (gzgets(file, buffer.data(), static_cast<int>(buffer.size())) != nullptr) {
+        for (const char c : std::string_view(buffer.data())) {
+            if (at_line_start && c == '>') {
+                skipping_header = true;
+            }
+            if (c == '\n') {
+                at_line_start = true;
+                skipping_header = false;
+                continue;
+            }
+            if (c == '\r') {
+                continue;
+            }
+            if (!skipping_header) {
+                seq.push_back(c);
+            }
+            at_line_start = false;
+        }
+    }
+
+    int gzerrnum = Z_OK;
+    const char* gzerr = gzerror(file, &gzerrnum);
+    const int close_status = gzclose(file);
+    if (gzerrnum != Z_OK && gzerrnum != Z_STREAM_END) {
+        throw std::runtime_error("Error reading gzip FASTA " + fname + ": " + std::string(gzerr ? gzerr : "unknown error"));
+    }
+    if (close_status != Z_OK) {
+        throw std::runtime_error("Error closing gzip FASTA: " + fname);
+    }
+    return seq;
+}
+
+std::string read_fasta_sequence(const std::string& fname) {
+    if (ends_with(fname, ".gz")) {
+        return read_gzip_fasta_sequence(fname);
+    }
+    return read_plain_fasta_sequence(fname);
+}
+
+SketchBuildResult make_odd_sketch_from_fasta(const std::string& fname, const OddsketchOptions& options) {
+    // 現在は FASTA を単純に 1 本の塩基列として連結して扱う。
+    const std::string seq = read_fasta_sequence(fname);
 
     if (options.sketch_size == 0 || (options.sketch_size % 64) != 0) {
         throw std::runtime_error("Invalid sketch size (must be a positive multiple of 64)");
@@ -544,58 +612,22 @@ std::vector<SketchInput> read_sketch_inputs_from_stdin() {
     std::vector<SketchInput> inputs;
     inputs.reserve(paths.size());
     for (const auto& path : paths) {
-        inputs.push_back({path, "", 1});
+        inputs.push_back({path});
     }
     return inputs;
 }
 
-std::vector<SketchInput> read_sketch_inputs_from_listfname_file(const std::string& listfname_path) {
-    std::ifstream ifs(listfname_path);
-    if (!ifs) {
-        throw std::runtime_error("Cannot open listfname file: " + listfname_path);
-    }
-
+std::vector<SketchInput> make_sketch_inputs_from_paths(const std::vector<std::string>& paths) {
     std::vector<SketchInput> inputs;
-    std::string line;
-    size_t lineno = 0;
-    while (std::getline(ifs, line)) {
-        ++lineno;
-        if (line.empty()) {
-            continue;
-        }
-
-        const auto first_tab = line.find('\t');
-        const auto second_tab = (first_tab == std::string::npos) ? std::string::npos : line.find('\t', first_tab + 1);
-        if (first_tab == std::string::npos || second_tab == std::string::npos) {
-            throw std::runtime_error(
-                "Invalid listfname line " + std::to_string(lineno) +
-                ": expected Path-to-sequence-file<TAB>genome-name<TAB>number-of-consecutive-sequences"
-            );
-        }
-
-        const std::string path = line.substr(0, first_tab);
-        const std::string genome_name = line.substr(first_tab + 1, second_tab - first_tab - 1);
-        const std::string consecutive_raw = line.substr(second_tab + 1);
-        if (path.empty() || genome_name.empty() || consecutive_raw.empty() || consecutive_raw.find('\t') != std::string::npos) {
-            throw std::runtime_error(
-                "Invalid listfname line " + std::to_string(lineno) +
-                ": expected exactly three non-empty tab-separated fields"
-            );
-        }
-
-        size_t consecutive_sequences = 0;
-        try {
-            consecutive_sequences = static_cast<size_t>(std::stoul(consecutive_raw));
-        } catch (...) {
-            throw std::runtime_error("Invalid listfname line " + std::to_string(lineno) + ": consecutive sequence count must be a positive integer");
-        }
-        if (consecutive_sequences == 0) {
-            throw std::runtime_error("Invalid listfname line " + std::to_string(lineno) + ": consecutive sequence count must be positive");
-        }
-
-        inputs.push_back({path, genome_name, consecutive_sequences});
+    inputs.reserve(paths.size());
+    for (const auto& path : paths) {
+        inputs.push_back({path});
     }
     return inputs;
+}
+
+std::vector<SketchInput> read_sketch_inputs_from_input_paths_file(const std::string& input_paths_path) {
+    return make_sketch_inputs_from_paths(read_paths_from_list_file(input_paths_path));
 }
 
 std::vector<SketchPair> read_pairs_from_pairlist_file(const std::string& pairlist_path) {
@@ -626,6 +658,50 @@ std::vector<SketchPair> read_pairs_from_pairlist_file(const std::string& pairlis
         pairs.push_back({left, right});
     }
     return pairs;
+}
+
+std::string sketch_output_path(const SketchInput& input, const CliArgs& args) {
+    if (args.out_dir.empty()) {
+        return input.sequence_path + ".sketch";
+    }
+
+    std::string filename = fs::path(input.sequence_path).filename().string();
+    if (ends_with(filename, ".gz")) {
+        filename.resize(filename.size() - 3);
+    }
+    return (fs::path(args.out_dir) / (filename + ".sketch")).string();
+}
+
+void ensure_parent_dir(const std::string& path) {
+    const fs::path parent = fs::path(path).parent_path();
+    if (!parent.empty()) {
+        fs::create_directories(parent);
+    }
+}
+
+void write_manifest_file(const std::string& manifest_path, const std::vector<std::string>& output_paths) {
+    ensure_parent_dir(manifest_path);
+    std::ofstream ofs(manifest_path);
+    if (!ofs) {
+        throw std::runtime_error("Cannot write manifest: " + manifest_path);
+    }
+    for (const auto& output_path : output_paths) {
+        ofs << output_path << "\n";
+    }
+}
+
+void reject_duplicate_outputs(const std::vector<std::string>& output_paths) {
+    std::unordered_map<std::string, size_t> seen;
+    for (size_t i = 0; i < output_paths.size(); ++i) {
+        const auto inserted = seen.emplace(output_paths[i], i);
+        if (!inserted.second) {
+            throw std::runtime_error(
+                "Duplicate sketch output path: " + output_paths[i] +
+                " (inputs " + std::to_string(inserted.first->second + 1) +
+                " and " + std::to_string(i + 1) + ")"
+            );
+        }
+    }
 }
 
 std::vector<PairlistGroup> group_pairs_by_left(const std::vector<SketchPair>& pairs) {
@@ -833,10 +909,12 @@ void set_threads(OddsketchOptions& options, const std::string& value) {
 }
 
 bool option_requires_value(const std::string& key) {
-    return key == "listfname" ||
+    return key == "input-paths" ||
            key == "qlist" ||
            key == "dblist" ||
            key == "pairlist" ||
+           key == "out-dir" ||
+           key == "manifest" ||
            key == "kmer" ||
            key == "kmerlen" ||
            key == "sketch-size" ||
@@ -885,9 +963,9 @@ CliArgs parse_options(int argc, char** argv) {
             require_value(key, value);
         }
 
-        if (key == "listfname") {
+        if (key == "input-paths") {
             require_value(key, value);
-            args.listfname_path = value;
+            args.input_paths_path = value;
         } else if (key == "qlist") {
             require_value(key, value);
             args.qlist_path = value;
@@ -897,6 +975,14 @@ CliArgs parse_options(int argc, char** argv) {
         } else if (key == "pairlist") {
             require_value(key, value);
             args.pairlist_path = value;
+        } else if (key == "out-dir") {
+            require_value(key, value);
+            args.out_dir = value;
+        } else if (key == "manifest") {
+            require_value(key, value);
+            args.manifest_path = value;
+        } else if (key == "skip-existing") {
+            args.skip_existing = true;
         } else if (key == "all-to-all" || key == "alltoall") {
             args.explicit_all_to_all = true;
         } else if (key == "bipartite") {
@@ -926,13 +1012,16 @@ CliArgs parse_options(int argc, char** argv) {
 void print_usage() {
     std::cerr
         << "Usage:\n"
-        << "  oddsketch sketch --listfname genomes.tsv [options]\n"
+        << "  oddsketch sketch --input-paths genomes.list [options]\n"
         << "  oddsketch dist --all-to-all [options] < sketches.list\n"
         << "  oddsketch dist --bipartite --qlist queries.list --dblist db.list [options]\n"
         << "  oddsketch dist --pairlist pairs.tsv [options]\n"
         << "\n"
         << "Options:\n"
-        << "  --listfname=genomes.tsv\n"
+        << "  --input-paths=genomes.list\n"
+        << "  --out-dir=sketches\n"
+        << "  --manifest=sketch_paths.txt\n"
+        << "  --skip-existing\n"
         << "  --kmer=N, --kmerlen=N\n"
         << "  --sketch-size=M\n"
         << "  --canonical=0|1\n"
@@ -941,7 +1030,7 @@ void print_usage() {
         << "  --threads=N\n"
         << "\n"
         << "Compatibility:\n"
-        << "  oddsketch sketch < paths.list still accepts one FASTA path per line.\n"
+        << "  oddsketch sketch < paths.list still accepts one FASTA or FASTA.gz path per line.\n"
         << "  oddsketch dist < sketches.list still runs all-to-all.\n"
         << "  --name=value and --name value are both accepted for value options.\n";
 }
@@ -979,8 +1068,12 @@ int oddsketch_cli_main(int argc, char** argv) {
         std::cerr << "Usage error: choose only one dist mode: --all-to-all, --bipartite, or --pairlist\n";
         return 1;
     }
-    if (args.mode == "dist" && !args.listfname_path.empty()) {
-        std::cerr << "Usage error: --listfname is only valid for sketch\n";
+    if (args.mode == "dist" && !args.input_paths_path.empty()) {
+        std::cerr << "Usage error: --input-paths is only valid for sketch\n";
+        return 1;
+    }
+    if (args.mode == "dist" && (!args.out_dir.empty() || !args.manifest_path.empty() || args.skip_existing)) {
+        std::cerr << "Usage error: --out-dir, --manifest, and --skip-existing are only valid for sketch\n";
         return 1;
     }
     if (args.explicit_bipartite && (args.qlist_path.empty() || args.dblist_path.empty())) {
@@ -990,9 +1083,9 @@ int oddsketch_cli_main(int argc, char** argv) {
 
     try {
         if (args.mode == "sketch") {
-            const auto inputs = args.listfname_path.empty()
-                ? read_sketch_inputs_from_stdin()
-                : read_sketch_inputs_from_listfname_file(args.listfname_path);
+            const auto inputs = !args.input_paths_path.empty()
+                ? read_sketch_inputs_from_input_paths_file(args.input_paths_path)
+                : read_sketch_inputs_from_stdin();
             std::cerr << "[oddsketch] sketch: nbits=" << args.options.sketch_size
                       << ", kbuckets=" << compute_num_buckets(args.options)
                       << ", inputs=" << inputs.size()
@@ -1000,13 +1093,26 @@ int oddsketch_cli_main(int argc, char** argv) {
                       << ", j0=" << std::fixed << std::setprecision(6) << args.options.j0
                       << ", canonical=" << (args.options.canonical ? "true" : "false")
                       << ", pos-mode=" << pos_mode_name(args.options.pos_mode)
+                      << ", out-dir=" << (args.out_dir.empty() ? "<input-dir>" : args.out_dir)
+                      << ", skip-existing=" << (args.skip_existing ? "true" : "false")
                       << "\n";
 
-            // sketch writes one output per input FASTA, preserving the historical <input>.sketch name.
+            // By default sketch writes <input>.sketch; --out-dir writes one file per input basename.
             std::vector<std::string> output_paths(inputs.size());
+            for (size_t i = 0; i < inputs.size(); ++i) {
+                output_paths[i] = sketch_output_path(inputs[i], args);
+            }
+            reject_duplicate_outputs(output_paths);
+            if (!args.out_dir.empty()) {
+                fs::create_directories(args.out_dir);
+            }
+
             run_in_parallel(inputs.size(), args.options.threads, [&](size_t i) {
                 const auto& input = inputs[i];
-                const std::string output_path = input.sequence_path + ".sketch";
+                const std::string& output_path = output_paths[i];
+                if (args.skip_existing && fs::exists(output_path) && fs::file_size(output_path) > 0) {
+                    return;
+                }
                 const SketchBuildResult sketch = make_odd_sketch_from_fasta(input.sequence_path, args.options);
                 write_sketch_binary(
                     sketch.words,
@@ -1015,8 +1121,11 @@ int oddsketch_cli_main(int argc, char** argv) {
                     static_cast<uint64_t>(sketch.num_buckets),
                     args.options.j0
                 );
-                output_paths[i] = output_path;
             });
+
+            if (!args.manifest_path.empty()) {
+                write_manifest_file(args.manifest_path, output_paths);
+            }
 
             for (const auto& output_path : output_paths) {
                 std::cout << output_path << "\n";

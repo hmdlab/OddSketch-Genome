@@ -29,6 +29,7 @@ OddSketch では次ができます。
 
 ローカル workflow:
 - C++17 コンパイラ
+- zlib の開発ヘッダ・ライブラリ
 - Python 3.10+
 - `uv sync`
 - BinDash は比較実験を行う場合のみ必要
@@ -65,10 +66,21 @@ make CXX=g++ LDFLAGS=-lstdc++fs
 `experiments/tools/bin/true_jaccard` と `experiments/tools/bin/true_index_pairs` は実験ワークフロー用の補助バイナリであり、OddSketch 本体 CLI そのものではありません。
 ソースは `experiments/tools/src/` にあります。
 
-CLI の基本例:
+CLI の基本例。
+
+FASTA path list から sketch を作り、出力先と manifest を指定する例:
 
 ```bash
-src/oddsketch sketch --listfname data/oddsketch_cli_sample/lists/sample_genomes.tsv --threads=8
+src/oddsketch sketch \
+  --input-paths data/oddsketch_cli_sample/lists/sample_fastas.list \
+  --out-dir /tmp/oddsketch_sketches \
+  --manifest /tmp/oddsketch_sketches.list \
+  --threads=8
+```
+
+生成済み sketch を比較する例:
+
+```bash
 src/oddsketch dist --all-to-all --threads=8 < data/oddsketch_cli_sample/lists/sample_sketches.list
 src/oddsketch dist --bipartite \
   --qlist data/oddsketch_cli_sample/lists/sample_queries.sketch.list \
@@ -79,14 +91,10 @@ src/oddsketch dist \
   --threads=8
 ```
 
-`--listfname` は次のタブ区切りファイルを受け取ります。
-
-```text
-Path-to-sequence-file<TAB>genome-name<TAB>number-of-consecutive-sequences
-```
+`sketch` は `--input-paths` または標準入力で、1 行 1 件の FASTA / `.fna.gz` path を受け取れます。`--out-dir` で sketch の保存先 directory を指定し、`--manifest` で生成された sketch list を保存できます。`--skip-existing` を指定すると、既存の非空 sketch を再構築せずに resume できます。
 
 上の例では、`data/oddsketch_cli_sample/fastas/` にある小さな FASTA サンプルを使います。
-`sketch` 実行後、同じディレクトリに `*.sketch` が生成されます。
+`--out-dir` を指定しない場合は、入力 FASTA と同じディレクトリに `*.sketch` が生成されます。
 
 `dist` は 3 つの明示的な mode を持ちます。
 - `--all-to-all` または `--alltoall`: 標準入力で受け取った sketch list を all-to-all 比較
@@ -163,7 +171,7 @@ uv run python experiments/refseq_sketch_task/scripts/refseq_sketch_runner.py \
   --config experiments/refseq_sketch_task/config.json
 ```
 
-設定ファイルの `paths.local_genome_list` に取得済みの `.fna` / `.fna.gz` の list を指定できます。`.fna.gz` を指定した場合は、実行中に一時展開して sketch 後に削除します。
+設定ファイルの `paths.local_genome_list` に取得済みの `.fna` / `.fna.gz` の list を指定できます。`.fna.gz` は OddSketch が直接読みます。
 
 実行準備だけ確認したい場合:
 

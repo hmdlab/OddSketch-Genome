@@ -4,7 +4,7 @@
 
 ## 入力
 - `assembly_summary_refseq.txt`: RefSeq の assembly summary。実行時に `metadata/assembly_summary_refseq.txt` へ必ずコピーまたは保存します。
-- `paths.local_genome_list`: 既に取得済みの genome list。`.fna.gz` のリストを指定すると、sketch 時だけ batch ごとに一時展開します。
+- `paths.local_genome_list`: 既に取得済みの genome list。`.fna` / `.fna.gz` のリストを指定できます。
 
 ## 先に全アセンブリをダウンロード
 `experiments/refseq_sketch_task/data/refseq_bacteria/assembly_summary.txt` に列挙された全アセンブリの genomic FASTA を `experiments/refseq_sketch_task/data/assembly/` に保存します。既定では容量を抑えるため `.fna.gz` のみを `gzip/` に保存し、展開済み `.fna` は保存しません。
@@ -57,9 +57,9 @@ uv run python experiments/refseq_sketch_task/scripts/validate_refseq_gzip.py --r
 - `logs/oddsketch_sketch_stdout.txt`
 - `logs/oddsketch_sketch_time.txt`
 
-`paths.local_genome_list` が `.fna.gz` を指す場合、この runner は `/data/.../temporary_fasta/` に batch ごとに一時展開し、OddSketch 実行後に展開済み FASTA を削除します。生成された `.sketch` は `/data/.../sketches/` へ移動します。
+`paths.local_genome_list` が `.fna.gz` を指す場合も、OddSketch が gzip FASTA を直接読みます。生成された `.sketch` は `/data/.../sketches/` へ保存します。
 
-`oddsketch_sketch_metrics.tsv` の `elapsed_sec` は OddSketch 本体の合計時間、`workflow_elapsed_sec` は一時展開を含む sketch workflow 全体の時間です。
+`oddsketch_sketch_metrics.tsv` の `elapsed_sec` は OddSketch 本体の実行時間、`workflow_elapsed_sec` は runner 側の準備や manifest 処理を含む sketch workflow 全体の時間です。
 
 ## 実行例
 root ディレクトリで実行します。

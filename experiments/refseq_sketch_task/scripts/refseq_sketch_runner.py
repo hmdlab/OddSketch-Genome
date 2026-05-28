@@ -10,7 +10,6 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -76,25 +75,6 @@ def allocate_run_dir(data_root: Path, run_id: str | None) -> Path:
         candidate = data_root / "runs" / f"{stamp}_{suffix:02d}"
         suffix += 1
     return candidate
-
-
-def parse_elapsed_wall_seconds(path: Path) -> float:
-    raw = ""
-    if path.exists():
-        for line in path.read_text(errors="replace").splitlines():
-            stripped = line.strip()
-            if stripped.startswith("Elapsed (wall clock) time"):
-                raw = stripped.rsplit(": ", 1)[-1]
-                break
-    parts = raw.split(":")
-    try:
-        if len(parts) == 3:
-            return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
-        if len(parts) == 2:
-            return int(parts[0]) * 60 + float(parts[1])
-    except ValueError:
-        return 0.0
-    return 0.0
 
 
 def download_file(url: str, out_path: Path) -> None:
@@ -246,8 +226,11 @@ def make_input_links(genomes: list[tuple[str, Path]], input_dir: Path) -> list[P
     input_dir.mkdir(parents=True, exist_ok=True)
     linked: list[Path] = []
     for idx, (name, source) in enumerate(genomes, 1):
-        suffix = "".join(source.suffixes) or ".fna"
-        link = input_dir / f"{idx:06d}_{safe_name(name)}{suffix}"
+        if is_gzip_path(source):
+            link = input_dir / f"{idx:08d}_{safe_name(ungzip_name(source))}.gz"
+        else:
+            suffix = "".join(source.suffixes) or ".fna"
+            link = input_dir / f"{idx:06d}_{safe_name(name)}{suffix}"
         if link.exists() or link.is_symlink():
             link.unlink()
         link.symlink_to(source)
@@ -257,7 +240,7 @@ def make_input_links(genomes: list[tuple[str, Path]], input_dir: Path) -> list[P
 
 def write_list(path: Path, values: list[Path]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("".join(f"{value.resolve()}\n" for value in values))
+    path.write_text("".join(f"{value.absolute()}\n" for value in values))
 
 
 def resolve_oddsketch_bin() -> str:
@@ -299,9 +282,15 @@ def git_commit() -> str | None:
         return None
 
 
-def oddsketch_cmd(cfg: dict) -> list[str]:
+def oddsketch_cmd(
+    cfg: dict,
+    input_list: Path | None = None,
+    out_dir: Path | None = None,
+    manifest: Path | None = None,
+    skip_existing: bool = False,
+) -> list[str]:
     odd = cfg.get("oddsketch", {})
-    return [
+    cmd = [
         resolve_oddsketch_bin(),
         "sketch",
         f"--kmer={odd.get('kmerlen', 64)}",
@@ -311,6 +300,15 @@ def oddsketch_cmd(cfg: dict) -> list[str]:
         f"--canonical={1 if odd.get('canonical', True) else 0}",
         f"--threads={odd.get('threads', 1)}",
     ]
+    if input_list is not None:
+        cmd.extend(["--input-paths", str(input_list)])
+    if out_dir is not None:
+        cmd.extend(["--out-dir", str(out_dir)])
+    if manifest is not None:
+        cmd.extend(["--manifest", str(manifest)])
+    if skip_existing:
+        cmd.append("--skip-existing")
+    return cmd
 
 
 def parse_time_v(path: Path) -> dict[str, str]:
@@ -325,138 +323,25 @@ def parse_time_v(path: Path) -> dict[str, str]:
     return metrics
 
 
-def run_sketch(input_list: Path, stdout_path: Path, time_path: Path, cfg: dict) -> tuple[float, dict[str, str]]:
-    cmd = oddsketch_cmd(cfg)
+def run_sketch(
+    input_list: Path,
+    stdout_path: Path,
+    time_path: Path,
+    cfg: dict,
+    out_dir: Path,
+    manifest: Path,
+    skip_existing: bool = False,
+) -> tuple[float, dict[str, str]]:
+    cmd = oddsketch_cmd(cfg, input_list=input_list, out_dir=out_dir, manifest=manifest, skip_existing=skip_existing)
     timed_cmd = ["/usr/bin/time", "-v", "-o", str(time_path), *cmd]
     if not Path("/usr/bin/time").exists():
         timed_cmd = cmd
-    print("[run]", " ".join(timed_cmd))
+    print("[run]", " ".join(timed_cmd), flush=True)
     t0 = perf_counter()
-    with input_list.open() as stdin, stdout_path.open("w") as stdout:
-        subprocess.run(timed_cmd, stdin=stdin, stdout=stdout, check=True)
+    with stdout_path.open("w") as stdout:
+        subprocess.run(timed_cmd, stdout=stdout, check=True)
     elapsed = perf_counter() - t0
     return elapsed, parse_time_v(time_path)
-
-
-def relocate_sketches(stdout_path: Path, sketches_dir: Path) -> list[Path]:
-    sketches_dir.mkdir(parents=True, exist_ok=True)
-    relocated: list[Path] = []
-    for line in stdout_path.read_text().splitlines():
-        raw = line.strip()
-        if not raw:
-            continue
-        src = Path(raw)
-        if not src.exists():
-            raise SystemExit(f"oddsketch reported missing sketch: {src}")
-        dst = sketches_dir / src.name
-        if dst.exists():
-            dst.unlink()
-        shutil.move(str(src), dst)
-        relocated.append(dst.resolve())
-    return relocated
-
-
-def metric_float(metrics: dict[str, str], key: str) -> float:
-    try:
-        return float(metrics.get(key, "") or 0.0)
-    except ValueError:
-        return 0.0
-
-
-def metric_int(metrics: dict[str, str], key: str) -> int:
-    try:
-        return int(metrics.get(key, "") or 0)
-    except ValueError:
-        return 0
-
-
-def run_sketch_with_temporary_inputs(
-    genomes: list[tuple[str, Path]],
-    temp_root: Path,
-    manifests_dir: Path,
-    logs_dir: Path,
-    sketches_dir: Path,
-    cfg: dict,
-    resume: bool = False,
-) -> tuple[float, dict[str, str], list[Path], int]:
-    odd = cfg.get("oddsketch", {})
-    threads = int(odd.get("threads", 1))
-    batch_size = max(1, int(odd.get("gzip_batch_size", max(1, threads * 16))))
-
-    total_elapsed = 0.0
-    total_decompression_elapsed = 0.0
-    max_rss = 0
-    user_sec = 0.0
-    system_sec = 0.0
-    relocated_all: list[Path] = []
-    batch_count = 0
-
-    for batch_start in range(0, len(genomes), batch_size):
-        batch_count += 1
-        batch = genomes[batch_start : batch_start + batch_size]
-        expected_sketches: list[Path] = []
-        for offset, (name, source) in enumerate(batch):
-            idx = batch_start + offset + 1
-            if is_gzip_path(source):
-                target_name = f"{idx:08d}_{safe_name(ungzip_name(source))}"
-            else:
-                suffix = "".join(source.suffixes) or ".fna"
-                target_name = f"{idx:08d}_{safe_name(name)}{suffix}"
-            expected_sketches.append(sketches_dir / f"{target_name}.sketch")
-
-        batch_input_list = manifests_dir / f"genome_paths_batch_{batch_count:06d}.txt"
-        batch_stdout = logs_dir / f"oddsketch_sketch_stdout_batch_{batch_count:06d}.txt"
-        batch_time = logs_dir / f"oddsketch_sketch_time_batch_{batch_count:06d}.txt"
-        if resume and batch_stdout.exists() and batch_time.exists() and all(path.exists() for path in expected_sketches):
-            metrics = parse_time_v(batch_time)
-            total_elapsed += parse_elapsed_wall_seconds(batch_time)
-            max_rss = max(max_rss, metric_int(metrics, "Maximum resident set size (kbytes)"))
-            user_sec += metric_float(metrics, "User time (seconds)")
-            system_sec += metric_float(metrics, "System time (seconds)")
-            relocated_all.extend(path.resolve() for path in expected_sketches)
-            print(f"[resume] batch {batch_count}: {len(batch)} genomes")
-            continue
-
-        batch_dir = temp_root / f"batch_{batch_count:06d}"
-        batch_dir.mkdir(parents=True, exist_ok=True)
-        batch_inputs: list[Path] = []
-        try:
-            decompress_t0 = perf_counter()
-            for offset, (name, source) in enumerate(batch):
-                idx = batch_start + offset + 1
-                if is_gzip_path(source):
-                    target_name = f"{idx:08d}_{safe_name(ungzip_name(source))}"
-                    target = batch_dir / target_name
-                    decompress_gzip(source, target)
-                else:
-                    suffix = "".join(source.suffixes) or ".fna"
-                    target = batch_dir / f"{idx:08d}_{safe_name(name)}{suffix}"
-                    if target.exists() or target.is_symlink():
-                        target.unlink()
-                    target.symlink_to(source)
-                batch_inputs.append(target)
-            total_decompression_elapsed += perf_counter() - decompress_t0
-
-            write_list(batch_input_list, batch_inputs)
-            elapsed, metrics = run_sketch(batch_input_list, batch_stdout, batch_time, cfg)
-            total_elapsed += elapsed
-            max_rss = max(max_rss, metric_int(metrics, "Maximum resident set size (kbytes)"))
-            user_sec += metric_float(metrics, "User time (seconds)")
-            system_sec += metric_float(metrics, "System time (seconds)")
-            relocated_all.extend(relocate_sketches(batch_stdout, sketches_dir))
-            print(f"[sketch] batch {batch_count}: {len(batch)} genomes")
-        finally:
-            shutil.rmtree(batch_dir, ignore_errors=True)
-
-    time_metrics = {
-        "Maximum resident set size (kbytes)": str(max_rss),
-        "User time (seconds)": f"{user_sec:.2f}",
-        "System time (seconds)": f"{system_sec:.2f}",
-        "Percent of CPU this job got": "",
-        "Exit status": "0",
-        "Temporary decompression time (seconds)": f"{total_decompression_elapsed:.6f}",
-    }
-    return total_elapsed, time_metrics, relocated_all, batch_count
 
 
 def write_tsv(path: Path, rows: list[dict[str, str]], fieldnames: list[str]) -> None:
@@ -489,10 +374,9 @@ def main() -> None:
     manifests_dir = run_dir / "manifests"
     input_dir = run_dir / "genome_inputs"
     genomes_dir = run_dir / "genomes"
-    temp_fasta_dir = run_dir / "temporary_fasta"
     sketches_dir = run_dir / "sketches"
     logs_dir = run_dir / "logs"
-    for d in (metadata_dir, manifests_dir, input_dir, genomes_dir, temp_fasta_dir, sketches_dir, logs_dir):
+    for d in (metadata_dir, manifests_dir, input_dir, genomes_dir, sketches_dir, logs_dir):
         d.mkdir(parents=True, exist_ok=True)
 
     used_config = metadata_dir / "used_config.json"
@@ -511,12 +395,8 @@ def main() -> None:
     input_list = manifests_dir / "genome_paths.txt"
     original_inputs = [path for _, path in genomes]
     uses_gzip_inputs = any(is_gzip_path(path) for path in original_inputs)
-    if uses_gzip_inputs:
-        write_list(input_list, original_inputs)
-        linked_inputs = original_inputs
-    else:
-        linked_inputs = make_input_links(genomes, input_dir)
-        write_list(input_list, linked_inputs)
+    linked_inputs = make_input_links(genomes, input_dir)
+    write_list(input_list, linked_inputs)
 
     metadata = {
         "run_dir": str(run_dir),
@@ -529,11 +409,10 @@ def main() -> None:
         "selected_assemblies": len(selected_rows),
         "input_genomes": len(linked_inputs),
         "uses_gzip_inputs": uses_gzip_inputs,
-        "gzip_batch_size": cfg.get("oddsketch", {}).get("gzip_batch_size"),
         "git_commit": git_commit(),
         "oddsketch_bin": resolve_oddsketch_bin(),
         "oddsketch_bin_sha256": sha256_file(Path(resolve_oddsketch_bin())),
-        "oddsketch_command": oddsketch_cmd(cfg),
+        "oddsketch_command": oddsketch_cmd(cfg, input_list=input_list, out_dir=sketches_dir, manifest=manifests_dir / "sketch_paths.txt", skip_existing=args.resume),
     }
     (metadata_dir / "run_metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
 
@@ -543,44 +422,41 @@ def main() -> None:
         return
 
     workflow_t0 = perf_counter()
-    if uses_gzip_inputs:
-        elapsed_sec, time_metrics, relocated, batch_count = run_sketch_with_temporary_inputs(
-            genomes,
-            temp_fasta_dir,
-            manifests_dir,
-            logs_dir,
-            sketches_dir,
-            cfg,
-            resume=args.resume,
-        )
-    else:
-        stdout_path = logs_dir / "oddsketch_sketch_stdout.txt"
-        time_path = logs_dir / "oddsketch_sketch_time.txt"
-        elapsed_sec, time_metrics = run_sketch(input_list, stdout_path, time_path, cfg)
-        relocated = relocate_sketches(stdout_path, sketches_dir)
-        batch_count = 1
-    workflow_elapsed_sec = perf_counter() - workflow_t0
+    stdout_path = logs_dir / "oddsketch_sketch_stdout.txt"
+    time_path = logs_dir / "oddsketch_sketch_time.txt"
     sketch_list = manifests_dir / "sketch_paths.txt"
-    write_list(sketch_list, relocated)
+    elapsed_sec, time_metrics = run_sketch(
+        input_list,
+        stdout_path,
+        time_path,
+        cfg,
+        out_dir=sketches_dir,
+        manifest=sketch_list,
+        skip_existing=args.resume,
+    )
+    relocated = read_local_genome_list(sketch_list)
+    relocated_paths = [path for _, path in relocated]
+    batch_count = 1
+    workflow_elapsed_sec = perf_counter() - workflow_t0
 
-    total_sketch_bytes = sum(path.stat().st_size for path in relocated)
+    total_sketch_bytes = sum(path.stat().st_size for path in relocated_paths)
     timing = {
         "elapsed_sec": f"{elapsed_sec:.6f}",
         "workflow_elapsed_sec": f"{workflow_elapsed_sec:.6f}",
-        "temporary_decompression_sec": time_metrics.get("Temporary decompression time (seconds)", ""),
+        "temporary_decompression_sec": "",
         "max_rss_kbytes": time_metrics.get("Maximum resident set size (kbytes)", ""),
         "user_sec": time_metrics.get("User time (seconds)", ""),
         "system_sec": time_metrics.get("System time (seconds)", ""),
         "cpu_percent": time_metrics.get("Percent of CPU this job got", ""),
         "exit_status": time_metrics.get("Exit status", ""),
         "input_genomes": str(len(linked_inputs)),
-        "sketch_count": str(len(relocated)),
+        "sketch_count": str(len(relocated_paths)),
         "batch_count": str(batch_count),
-        "temporary_decompression": str(uses_gzip_inputs),
+        "temporary_decompression": "False",
         "total_sketch_bytes": str(total_sketch_bytes),
     }
     write_tsv(run_dir / "results" / "oddsketch_sketch_metrics.tsv", [timing], list(timing.keys()))
-    print(f"[done] sketches={len(relocated)} bytes={total_sketch_bytes}")
+    print(f"[done] sketches={len(relocated_paths)} bytes={total_sketch_bytes}")
     print(f"[done] metrics={run_dir / 'results' / 'oddsketch_sketch_metrics.tsv'}")
     print(f"[done] run_dir={run_dir}")
 

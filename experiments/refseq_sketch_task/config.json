@@ -32,7 +32,6 @@
     "sketch_size": 8192,
     "j0": 0.9,
     "pos_mode": "mix",
-    "canonical": true,
-    "gzip_batch_size": 128
+    "canonical": true
   }
 }

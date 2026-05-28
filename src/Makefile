@@ -3,6 +3,7 @@ CXXFLAGS := -std=c++17 -O3 -march=native -Wall -Wextra
 CPPFLAGS := -I../include
 LDFLAGS ?=
 THREAD_LDFLAGS ?= -pthread
+ZLIB_LDFLAGS ?= -lz
 
 ODDSKETCH_BIN := oddsketch
 TOOLS_BIN_DIR := ../experiments/tools/bin
@@ -18,7 +19,7 @@ TRUE_INDEX_PAIRS_SRCS := ../experiments/tools/src/true_index_pairs_main.cpp
 all: $(ODDSKETCH_BIN) $(TRUE_JACCARD_BIN) $(TRUE_INDEX_PAIRS_BIN)
 
 $(ODDSKETCH_BIN): $(ODDSKETCH_SRCS)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(THREAD_LDFLAGS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(THREAD_LDFLAGS) $(ZLIB_LDFLAGS)
 
 $(TRUE_JACCARD_BIN): $(TRUE_JACCARD_SRCS) | $(TOOLS_BIN_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(THREAD_LDFLAGS)

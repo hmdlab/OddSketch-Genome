@@ -29,6 +29,7 @@ Use either the local `uv` workflow or Docker.
 
 Local workflow:
 - C++17 compiler
+- zlib development headers/library
 - Python 3.10+
 - `uv sync`
 - BinDash only if you want comparison runs
@@ -65,10 +66,21 @@ This builds:
 `experiments/tools/bin/true_jaccard` and `experiments/tools/bin/true_index_pairs` are experimental helper binaries used by the benchmark workflows, not part of the core OddSketch CLI surface.
 Their source files live in `experiments/tools/src/`.
 
-Core CLI examples:
+Core CLI examples.
+
+Sketch from a FASTA path list while choosing an output directory and manifest:
 
 ```bash
-src/oddsketch sketch --listfname data/oddsketch_cli_sample/lists/sample_genomes.tsv --threads=8
+src/oddsketch sketch \
+  --input-paths data/oddsketch_cli_sample/lists/sample_fastas.list \
+  --out-dir /tmp/oddsketch_sketches \
+  --manifest /tmp/oddsketch_sketches.list \
+  --threads=8
+```
+
+Compare existing sketches:
+
+```bash
 src/oddsketch dist --all-to-all --threads=8 < data/oddsketch_cli_sample/lists/sample_sketches.list
 src/oddsketch dist --bipartite \
   --qlist data/oddsketch_cli_sample/lists/sample_queries.sketch.list \
@@ -79,14 +91,10 @@ src/oddsketch dist \
   --threads=8
 ```
 
-`--listfname` expects a tab-separated file:
-
-```text
-Path-to-sequence-file<TAB>genome-name<TAB>number-of-consecutive-sequences
-```
+`sketch` accepts one FASTA or `.fna.gz` path per line with `--input-paths` or stdin. Use `--out-dir` to place sketches in one directory, `--manifest` to write the resulting sketch list, and `--skip-existing` to resume without rebuilding existing non-empty sketches.
 
 The examples above use the small FASTA samples under `data/oddsketch_cli_sample/fastas/`.
-After `sketch`, generated `*.sketch` files are written next to those FASTA files.
+Without `--out-dir`, generated `*.sketch` files are written next to those FASTA files.
 
 `dist` supports three explicit modes:
 - `--all-to-all` (or `--alltoall`): compare all sketches listed on stdin
@@ -168,7 +176,7 @@ uv run python experiments/refseq_sketch_task/scripts/refseq_sketch_runner.py \
   --config experiments/refseq_sketch_task/config.json
 ```
 
-Set `paths.local_genome_list` in the config to use existing `.fna` / `.fna.gz` files. `.fna.gz` inputs are temporarily decompressed in batches and removed after sketching.
+Set `paths.local_genome_list` in the config to use existing `.fna` / `.fna.gz` files. OddSketch reads `.fna.gz` inputs directly.
 
 To check preparation without sketching:
 
