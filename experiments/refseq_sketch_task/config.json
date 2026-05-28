@@ -21,7 +21,7 @@
   "oddsketch": {
     "threads": 16,
     "kmerlen": 64,
-    "sketch_size": 8192,
+    "sketch_size": 16384,
     "j0": 0.9,
     "pos_mode": "mix",
     "canonical": true
