@@ -286,7 +286,7 @@ def oddsketch_cmd(
     cfg: dict,
     input_list: Path | None = None,
     out_dir: Path | None = None,
-    manifest: Path | None = None,
+    sketch_paths_out: Path | None = None,
     skip_existing: bool = False,
 ) -> list[str]:
     odd = cfg.get("oddsketch", {})
@@ -304,8 +304,8 @@ def oddsketch_cmd(
         cmd.extend(["--input-paths", str(input_list)])
     if out_dir is not None:
         cmd.extend(["--out-dir", str(out_dir)])
-    if manifest is not None:
-        cmd.extend(["--manifest", str(manifest)])
+    if sketch_paths_out is not None:
+        cmd.extend(["--sketch-paths-out", str(sketch_paths_out)])
     if skip_existing:
         cmd.append("--skip-existing")
     return cmd
@@ -329,10 +329,16 @@ def run_sketch(
     time_path: Path,
     cfg: dict,
     out_dir: Path,
-    manifest: Path,
+    sketch_paths_out: Path,
     skip_existing: bool = False,
 ) -> tuple[float, dict[str, str]]:
-    cmd = oddsketch_cmd(cfg, input_list=input_list, out_dir=out_dir, manifest=manifest, skip_existing=skip_existing)
+    cmd = oddsketch_cmd(
+        cfg,
+        input_list=input_list,
+        out_dir=out_dir,
+        sketch_paths_out=sketch_paths_out,
+        skip_existing=skip_existing,
+    )
     timed_cmd = ["/usr/bin/time", "-v", "-o", str(time_path), *cmd]
     if not Path("/usr/bin/time").exists():
         timed_cmd = cmd
@@ -412,7 +418,13 @@ def main() -> None:
         "git_commit": git_commit(),
         "oddsketch_bin": resolve_oddsketch_bin(),
         "oddsketch_bin_sha256": sha256_file(Path(resolve_oddsketch_bin())),
-        "oddsketch_command": oddsketch_cmd(cfg, input_list=input_list, out_dir=sketches_dir, manifest=manifests_dir / "sketch_paths.txt", skip_existing=args.resume),
+        "oddsketch_command": oddsketch_cmd(
+            cfg,
+            input_list=input_list,
+            out_dir=sketches_dir,
+            sketch_paths_out=manifests_dir / "sketch_paths.txt",
+            skip_existing=args.resume,
+        ),
     }
     (metadata_dir / "run_metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
 
@@ -431,7 +443,7 @@ def main() -> None:
         time_path,
         cfg,
         out_dir=sketches_dir,
-        manifest=sketch_list,
+        sketch_paths_out=sketch_list,
         skip_existing=args.resume,
     )
     relocated = read_local_genome_list(sketch_list)

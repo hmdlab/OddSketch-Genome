@@ -1,5 +1,6 @@
 # Test data and generated artifacts
 src/test/test_genomes/genomes
+data/oddsketch_cli_sample/sketches/
 
 
 # Build artifacts (local)

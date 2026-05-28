@@ -1,157 +1,166 @@
 # genome-oddsketch
 
-OddSketch 本体は `src/` に置き、単独でビルド・利用できるようにしています。比較実験のワークフローは `experiments/` 配下に分離しています。
+このリポジトリは、ゲノム間 Jaccard 類似度推定用の standalone OddSketch CLI と、その評価用 benchmark workflow をまとめたものです。
 
-## 概要
-このリポジトリは、ゲノム間の Jaccard 類似度を推定する OddSketch CLI と、その評価を再現するための実験 workflow をまとめたものです。
+OddSketch 本体は `src/` 配下にあり、単独でビルドして使えます。再現実験や比較 workflow は `experiments/` 配下に分離しています。
 
-OddSketch では次ができます。
-- `sketch`: 標準入力で受け取った genome FASTA の list から sketch を作成
-- `dist`: sketch 間の Jaccard 類似度を推定。mode は次の 3 つです。
-  - `--all-to-all` / `--alltoall`: 標準入力で受け取った sketch list を all-to-all 比較 (list*list)
-  - `--bipartite --qlist ... --dblist ...`: query sketch と database sketch を二部比較（qlist*dblist）
-  - `--pairlist ...`: 2 列 TSV に書かれた sketch pair だけを比較
+## 含まれるもの
 
-実験再現 workflow は `experiments/` 配下にあります。
-- `pair_task`: 合成ゲノムペアで、厳密 Jaccard、OddSketch、BinDash を比較
-- `search_task`: クラスタ化した合成ゲノムで検索性能を比較
-- `refseq_sketch_task`: 実 RefSeq ゲノムを使った sketch build 時間・メモリ・サイズ計測
+- `src/`, `include/`: C++17 の OddSketch 実装と CLI
+- `data/oddsketch_cli_sample/`: CLI smoke test 用の小さな FASTA サンプルと path list
+- `experiments/pair_task/`: 合成ゲノムペアでの exact Jaccard、OddSketch、BinDash benchmark
+- `experiments/search_task/`: クラスタ化合成ゲノムでの探索的 search benchmark
+- `experiments/refseq_sketch_task/`: 実 RefSeq ゲノムの sketch build benchmark
+- `experiments/tools/`: benchmark workflow で使う補助バイナリとスクリプト
+- `Dockerfile`, `docker-compose.yml`: CLI と benchmark workflow 用の container 環境
 
-## 構成
-- `src/`, `include/`: OddSketch 本体実装と CLI
-- `experiments/pair_task`: 合成ゲノムペアに対する Jaccard 比較
-- `experiments/search_task`: クラスタ化合成ゲノムに対する検索比較
-- `experiments/refseq_sketch_task`: 実 RefSeq ゲノムの OddSketch DB 構築時間・メモリ・サイズ計測
-- `experiments/tools/src/`, `experiments/tools/bin/`: ベンチマーク用の実験補助ツール
+詳細は task ごとの README を参照してください。
+
+- [`experiments/README-ja.md`](experiments/README-ja.md)
+- [`experiments/pair_task/README-ja.md`](experiments/pair_task/README-ja.md)
+- [`experiments/search_task/README_ja.md`](experiments/search_task/README_ja.md)
+- [`experiments/refseq_sketch_task/README-ja.md`](experiments/refseq_sketch_task/README-ja.md)
+- [`README-docker.md`](README-docker.md)
 
 ## 必要環境
-実行方法は、ローカルの `uv` workflow か Docker workflow のどちらかを選べます。
 
 ローカル workflow:
+
 - C++17 コンパイラ
-- zlib の開発ヘッダ・ライブラリ
+- zlib の開発ヘッダとライブラリ
 - Python 3.10+
-- `uv sync`
-- BinDash は比較実験を行う場合のみ必要
+- [`uv`](https://docs.astral.sh/uv/)
+- BinDash。BinDash と比較する workflow でのみ必要です。
 
 Docker workflow:
+
 - Docker Compose が使える Docker 環境
 - 詳細は [`README-docker.md`](README-docker.md)
 
-### BinDash セットアップ
-Linux/HPC では、BinDash をこのリポジトリの `experiments/tools/bin/bindash` に配置する運用を想定しています。
-次のスクリプトで、BinDash を `git clone` して `v2.6` をビルドし、その場所に自動配置できます。
+## Quick Start
+
+OddSketch と benchmark 補助バイナリをビルドします。
 
 ```bash
-bash scripts/bootstrap.sh
-```
-
-必要なら tag を変えられます。
-
-```bash
-BINDASH_TAG=v2.6 bash scripts/bootstrap.sh
-```
-
-### OddSketch のビルド
-```bash
-cd src
-make CXX=g++ LDFLAGS=-lstdc++fs
+make -C src CXX=g++ LDFLAGS=-lstdc++fs
 ```
 
 生成されるもの:
+
 - `src/oddsketch`
 - `experiments/tools/bin/true_jaccard`
 - `experiments/tools/bin/true_index_pairs`
 
-`experiments/tools/bin/true_jaccard` と `experiments/tools/bin/true_index_pairs` は実験ワークフロー用の補助バイナリであり、OddSketch 本体 CLI そのものではありません。
-ソースは `experiments/tools/src/` にあります。
-
-CLI の基本例。
-
-FASTA path list から sketch を作り、出力先と manifest を指定する例:
+小さなサンプルで sketch を作ります。
 
 ```bash
 src/oddsketch sketch \
   --input-paths data/oddsketch_cli_sample/lists/sample_fastas.list \
-  --out-dir /tmp/oddsketch_sketches \
-  --manifest /tmp/oddsketch_sketches.list \
+  --out-dir data/oddsketch_cli_sample/sketches \
+  --sketch-paths-out data/oddsketch_cli_sample/lists/sample_sketches.list \
   --threads=8
 ```
 
-生成済み sketch を比較する例:
+生成した sketch を比較します。
 
 ```bash
 src/oddsketch dist --all-to-all --threads=8 < data/oddsketch_cli_sample/lists/sample_sketches.list
+```
+
+## OddSketch CLI
+
+`oddsketch` の主な command は `sketch` と `dist` です。
+
+### `sketch`
+
+FASTA または `.fna.gz` から sketch を作ります。入力は `--input-paths` または標準入力で渡せます。どちらも 1 行 1 path です。
+
+```bash
+src/oddsketch sketch \
+  --input-paths data/oddsketch_cli_sample/lists/sample_fastas.list \
+  --out-dir data/oddsketch_cli_sample/sketches \
+  --sketch-paths-out data/oddsketch_cli_sample/lists/sample_sketches.list \
+  --threads=8
+```
+
+よく使う option:
+
+- `--out-dir`: 生成した sketch を 1 つの directory に保存
+- `--sketch-paths-out`: 生成された sketch path list を書き出し
+- `--skip-existing`: 既存の非空 sketch を再利用して resume
+
+`--out-dir` を指定しない場合、生成された `*.sketch` は入力 FASTA と同じ directory に保存されます。
+
+### `dist`
+
+既存 sketch 間の Jaccard 類似度を推定します。
+
+All-to-all 比較:
+
+```bash
+src/oddsketch dist --all-to-all --threads=8 < data/oddsketch_cli_sample/lists/sample_sketches.list
+```
+
+query-vs-database の bipartite 比較:
+
+```bash
 src/oddsketch dist --bipartite \
   --qlist data/oddsketch_cli_sample/lists/sample_queries.sketch.list \
   --dblist data/oddsketch_cli_sample/lists/sample_db.sketch.list \
   --threads=8
+```
+
+pair list 比較:
+
+```bash
 src/oddsketch dist \
   --pairlist data/oddsketch_cli_sample/lists/sample_sketch_pairs.tsv \
   --threads=8
 ```
 
-`sketch` は `--input-paths` または標準入力で、1 行 1 件の FASTA / `.fna.gz` path を受け取れます。`--out-dir` で sketch の保存先 directory を指定し、`--manifest` で生成された sketch list を保存できます。`--skip-existing` を指定すると、既存の非空 sketch を再構築せずに resume できます。
+`--pairlist` は、1 行に 1 組の sketch pair を書いた 2 列 TSV を受け取ります。
 
-上の例では、`data/oddsketch_cli_sample/fastas/` にある小さな FASTA サンプルを使います。
-`--out-dir` を指定しない場合は、入力 FASTA と同じディレクトリに `*.sketch` が生成されます。
+## Benchmark Workflows
 
-`dist` は 3 つの明示的な mode を持ちます。
-- `--all-to-all` または `--alltoall`: 標準入力で受け取った sketch list を all-to-all 比較
-- `--bipartite --qlist ... --dblist ...`: query sketch 全体と database sketch 全体を二部比較
-- `--pairlist ...`: 2 列 TSV の pairlist に書かれた pair だけを比較
-
-`--pairlist` は、1 行に 1 組の sketch path をタブ区切りで書いたファイルを受け取ります。
-
-## Docker
-Docker の詳しい使い方は [`README-docker.md`](README-docker.md) に分離しています。
-リポジトリ root の `Dockerfile` と `docker-compose.yml` で、Python 依存、`src/oddsketch`、実験補助ツール、BinDash を含む image を build します。
-
-主な役割:
-- `docker run --rm genome-oddsketch`: `oddsketch --help` を表示
-- `docker compose run --rm oddsketch --help`: OddSketch CLI service を使う
-- `docker compose run --rm pair-task`: 既定の pair_task を実行
-- `docker compose run --rm pair-task-sketchsize`: sketch size sweep を再現
-- `docker compose run --rm pair-task-bbits`: b-bits sweep を再現
+ローカル workflow を実行する前に Python 依存を入れます。
 
 ```bash
-docker compose build
-docker run --rm genome-oddsketch
-docker compose run --rm oddsketch --help
-docker compose run --rm pair-task
-docker compose run --rm pair-task-sketchsize
-docker compose run --rm pair-task-bbits
+uv sync
 ```
 
-## pair_task
-既定では `experiments/pair_task/outputs/default/` 以下に入出力します。別の場所を使いたい場合は `experiments/pair_task/config.json` の `paths.outdir` を変更するか、生成ステップで `--outdir` を指定してください。
+BinDash と比較する workflow では、BinDash を `experiments/tools/bin/bindash` に配置します。
+
+```bash
+bash scripts/bootstrap.sh
+```
+
+既定の BinDash tag は `v2.6` です。必要なら `BINDASH_TAG` で変更できます。
+
+```bash
+BINDASH_TAG=v2.6 bash scripts/bootstrap.sh
+```
+
+### Pairwise Benchmark
+
+合成ゲノムペアで exact Jaccard、OddSketch、BinDash を比較します。
 
 ```bash
 cd experiments/pair_task
 uv run python scripts/batch_project_runner.py --config config.json
 ```
 
-個別実行:
+既定の出力先は `experiments/pair_task/outputs/default/` です。
 
-```bash
-uv run python scripts/make_genomes.py --config config.json
-uv run python scripts/cal_jaccard_true.py --config config.json
-uv run python scripts/cal_jaccard_oddsketch.py --config config.json
-uv run python scripts/cal_jaccard_bindash.py --config config.json
-uv run python analysis/compute_rmse.py \
-  --csv outputs/default/<run>/results/comparison_results_oddsketch.csv \
-  --csv outputs/default/<run>/results/comparison_results_bindash.csv
-```
+主な生成物:
 
-生成物:
-- FASTA ペア: `experiments/pair_task/outputs/default/<run>/genomes/`
-- ペア情報: `experiments/pair_task/outputs/default/<run>/pair_info.txt`
-- 結果テーブル: `experiments/pair_task/outputs/default/<run>/results/`
-- 図: `experiments/pair_task/outputs/default/<run>/figures/`
+- `genomes/`: 生成した FASTA ペア
+- `pair_info.txt`: ペア metadata
+- `results/`: 結果 table
+- `figures/`: 図
 
-## search_task
-この task は探索的な search-style benchmark です。主論文の結果には含めませんが、初期評価ワークフローの記録と、将来的な検索・DB照合実験の土台として残しています。
-既定の出力先は `experiments/search_task/outputs/default/` です。必要なら `experiments/search_task/config.json` の `paths.outdir` を変更してください。
+### Search Benchmark
+
+クラスタ化合成ゲノムを使う探索的な search benchmark です。初期評価 workflow の記録と、将来の検索・DB 照合実験の土台として残しています。
 
 ```bash
 bash scripts/bootstrap.sh
@@ -160,10 +169,13 @@ cd experiments/search_task
 uv run python scripts/project_runner.py --config config.json
 ```
 
-## refseq_sketch_task
-実ゲノムを OddSketch でスケッチ化し、DB サイズ、構築時間、最大メモリ使用量を計測する workflow です。RefSeq のバージョン・取得日・`assembly_summary_refseq.txt` も run ごとの `metadata/` に保存します。
+既定の出力先は `experiments/search_task/outputs/default/` です。
 
-通常は root ディレクトリから runner を直接実行します。
+### RefSeq Sketch Benchmark
+
+実 RefSeq ゲノムの sketch build benchmark です。sketch サイズ、構築時間、最大メモリ使用量、RefSeq metadata、保存した `assembly_summary_refseq.txt` を記録します。
+
+リポジトリ root から実行します。
 
 ```bash
 make -C src CXX=g++ LDFLAGS=-lstdc++fs
@@ -171,9 +183,9 @@ uv run python experiments/refseq_sketch_task/scripts/refseq_sketch_runner.py \
   --config experiments/refseq_sketch_task/config.json
 ```
 
-設定ファイルの `paths.local_genome_list` に取得済みの `.fna` / `.fna.gz` の list を指定できます。`.fna.gz` は OddSketch が直接読みます。
+取得済みの `.fna` または `.fna.gz` を使う場合は、`experiments/refseq_sketch_task/config.json` の `paths.local_genome_list` に path list を指定します。OddSketch は `.fna.gz` を直接読めます。
 
-実行準備だけ確認したい場合:
+sketch せずに準備だけ確認する場合:
 
 ```bash
 uv run python experiments/refseq_sketch_task/scripts/refseq_sketch_runner.py \
@@ -181,16 +193,40 @@ uv run python experiments/refseq_sketch_task/scripts/refseq_sketch_runner.py \
   --prepare-only
 ```
 
-HPC / Grid Engine 環境では qsub wrapper も使えます。
+HPC / Grid Engine 環境では qsub wrapper を使えます。
 
 ```bash
 qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh
+qsub experiments/refseq_sketch_task/jobs/qsub_download_refseq_assemblies.sh
+qsub experiments/refseq_sketch_task/jobs/qsub_validate_refseq_gzip.sh
 ```
 
-先に RefSeq assembly をまとめて取得する場合:
+## Docker
+
+image を build します。
 
 ```bash
-qsub experiments/refseq_sketch_task/jobs/qsub_download_refseq_assemblies.sh
+docker compose build
 ```
 
-詳細は `experiments/README-ja.md`, `experiments/pair_task/README-ja.md`, `experiments/search_task/README_ja.md`, `experiments/refseq_sketch_task/README-ja.md` を参照してください。
+CLI を実行します。
+
+```bash
+docker run --rm genome-oddsketch
+docker compose run --rm oddsketch --help
+```
+
+benchmark service を実行します。
+
+```bash
+docker compose run --rm pair-task
+docker compose run --rm pair-task-sketchsize
+docker compose run --rm pair-task-bbits
+```
+
+volume 構成、service の詳細、自分のデータを使う例は [`README-docker.md`](README-docker.md) を参照してください。
+
+## Notes
+
+- `experiments/tools/bin/true_jaccard` と `experiments/tools/bin/true_index_pairs` は benchmark 用の補助バイナリであり、公開 OddSketch CLI surface の一部ではありません。
+- 英語 README は [`README.md`](README.md) です。

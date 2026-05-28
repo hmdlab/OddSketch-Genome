@@ -50,7 +50,7 @@ struct CliArgs {
     std::string dblist_path;
     std::string pairlist_path;
     std::string out_dir;
-    std::string manifest_path;
+    std::string sketch_paths_out;
     bool explicit_all_to_all = false;
     bool explicit_bipartite = false;
     bool skip_existing = false;
@@ -679,11 +679,11 @@ void ensure_parent_dir(const std::string& path) {
     }
 }
 
-void write_manifest_file(const std::string& manifest_path, const std::vector<std::string>& output_paths) {
-    ensure_parent_dir(manifest_path);
-    std::ofstream ofs(manifest_path);
+void write_sketch_paths_file(const std::string& sketch_paths_out, const std::vector<std::string>& output_paths) {
+    ensure_parent_dir(sketch_paths_out);
+    std::ofstream ofs(sketch_paths_out);
     if (!ofs) {
-        throw std::runtime_error("Cannot write manifest: " + manifest_path);
+        throw std::runtime_error("Cannot write sketch path list: " + sketch_paths_out);
     }
     for (const auto& output_path : output_paths) {
         ofs << output_path << "\n";
@@ -914,6 +914,7 @@ bool option_requires_value(const std::string& key) {
            key == "dblist" ||
            key == "pairlist" ||
            key == "out-dir" ||
+           key == "sketch-paths-out" ||
            key == "manifest" ||
            key == "kmer" ||
            key == "kmerlen" ||
@@ -978,9 +979,9 @@ CliArgs parse_options(int argc, char** argv) {
         } else if (key == "out-dir") {
             require_value(key, value);
             args.out_dir = value;
-        } else if (key == "manifest") {
+        } else if (key == "sketch-paths-out" || key == "manifest") {
             require_value(key, value);
-            args.manifest_path = value;
+            args.sketch_paths_out = value;
         } else if (key == "skip-existing") {
             args.skip_existing = true;
         } else if (key == "all-to-all" || key == "alltoall") {
@@ -1020,7 +1021,7 @@ void print_usage() {
         << "Options:\n"
         << "  --input-paths=genomes.list\n"
         << "  --out-dir=sketches\n"
-        << "  --manifest=sketch_paths.txt\n"
+        << "  --sketch-paths-out=sketch_paths.txt\n"
         << "  --skip-existing\n"
         << "  --kmer=N, --kmerlen=N\n"
         << "  --sketch-size=M\n"
@@ -1072,8 +1073,8 @@ int oddsketch_cli_main(int argc, char** argv) {
         std::cerr << "Usage error: --input-paths is only valid for sketch\n";
         return 1;
     }
-    if (args.mode == "dist" && (!args.out_dir.empty() || !args.manifest_path.empty() || args.skip_existing)) {
-        std::cerr << "Usage error: --out-dir, --manifest, and --skip-existing are only valid for sketch\n";
+    if (args.mode == "dist" && (!args.out_dir.empty() || !args.sketch_paths_out.empty() || args.skip_existing)) {
+        std::cerr << "Usage error: --out-dir, --sketch-paths-out, and --skip-existing are only valid for sketch\n";
         return 1;
     }
     if (args.explicit_bipartite && (args.qlist_path.empty() || args.dblist_path.empty())) {
@@ -1123,8 +1124,8 @@ int oddsketch_cli_main(int argc, char** argv) {
                 );
             });
 
-            if (!args.manifest_path.empty()) {
-                write_manifest_file(args.manifest_path, output_paths);
+            if (!args.sketch_paths_out.empty()) {
+                write_sketch_paths_file(args.sketch_paths_out, output_paths);
             }
 
             for (const auto& output_path : output_paths) {
