@@ -3,7 +3,7 @@
 #$ -V
 #$ -N refseq_oddsketch
 #$ -q tsmall
-#$ -pe OpenMP 16
+#$ -pe OpenMP 8
 #$ -l mem_req=16g
 #$ -l h_vmem=16g
 

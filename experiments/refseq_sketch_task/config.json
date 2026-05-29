@@ -19,7 +19,7 @@
     "limit": null
   },
   "oddsketch": {
-    "threads": 16,
+    "threads": 8,
     "kmerlen": 64,
     "sketch_size": 16384,
     "j0": 0.9,

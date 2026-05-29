@@ -3,9 +3,9 @@
 #$ -V
 #$ -N refseq_gzip_check
 #$ -q tsmall
-#$ -pe OpenMP 4
-#$ -l mem_req=8g
-#$ -l h_vmem=8g
+#$ -pe OpenMP 16
+#$ -l mem_req=4g
+#$ -l h_vmem=4g
 
 set -euo pipefail
 
