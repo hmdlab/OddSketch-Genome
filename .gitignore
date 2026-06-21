@@ -22,14 +22,21 @@ external/
 .DS_Store
 .vscode/
 
+# Localized documentation excluded from public release
+README-ja.md
+**/README-ja.md
+**/README_ja.md
+
 # Project experiment data
 src/project/data/
 experiments/pair_task/outputs/
-experiments/search_task/outputs/
 experiments/refseq_sketch_task/outputs/
 experiments/refseq_sketch_task/data/assembly/
 experiments/refseq_sketch_task/data
 experiments/refseq_sketch_task/data.bak
+
+# Private or exploratory experiment workspaces
+experiments/search_task/
 
 # Temporary local analysis helpers
 experiments/pair_task/analysis/plot_bbits_rmse_by_true_jaccard.py

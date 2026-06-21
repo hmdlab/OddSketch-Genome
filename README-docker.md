@@ -1,97 +1,87 @@
-# Docker usage
+# Docker Usage
 
-このファイルは Docker を使った OddSketch CLI と pair_task 実験の実行方法をまとめます。
-通常の README では概要だけを示し、Docker の詳しい使い方はここに分けています。
+This file describes the Docker workflow for the OddSketch CLI and the `pair_task` benchmark. The main README keeps only the short overview; Docker-specific details live here.
 
-## 役割
+## Components
 
-このリポジトリの Docker 構成は、1 つの image と複数の compose service を使います。
+This repository uses one image and several Compose services.
 
-| 名前 | 役割 |
+| Name | Purpose |
 | --- | --- |
-| `genome-oddsketch:latest` | OddSketch 本体、Python 依存、実験補助ツール、BinDash を含む Docker image |
-| `docker run --rm genome-oddsketch` | image の既定動作。`oddsketch --help` を表示 |
-| `oddsketch` | OddSketch CLI を直接使う compose service |
-| `pair-task` | `experiments/pair_task/config.json` で pair_task を 1 run 実行 |
-| `pair-task-sketchsize` | `experiments/pair_task/configs/sketchsize/` の config 群を実行 |
-| `pair-task-bbits` | `experiments/pair_task/configs/bbits/` の config 群を実行 |
+| `genome-oddsketch:latest` | Docker image containing OddSketch, Python dependencies, benchmark helper tools, and BinDash |
+| `docker run --rm genome-oddsketch` | Default image command; shows `oddsketch --help` |
+| `oddsketch` | Compose service for direct OddSketch CLI use |
+| `pair-task` | Runs one `pair_task` job with `experiments/pair_task/config.json` |
+| `pair-task-sketchsize` | Runs configs under `experiments/pair_task/configs/sketchsize/` |
+| `pair-task-bbits` | Runs configs under `experiments/pair_task/configs/bbits/` |
 
 ## Build
 
-最初に image を build します。
+Build the image:
 
 ```bash
 docker compose build
 ```
 
-BinDash の tag を変えたい場合:
+To use a different BinDash tag:
 
 ```bash
 BINDASH_TAG=v2.6 docker compose build
 ```
 
-## ローカル出力 mount
+## Local Output Mounts
 
-Docker container の中は、ホストとは別の filesystem です。
-何も mount せずに container 内へ結果を書くと、`--rm` で container を消したときに結果も消えます。
+Container filesystems are separate from the host filesystem. Results written only inside a `--rm` container disappear when the container exits.
 
-このリポジトリでは、ホスト側のディレクトリを container 内の以下の場所にマウントしています。
+The Compose services mount these host directories:
 
-
-| ローカル | container 内 | 用途 |
+| Host path | Container path | Purpose |
 | --- | --- | --- |
-| `./experiments/pair_task` | `/workspace/experiments/pair_task` | pair_task の config、script、出力 |
-| `./docker-data` | `/data` | OddSketch CLI に渡す FASTA、sketch、list |
+| `./experiments/pair_task` | `/workspace/experiments/pair_task` | `pair_task` configs, scripts, and outputs |
+| `./docker-data` | `/data` | FASTA files, sketches, and path lists for the OddSketch CLI |
 
-
-初回だけ、必要ならローカルディレクトリを作成します。
+Create local directories when needed:
 
 ```bash
 mkdir -p experiments/pair_task/outputs docker-data
 ```
 
-`docker-data/` は OddSketch CLI に自分の FASTA や list を渡すための置き場です。
-例えばホスト側の:
+A host file such as:
 
 ```text
 ./docker-data/genome_001.fna
 ```
 
-は container 内では:
+is visible in the container as:
 
 ```text
 /data/genome_001.fna
 ```
 
-として見えます。
-
-
 ## OddSketch CLI
 
-help:
+Show help:
 
 ```bash
 docker run --rm genome-oddsketch
 docker compose run --rm oddsketch --help
 ```
 
-`docker-data/` に FASTA を置くと、container 内では `/data/...` として見えます。
-
-sketch:
+Build sketches:
 
 ```bash
 printf '/data/genome_001.fna\n/data/genome_002.fna\n' > docker-data/genomes.list
 docker compose run --rm oddsketch sketch --input-paths /data/genomes.list --threads=8
 ```
 
-dist all-to-all:
+Run all-to-all distances:
 
 ```bash
 printf '%s\n' /data/genome_001.fna.sketch /data/genome_002.fna.sketch | \
 docker compose run --rm -T oddsketch dist --all-to-all --threads=8
 ```
 
-dist bipartite:
+Run bipartite distances:
 
 ```bash
 docker compose run --rm oddsketch dist --bipartite \
@@ -100,7 +90,7 @@ docker compose run --rm oddsketch dist --bipartite \
   --threads=8
 ```
 
-dist pairlist:
+Run pair-list distances:
 
 ```bash
 docker compose run --rm oddsketch dist \
@@ -110,61 +100,61 @@ docker compose run --rm oddsketch dist \
 
 ## pair_task
 
-default config を 1 run 実行:
+Run the default config once:
 
 ```bash
 docker compose run --rm pair-task
 ```
 
-出力先:
+Output is written under:
 
 ```text
 experiments/pair_task/outputs/default/
 ```
 
-## pair_task 実験再現: sketchsize
+## Reproduce Sketch-Size Runs
 
-`experiments/pair_task/configs/sketchsize/` の config 群を実行します。
+Run configs under `experiments/pair_task/configs/sketchsize/`:
 
 ```bash
 docker compose run --rm pair-task-sketchsize
 ```
 
-並列数を指定する場合:
+Set parallelism when needed:
 
 ```bash
 PAIR_TASK_JOBS=4 docker compose run --rm pair-task-sketchsize
 ```
 
-出力先:
+Output is written under:
 
 ```text
 experiments/pair_task/outputs/sketchsize/
 ```
 
-## pair_task実験再現：b-bits
+## Reproduce b-bits Runs
 
-`experiments/pair_task/configs/bbits/` の config 群を実行します。
+Run configs under `experiments/pair_task/configs/bbits/`:
 
 ```bash
 docker compose run --rm pair-task-bbits
 ```
 
-並列数を指定する場合:
+Set parallelism when needed:
 
 ```bash
 PAIR_TASK_JOBS=4 docker compose run --rm pair-task-bbits
 ```
 
-出力先:
+Output is written under:
 
 ```text
 experiments/pair_task/outputs/bbits/
 ```
 
-## docker run で実験を直接指定する場合
+## Direct docker run
 
-compose service を使わず、image に直接コマンドを渡すこともできます。
+You can run the image directly instead of using Compose:
 
 ```bash
 docker run --rm \
@@ -175,4 +165,4 @@ docker run --rm \
     --config experiments/pair_task/config.json
 ```
 
-ただし通常は `docker compose run --rm pair-task` の方が短く、mount も compose 側で揃うので扱いやすいです。
+The Compose services are usually shorter and keep the mounts consistent.

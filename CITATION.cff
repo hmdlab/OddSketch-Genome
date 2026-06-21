@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use genome-oddsketch, please cite the accompanying paper and this software record."
+title: "genome-oddsketch"
+type: software
+version: "0.1.0"
+date-released: "2026-06-21"
+license: MIT
+authors:
+  - name: "genome-oddsketch contributors"
+abstract: "Standalone OddSketch CLI and benchmark workflows for evaluating genome Jaccard similarity estimation."
+
+# Before public release, replace the placeholders below with the final paper
+# title, authors, DOI or preprint URL, venue, and Zenodo DOI.
+preferred-citation:
+  type: article
+  title: "TODO: add accompanying paper title"
+  authors:
+    - name: "TODO: add paper authors"
+  year: 2026
+  notes: "TODO: add DOI, preprint URL, venue, and Zenodo DOI."

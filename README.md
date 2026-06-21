@@ -9,7 +9,6 @@ OddSketch itself is implemented under `src/` and can be built independently. Rep
 - `src/`, `include/`: C++17 OddSketch implementation and CLI
 - `data/oddsketch_cli_sample/`: small FASTA samples and path lists for CLI smoke tests
 - `experiments/pair_task/`: synthetic genome-pair benchmarks for exact Jaccard, OddSketch, and BinDash
-- `experiments/search_task/`: exploratory clustered-genome search benchmark
 - `experiments/refseq_sketch_task/`: real RefSeq genome sketch-build benchmark
 - `experiments/tools/`: helper binaries and scripts used by benchmark workflows
 - `Dockerfile`, `docker-compose.yml`: containerized environment for the CLI and benchmark workflows
@@ -18,7 +17,6 @@ Task-specific details live in:
 
 - [`experiments/README.md`](experiments/README.md)
 - [`experiments/pair_task/README.md`](experiments/pair_task/README.md)
-- [`experiments/search_task/README.md`](experiments/search_task/README.md)
 - [`experiments/refseq_sketch_task/README.md`](experiments/refseq_sketch_task/README.md)
 - [`README-docker.md`](README-docker.md)
 
@@ -157,19 +155,6 @@ Common generated files:
 - `results/`: result tables
 - `figures/`: plots
 
-### Search Benchmark
-
-Exploratory clustered-genome search benchmark. It is kept as workflow documentation and as a base for future search/database experiments.
-
-```bash
-bash scripts/bootstrap.sh
-make -C src CXX=g++ LDFLAGS=-lstdc++fs
-cd experiments/search_task
-uv run python scripts/project_runner.py --config config.json
-```
-
-Default outputs are written under `experiments/search_task/outputs/default/`.
-
 ### RefSeq Sketch Benchmark
 
 Real RefSeq genome sketch-build benchmark. It records sketch size, build time, peak memory, RefSeq metadata, and the saved `assembly_summary_refseq.txt`.
@@ -225,7 +210,15 @@ docker compose run --rm pair-task-bbits
 
 See [`README-docker.md`](README-docker.md) for volume layout, service details, and examples using your own data.
 
+## Citation
+
+If you use this repository, cite the accompanying paper and the software record described in [`CITATION.cff`](CITATION.cff). Add the final paper DOI, preprint URL, and Zenodo DOI to that file before public release.
+
+## License
+
+This project is released under the MIT License. See [`LICENSE`](LICENSE).
+
 ## Notes
 
 - `experiments/tools/bin/true_jaccard` and `experiments/tools/bin/true_index_pairs` are benchmark helper binaries, not part of the public OddSketch CLI surface.
-- The Japanese README is available at [`README-ja.md`](README-ja.md).
+- Use `scripts/make_public_archive.sh` to create a release archive from tracked and non-ignored files in the current working tree.
