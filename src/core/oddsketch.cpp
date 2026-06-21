@@ -29,7 +29,15 @@ namespace {
 namespace fs = std::filesystem;
 
 constexpr uint64_t kHashSeed = 0x9E3779B97F4A7C15ULL;
+constexpr uint64_t kBucketHashSeed = 0xD1B54A32D192ED03ULL;
+constexpr uint64_t kRankHashSeed = 0xABC98388FB8FAC03ULL;
 constexpr uint64_t kEmptyBucket = std::numeric_limits<uint64_t>::max();
+constexpr uint64_t kBaseSeeds[4] = {
+    0x3C8BFBB395C60474ULL, // A
+    0x3193C18562A02B4CULL, // C
+    0x20323ED082572324ULL, // G
+    0x295549F54BE24456ULL, // T
+};
 
 enum class PosMode { Value = 0, Mix = 1, Stripe = 2 };
 
@@ -123,39 +131,65 @@ struct UnivHash {
     }
 };
 
-uint64_t hash_kmer(std::string_view kmer) {
-    return XXH64(kmer.data(), kmer.length(), 0);
+uint64_t rotl64(uint64_t value, size_t count) {
+    const unsigned r = static_cast<unsigned>(count & 63U);
+    if (r == 0) {
+        return value;
+    }
+    return (value << r) | (value >> (64U - r));
 }
 
-char comp_base(char c) {
+uint64_t rotr64(uint64_t value, size_t count) {
+    const unsigned r = static_cast<unsigned>(count & 63U);
+    if (r == 0) {
+        return value;
+    }
+    return (value >> r) | (value << (64U - r));
+}
+
+uint64_t mix64(uint64_t value) {
+    value += 0x9E3779B97F4A7C15ULL;
+    value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9ULL;
+    value = (value ^ (value >> 27)) * 0x94D049BB133111EBULL;
+    return value ^ (value >> 31);
+}
+
+int base_index(char c) {
     switch (c) {
         case 'A':
         case 'a':
-            return 'T';
+            return 0;
         case 'C':
         case 'c':
-            return 'G';
+            return 1;
         case 'G':
         case 'g':
-            return 'C';
+            return 2;
         case 'T':
         case 't':
-            return 'A';
+            return 3;
         default:
-            return 'N';
+            return -1;
     }
 }
 
-uint64_t hash_kmer_canonical(const char* kmer, size_t k, std::string& rcbuf) {
-    rcbuf.resize(k);
-    for (size_t i = 0; i < k; ++i) {
-        rcbuf[k - 1 - i] = comp_base(kmer[i]);
+char normalize_base(char c) {
+    switch (c) {
+        case 'A':
+        case 'a':
+            return 'A';
+        case 'C':
+        case 'c':
+            return 'C';
+        case 'G':
+        case 'g':
+            return 'G';
+        case 'T':
+        case 't':
+            return 'T';
+        default:
+            return '\0';
     }
-
-    std::string_view fwd(kmer, k);
-    std::string_view rev(rcbuf.data(), k);
-    const std::string_view canon = (rev < fwd) ? rev : fwd;
-    return XXH64(canon.data(), canon.size(), 0);
 }
 
 size_t floor_pow2(size_t x) {
@@ -283,40 +317,52 @@ std::vector<uint64_t> densify_optimal(const std::vector<uint64_t>& buckets) {
     return out;
 }
 
-MinhashResult get_minhash_one_permutation(const std::string& seq, const OddsketchOptions& options) {
-    const size_t num_buckets = compute_num_buckets(options);
-    std::vector<uint64_t> bucket_min_hash(num_buckets, kEmptyBucket);
-
-    const size_t num_kmers = (seq.size() >= options.kmer) ? (seq.size() - options.kmer + 1) : 0;
-    unsigned m = 0;
-    while ((1ULL << m) < num_buckets) {
-        ++m;
-    }
-    const unsigned shift = 64 - m;
-
-    // OPH の各バケットに対して最小 hash 値だけを保持する。
-    if (options.canonical) {
-        std::string rcbuf;
-        for (size_t i = 0; i < num_kmers; ++i) {
-            const char* kptr = &seq[i];
-            const uint64_t hv = hash_kmer_canonical(kptr, options.kmer, rcbuf);
-            const size_t bucket_id = static_cast<size_t>(hv >> shift);
-            if (hv < bucket_min_hash[bucket_id]) {
-                bucket_min_hash[bucket_id] = hv;
-            }
-        }
-    } else {
-        for (size_t i = 0; i < num_kmers; ++i) {
-            const std::string_view kmer(&seq[i], options.kmer);
-            const uint64_t hv = hash_kmer(kmer);
-            const size_t bucket_id = static_cast<size_t>(hv >> shift);
-            if (hv < bucket_min_hash[bucket_id]) {
-                bucket_min_hash[bucket_id] = hv;
-            }
-        }
+void update_minhash_buckets_from_sequence(
+    std::string_view seq,
+    const OddsketchOptions& options,
+    unsigned shift,
+    std::vector<uint64_t>& bucket_min_hash
+) {
+    const size_t k = options.kmer;
+    if (k == 0 || seq.size() < k) {
+        return;
     }
 
-    return {densify_optimal(bucket_min_hash), num_buckets};
+    auto update_bucket = [&](uint64_t raw_hash) {
+        const uint64_t h_bucket = mix64(raw_hash ^ kBucketHashSeed);
+        uint64_t h_rank = mix64(raw_hash ^ kRankHashSeed);
+        if (h_rank == kEmptyBucket) {
+            --h_rank;
+        }
+        const size_t bucket_id = static_cast<size_t>(h_bucket >> shift);
+        if (h_rank < bucket_min_hash[bucket_id]) {
+            bucket_min_hash[bucket_id] = h_rank;
+        }
+    };
+
+    uint64_t fwd = 0;
+    uint64_t rev = 0;
+    for (size_t i = 0; i < k; ++i) {
+        const int idx = base_index(seq[i]);
+        if (idx < 0) {
+            return;
+        }
+        fwd ^= rotl64(kBaseSeeds[idx], k - 1 - i);
+        rev ^= rotl64(kBaseSeeds[3 - idx], i);
+    }
+    update_bucket(options.canonical ? std::min(fwd, rev) : fwd);
+
+    for (size_t i = k; i < seq.size(); ++i) {
+        const int out_idx = base_index(seq[i - k]);
+        const int in_idx = base_index(seq[i]);
+        if (out_idx < 0 || in_idx < 0) {
+            return;
+        }
+
+        fwd = rotl64(fwd, 1) ^ rotl64(kBaseSeeds[out_idx], k) ^ kBaseSeeds[in_idx];
+        rev = rotr64(rev, 1) ^ rotr64(kBaseSeeds[3 - out_idx], 1) ^ rotl64(kBaseSeeds[3 - in_idx], k - 1);
+        update_bucket(options.canonical ? std::min(fwd, rev) : fwd);
+    }
 }
 
 void flip_bit(std::vector<uint64_t>& words, size_t idx) {
@@ -349,54 +395,157 @@ size_t map_position(uint32_t idx, uint64_t hv, size_t nbits, size_t kbuckets, Po
     return static_cast<size_t>(mixed % nbits);
 }
 
-std::string read_plain_fasta_sequence(const std::string& fname) {
+void update_from_sequence_line(
+    const std::string& line,
+    const OddsketchOptions& options,
+    unsigned shift,
+    std::vector<uint64_t>& bucket_min_hash,
+    std::string& segment
+) {
+    auto flush_segment = [&]() {
+        if (!segment.empty()) {
+            update_minhash_buckets_from_sequence(segment, options, shift, bucket_min_hash);
+            segment.clear();
+        }
+    };
+
+    for (char c : line) {
+        if (std::isspace(static_cast<unsigned char>(c))) {
+            continue;
+        }
+        const char base = normalize_base(c);
+        if (base == '\0') {
+            flush_segment();
+            continue;
+        }
+        segment.push_back(base);
+    }
+}
+
+template <typename LineFunc>
+void process_sequence_line(
+    std::string line,
+    const OddsketchOptions& options,
+    unsigned shift,
+    std::vector<uint64_t>& bucket_min_hash,
+    std::string& segment,
+    bool& skip_quality_line,
+    LineFunc&& update_line
+) {
+    if (!line.empty() && line.back() == '\r') {
+        line.pop_back();
+    }
+    const auto first = std::find_if_not(line.begin(), line.end(), [](char c) {
+        return std::isspace(static_cast<unsigned char>(c));
+    });
+    if (first == line.end()) {
+        return;
+    }
+
+    auto flush_segment = [&]() {
+        if (!segment.empty()) {
+            update_minhash_buckets_from_sequence(segment, options, shift, bucket_min_hash);
+            segment.clear();
+        }
+    };
+
+    if (skip_quality_line) {
+        skip_quality_line = false;
+        flush_segment();
+        return;
+    }
+
+    const char lead = *first;
+    if (lead == '>' || lead == '@') {
+        flush_segment();
+        return;
+    }
+    if (lead == '+') {
+        flush_segment();
+        skip_quality_line = true;
+        return;
+    }
+
+    update_line(line, options, shift, bucket_min_hash, segment);
+}
+
+void update_minhash_from_plain_sequence_file(
+    const std::string& fname,
+    const OddsketchOptions& options,
+    unsigned shift,
+    std::vector<uint64_t>& bucket_min_hash
+) {
     std::ifstream ifs(fname);
     if (!ifs) {
         throw std::runtime_error("Cannot open " + fname);
     }
 
     std::string line;
-    std::string seq;
+    std::string segment;
+    bool skip_quality_line = false;
     while (std::getline(ifs, line)) {
-        if (line.empty() || line[0] == '>') {
-            continue;
-        }
-        if (!line.empty() && line.back() == '\r') {
-            line.pop_back();
-        }
-        seq += line;
+        process_sequence_line(
+            line,
+            options,
+            shift,
+            bucket_min_hash,
+            segment,
+            skip_quality_line,
+            update_from_sequence_line
+        );
     }
-    return seq;
+    if (!segment.empty()) {
+        update_minhash_buckets_from_sequence(segment, options, shift, bucket_min_hash);
+    }
 }
 
-std::string read_gzip_fasta_sequence(const std::string& fname) {
+void update_minhash_from_gzip_sequence_file(
+    const std::string& fname,
+    const OddsketchOptions& options,
+    unsigned shift,
+    std::vector<uint64_t>& bucket_min_hash
+) {
     gzFile file = gzopen(fname.c_str(), "rb");
     if (file == nullptr) {
         throw std::runtime_error("Cannot open gzip FASTA: " + fname);
     }
 
-    std::string seq;
     std::vector<char> buffer(1024 * 1024);
-    bool at_line_start = true;
-    bool skipping_header = false;
+    std::string line;
+    std::string segment;
+    bool skip_quality_line = false;
     while (gzgets(file, buffer.data(), static_cast<int>(buffer.size())) != nullptr) {
-        for (const char c : std::string_view(buffer.data())) {
-            if (at_line_start && c == '>') {
-                skipping_header = true;
-            }
+        const std::string_view chunk(buffer.data());
+        for (char c : chunk) {
             if (c == '\n') {
-                at_line_start = true;
-                skipping_header = false;
-                continue;
+                process_sequence_line(
+                    line,
+                    options,
+                    shift,
+                    bucket_min_hash,
+                    segment,
+                    skip_quality_line,
+                    update_from_sequence_line
+                );
+                line.clear();
+            } else {
+                line.push_back(c);
             }
-            if (c == '\r') {
-                continue;
-            }
-            if (!skipping_header) {
-                seq.push_back(c);
-            }
-            at_line_start = false;
         }
+    }
+    if (!line.empty()) {
+        process_sequence_line(
+            line,
+            options,
+            shift,
+            bucket_min_hash,
+            segment,
+            skip_quality_line,
+            update_from_sequence_line
+        );
+    }
+    if (!segment.empty()) {
+        update_minhash_buckets_from_sequence(segment, options, shift, bucket_min_hash);
     }
 
     int gzerrnum = Z_OK;
@@ -408,25 +557,35 @@ std::string read_gzip_fasta_sequence(const std::string& fname) {
     if (close_status != Z_OK) {
         throw std::runtime_error("Error closing gzip FASTA: " + fname);
     }
-    return seq;
 }
 
-std::string read_fasta_sequence(const std::string& fname) {
-    if (ends_with(fname, ".gz")) {
-        return read_gzip_fasta_sequence(fname);
+MinhashResult get_minhash_one_permutation_from_sequence_file(
+    const std::string& fname,
+    const OddsketchOptions& options
+) {
+    const size_t num_buckets = compute_num_buckets(options);
+    std::vector<uint64_t> bucket_min_hash(num_buckets, kEmptyBucket);
+
+    unsigned m = 0;
+    while ((1ULL << m) < num_buckets) {
+        ++m;
     }
-    return read_plain_fasta_sequence(fname);
+    const unsigned shift = 64 - m;
+
+    if (ends_with(fname, ".gz")) {
+        update_minhash_from_gzip_sequence_file(fname, options, shift, bucket_min_hash);
+    } else {
+        update_minhash_from_plain_sequence_file(fname, options, shift, bucket_min_hash);
+    }
+    return {densify_optimal(bucket_min_hash), num_buckets};
 }
 
 SketchBuildResult make_odd_sketch_from_fasta(const std::string& fname, const OddsketchOptions& options) {
-    // 現在は FASTA を単純に 1 本の塩基列として連結して扱う。
-    const std::string seq = read_fasta_sequence(fname);
-
     if (options.sketch_size == 0 || (options.sketch_size % 64) != 0) {
         throw std::runtime_error("Invalid sketch size (must be a positive multiple of 64)");
     }
 
-    const MinhashResult minhash = get_minhash_one_permutation(seq, options);
+    const MinhashResult minhash = get_minhash_one_permutation_from_sequence_file(fname, options);
     std::vector<uint64_t> words(options.sketch_size / 64, 0);
     for (size_t i = 0; i < minhash.values.size(); ++i) {
         const uint64_t hv = minhash.values[i];
