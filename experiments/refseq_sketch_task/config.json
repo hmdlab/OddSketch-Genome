@@ -25,5 +25,12 @@
     "j0": 0.9,
     "pos_mode": "mix",
     "canonical": true
+  },
+  "bindash": {
+    "bindash_bin": "experiments/tools/bin/bindash",
+    "threads": 8,
+    "kmerlen": 64,
+    "sketch_size": 16384,
+    "bbits": 16
   }
 }

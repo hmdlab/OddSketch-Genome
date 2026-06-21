@@ -1,7 +1,7 @@
 #!/bin/bash
 #$ -cwd
 #$ -V
-#$ -N refseq_oddsketch
+#$ -N refseq_bindash
 #$ -q h.q
 #$ -pe OpenMP 8
 #$ -l mem_req=16g
@@ -12,7 +12,7 @@ set -euo pipefail
 REPO_ROOT=$(pwd)
 if [[ ! -f "${REPO_ROOT}/README.md" || ! -d "${REPO_ROOT}/experiments/refseq_sketch_task" ]]; then
   echo "Run this job from the repository root:" >&2
-  echo "  cd /path/to/genome-oddsketch && qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh" >&2
+  echo "  cd /path/to/genome-oddsketch && qsub experiments/refseq_sketch_task/jobs/qsub_refseq_bindash_sketch.sh" >&2
   exit 1
 fi
 
@@ -41,17 +41,21 @@ fi
 if [[ -x /usr/bin/python3.11 ]]; then
   PYTHON_BIN_DEFAULT=/usr/bin/python3.11
 else
-  PYTHON_BIN_DEFAULT=$(command -v python3.11 || true)
+  PYTHON_BIN_DEFAULT=$(command -v python3.11 || command -v python3 || true)
 fi
 PYTHON_BIN=${PYTHON_BIN:-"${PYTHON_BIN_DEFAULT}"}
 
-ODDSKETCH_BIN=${ODDSKETCH_BIN:-"${REPO_ROOT}/src/oddsketch"}
-if [[ ! -x "${ODDSKETCH_BIN}" ]]; then
-  echo "warning: oddsketch binary not found at ${ODDSKETCH_BIN}" >&2
+BINDASH_BIN=${BINDASH_BIN:-"${REPO_ROOT}/experiments/tools/bin/bindash"}
+if [[ ! -x "${BINDASH_BIN}" ]]; then
+  BINDASH_BIN=$(command -v bindash || true)
+fi
+if [[ -z "${BINDASH_BIN}" || ! -x "${BINDASH_BIN}" ]]; then
+  echo "bindash not found. Set BINDASH_BIN or run scripts/bootstrap.sh first." >&2
+  exit 1
 fi
 
 export UV_CACHE_DIR=${UV_CACHE_DIR:-"${TMPDIR:-/tmp}/uv-cache-${USER}"}
-export ODDSKETCH_BIN
+export BINDASH_BIN
 mkdir -p "${UV_CACHE_DIR}"
 
 UV_RUN_ARGS=(run --no-sync)
@@ -70,10 +74,10 @@ echo "[job] uv=${UV_BIN}"
 if [[ -n "${PYTHON_BIN}" ]]; then
   echo "[job] python=${PYTHON_BIN}"
 fi
-echo "[job] oddsketch=${ODDSKETCH_BIN}"
+echo "[job] bindash=${BINDASH_BIN}"
 echo "[job] uv_cache_dir=${UV_CACHE_DIR}"
 
 "${UV_BIN}" sync
-"${UV_BIN}" "${UV_RUN_ARGS[@]}" python "${TASK_DIR}/scripts/refseq_sketch_runner.py" --config "${CONFIG_PATH}" "$@"
+"${UV_BIN}" "${UV_RUN_ARGS[@]}" python "${TASK_DIR}/scripts/refseq_bindash_sketch_runner.py" --config "${CONFIG_PATH}" "$@"
 
 echo "[job] end=$(date)"

@@ -44,3 +44,15 @@ qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh \
 ```
 
 Use a fresh run without `--resume` when you want a new end-to-end build-time measurement.
+
+## BinDash sketch run
+To measure BinDash sketch time on the same RefSeq genomes listed in `paths.local_genome_list`, submit:
+
+```bash
+qsub experiments/refseq_sketch_task/jobs/qsub_refseq_bindash_sketch.sh \
+  experiments/refseq_sketch_task/config.json
+```
+
+BinDash parameters live in the `bindash` section of `config.json`. `bindash.sketch_size` is treated as target bits and converted to BinDash `--sketchsize64`. The default values match the OddSketch run for `threads`, `kmerlen`, and `sketch_size`.
+
+Outputs are written under `data/sketch_runs/runs/<run_id>/`, including `results/bindash_sketch_metrics.tsv`, `logs/bindash_sketch_time.txt`, `logs/bindash_sketch_stdout.txt`, `manifests/bindash_sketch_files.tsv`, and `bindash_sketches/bindash_refseq_sketch*`.

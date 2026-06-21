@@ -2,10 +2,10 @@
 #$ -cwd
 #$ -V
 #$ -N pair_project_runner
-#$ -q tsmall
+#$ -q h.q
 #$ -pe OpenMP 4
-#$ -l mem_req=32g
-#$ -l h_vmem=32g
+#$ -l mem_req=16g
+#$ -l h_vmem=16g
 
 set -euo pipefail
 
