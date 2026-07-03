@@ -2,6 +2,16 @@
 
 This task generates synthetic genome pairs and compares exact Jaccard, OddSketch, and BinDash.
 
+BinDash is an external dependency and is not vendored in this repository. The default helper script installs it from:
+
+```text
+https://github.com/zhaoxiaofei/bindash.git
+```
+
+with `BINDASH_TAG=v2.6`.
+
+For the benchmark baseline reported here, tag `v2.6` corresponds to commit `ce2d16816beade65db992b8cd6eced00b54ca9ef`, and the executable reports `version 2.2.0 commit ce2d168-clean`.
+
 ## Layout
 - `config.json`: task settings
 - `scripts/`: genome generation, Jaccard calculation, and task runner

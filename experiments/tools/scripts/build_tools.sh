@@ -3,6 +3,7 @@ set -euo pipefail
 
 METHOD="auto"
 BINDASH_REF="v2.6"
+BINDASH_REPO=${BINDASH_REPO:-https://github.com/zhaoxiaofei/bindash.git}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -31,6 +32,8 @@ mkdir -p "${BIN_DIR}" "${TOOLS_DIR}"
 
 echo "[build_tools] BinDash is an external tool by its original authors."
 echo "[build_tools] This repository does not vendor BinDash source or binaries."
+echo "[build_tools] source repo: ${BINDASH_REPO}"
+echo "[build_tools] source ref : ${BINDASH_REF}"
 
 if command -v bindash >/dev/null 2>&1; then
   echo "[build_tools] bindash found on PATH: $(command -v bindash)"
@@ -43,7 +46,7 @@ install_from_source() {
   command -v make >/dev/null
 
   if [[ ! -d "${SRC_DIR}/.git" ]]; then
-    git clone https://github.com/jianshu93/bindash.git "${SRC_DIR}"
+    git clone "${BINDASH_REPO}" "${SRC_DIR}"
   fi
 
   git -C "${SRC_DIR}" fetch --tags --all
@@ -64,14 +67,6 @@ install_from_source() {
 }
 
 if [[ "${METHOD}" == "auto" ]]; then
-  if [[ "$(uname -s)" == "Darwin" ]] && command -v brew >/dev/null 2>&1; then
-    echo "[build_tools] Using Homebrew path"
-    brew tap jianshu93/bindash
-    brew update
-    brew install --cc=gcc-13 bindash
-    exit 0
-  fi
-
   if command -v conda >/dev/null 2>&1; then
     echo "[build_tools] Using conda path"
     conda install -y bindash -c bioconda
@@ -84,12 +79,6 @@ if [[ "${METHOD}" == "auto" ]]; then
 fi
 
 case "${METHOD}" in
-  brew)
-    command -v brew >/dev/null
-    brew tap jianshu93/bindash
-    brew update
-    brew install --cc=gcc-13 bindash
-    ;;
   conda)
     command -v conda >/dev/null
     conda install -y bindash -c bioconda

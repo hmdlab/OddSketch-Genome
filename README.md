@@ -131,11 +131,19 @@ If a workflow compares against BinDash, install BinDash into `experiments/tools/
 bash scripts/bootstrap.sh
 ```
 
-The default BinDash tag is `v2.6`. Override it with `BINDASH_TAG` when needed:
+BinDash is installed from:
+
+```text
+https://github.com/zhaoxiaofei/bindash.git
+```
+
+The default BinDash tag used by the bootstrap script and Docker build is `v2.6`. Override the source repository or tag with `BINDASH_REPO` or `BINDASH_TAG` when needed:
 
 ```bash
 BINDASH_TAG=v2.6 bash scripts/bootstrap.sh
 ```
+
+For the benchmark baseline reported here, BinDash was built from tag `v2.6`, commit `ce2d16816beade65db992b8cd6eced00b54ca9ef`. The executable reports `version 2.2.0 commit ce2d168-clean`.
 
 ### Pairwise Benchmark
 
@@ -158,6 +166,16 @@ Common generated files:
 ### RefSeq Sketch Benchmark
 
 Real RefSeq genome sketch-build benchmark. It records sketch size, build time, peak memory, RefSeq metadata, and the saved `assembly_summary_refseq.txt`.
+
+The benchmark uses the NCBI RefSeq bacteria assembly summary file:
+
+```text
+https://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt
+```
+
+For the benchmark run reported here, the local `assembly_summary.txt` copy had a file timestamp of 2026-05-11 09:19:56 JST. RefSeq genome FASTA files were downloaded from 2026-05-13 15:42:11 JST to 2026-05-15 10:11:13 JST.
+
+Genome FASTA files are downloaded from each selected row's `ftp_path` by appending `<assembly_directory>_genomic.fna.gz`. See [`experiments/refseq_sketch_task/README.md`](experiments/refseq_sketch_task/README.md) for details.
 
 Run from the repository root:
 

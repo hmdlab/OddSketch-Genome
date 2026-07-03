@@ -29,6 +29,14 @@ To use a different BinDash tag:
 BINDASH_TAG=v2.6 docker compose build
 ```
 
+By default, the image builds BinDash from:
+
+```text
+https://github.com/zhaoxiaofei/bindash.git
+```
+
+with `BINDASH_TAG=v2.6`. Override `BINDASH_REPO` or `BINDASH_TAG` when a different BinDash source or revision is required.
+
 ## Local Output Mounts
 
 Container filesystems are separate from the host filesystem. Results written only inside a `--rm` container disappear when the container exits.

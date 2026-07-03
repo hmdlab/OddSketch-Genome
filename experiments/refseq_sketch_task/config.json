@@ -6,6 +6,7 @@
   },
   "download": {
     "assembly_summary": "data/refseq_bacteria/assembly_summary.txt",
+    "assembly_summary_source_url": "https://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt",
     "outdir": "data/assembly",
     "version_label": "RefSeq bacteria assembly_summary.txt",
     "threads": 4,
@@ -28,6 +29,9 @@
   },
   "bindash": {
     "bindash_bin": "experiments/tools/bin/bindash",
+    "source_repo": "https://github.com/zhaoxiaofei/bindash.git",
+    "source_tag": "v2.6",
+    "source_commit": "ce2d16816beade65db992b8cd6eced00b54ca9ef",
     "threads": 8,
     "kmerlen": 64,
     "sketch_size": 16384,

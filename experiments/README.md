@@ -47,7 +47,7 @@ docker compose run --rm oddsketch dist --pairlist /data/sketch_pairs.tsv --threa
 
 ## Notes
 - To use a specific OddSketch binary, set `ODDSKETCH_BIN`.
-- BinDash is external and is not vendored in this repository.
+- BinDash is external and is not vendored in this repository. The default helper script builds it from `https://github.com/zhaoxiaofei/bindash.git` at tag `v2.6`.
 - Task-local `config.json` files define the default output roots via `paths.outdir`.
 - `pair_task/scripts/batch_project_runner.py` creates a unique run directory under `paths.outdir` for each config and saves the resolved config to `<run>/metadata/used_config.json`.
 - Exact-Jaccard helper binaries are built from `experiments/tools/src/` into `experiments/tools/bin/` by `make -C src`.
