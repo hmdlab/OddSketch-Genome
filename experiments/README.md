@@ -13,16 +13,45 @@ Each task keeps its own defaults:
 - code: `<task>/scripts/`, `<task>/analysis/`
 - generated data: `<task>/outputs/default/`
 
+## Task Size
+- `pair_task/` is the lighter synthetic benchmark. It can be used as a local smoke test after reducing `make_genomes.genome_length` and `make_genomes.num_pairs` in `pair_task/config.json`.
+- `refseq_sketch_task/` is the heavy real-data benchmark. It downloads and sketches hundreds of thousands of RefSeq bacterial genomes, so it is intended for an HPC or server environment with substantial storage and runtime.
+
+BinDash is not needed for ordinary OddSketch-Genome CLI use or OddSketch-only experiment runs. Install BinDash only when reproducing workflows that include the BinDash baseline:
+- `pair_task/scripts/cal_jaccard_bindash.py`
+- `pair_task` runs with `bindash.enabled=true`
+- `refseq_sketch_task/scripts/refseq_bindash_sketch_runner.py`
+- `refseq_sketch_task/jobs/qsub_refseq_bindash_sketch.sh`
+
 ## Quick Run
-Run each task from its own directory:
+Install Python dependencies and build helper binaries from the repository root:
 
 ```bash
 uv sync
+make -C src CXX=g++ LDFLAGS=-lstdc++fs
+```
+
+Install BinDash only if you will run one of the BinDash baseline workflows listed above:
+
+```bash
+bash scripts/bootstrap.sh
+```
+
+Run the pairwise synthetic benchmark from its task directory:
+
+```bash
 cd experiments/pair_task
 uv run python scripts/batch_project_runner.py --config config.json
 ```
 
-The real RefSeq sketch-build benchmark is submitted from the repository root:
+Run the RefSeq sketch-build benchmark from the repository root:
+
+```bash
+uv run python experiments/refseq_sketch_task/scripts/refseq_sketch_runner.py \
+  --config experiments/refseq_sketch_task/config.json
+```
+
+Or submit it to Grid Engine:
 
 ```bash
 qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh

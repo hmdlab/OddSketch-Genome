@@ -2,6 +2,8 @@
 
 This task generates synthetic genome pairs and compares exact Jaccard, OddSketch, and BinDash.
 
+This is the lighter benchmark workflow in this repository. For a quick local smoke test, reduce `make_genomes.genome_length` and `make_genomes.num_pairs` in `config.json`.
+
 BinDash is an external dependency and is not vendored in this repository. The default helper script installs it from:
 
 ```text
@@ -9,6 +11,8 @@ https://github.com/zhaoxiaofei/bindash.git
 ```
 
 with `BINDASH_TAG=v2.6`.
+
+BinDash is required only for `cal_jaccard_bindash.py` or task runs with `bindash.enabled=true`. Set `bindash.enabled=false` for OddSketch-only runs.
 
 For the benchmark baseline reported here, tag `v2.6` corresponds to commit `ce2d16816beade65db992b8cd6eced00b54ca9ef`, and the executable reports `version 2.2.0 commit ce2d168-clean`.
 

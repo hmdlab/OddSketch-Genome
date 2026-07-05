@@ -2,6 +2,10 @@
 
 This task sketches real genomes with OddSketch and records database size, build time, and peak memory. Submit it with `qsub` from the repository root.
 
+This is the heavy real-data benchmark in this repository. It is intended for an HPC or server environment because it downloads and sketches hundreds of thousands of RefSeq bacterial genomes and requires substantial storage and runtime.
+
+BinDash is not required for the OddSketch RefSeq sketch run. It is needed only for the separate BinDash sketch benchmark described in [BinDash sketch run](#bindash-sketch-run).
+
 ## RefSeq source
 
 The RefSeq benchmark uses the NCBI RefSeq bacteria assembly summary file:
