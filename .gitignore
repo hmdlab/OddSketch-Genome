@@ -41,8 +41,6 @@ experiments/search_task/
 # Temporary local analysis helpers
 experiments/pair_task/analysis/plot_bbits_rmse_by_true_jaccard.py
 experiments/pair_task/analysis/plot_sketchsize_summary.py
-docker-data/*
-!docker-data/.gitkeep
 
 # Object files
 src/*.o

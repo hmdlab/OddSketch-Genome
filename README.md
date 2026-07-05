@@ -7,11 +7,8 @@ OddSketch-Genome is a standalone command-line tool for sketching genome FASTA fi
 - `src/`, `include/`: C++17 OddSketch-Genome CLI
 - `data/oddsketch_cli_sample/`: small FASTA files for the quick tutorial
 - `experiments/`: benchmark workflows and reproduction scripts
-- `Dockerfile`, `docker-compose.yml`: containerized environment
 
 ## Installation
-
-### Local Build
 
 Requirements:
 
@@ -32,15 +29,6 @@ BinDash is not required for the OddSketch-Genome CLI, the quick tutorial, or Odd
 ```bash
 bash scripts/bootstrap.sh
 ```
-
-### Docker
-
-```bash
-docker compose build
-docker compose run --rm oddsketch --help
-```
-
-See [`README-docker.md`](README-docker.md) for Docker volume layout and benchmark services.
 
 ## Quick Tutorial
 
@@ -144,7 +132,7 @@ If you use OddSketch-Genome, please cite the accompanying paper and this softwar
 
 ## License
 
-This project is released under the MIT License. See [`LICENSE`](LICENSE).
+Original OddSketch-Genome code is released under the MIT License. Bundled third-party source files and external tools/data keep their own license or usage terms; see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 ## Support
 
