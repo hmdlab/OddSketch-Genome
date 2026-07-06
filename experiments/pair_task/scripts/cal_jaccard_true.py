@@ -56,7 +56,7 @@ def main() -> None:
     output_file = results_dir / "jaccard_true_results.txt"
 
     if not pair_info_file.exists():
-        raise SystemExit(f"pair_info が見つかりません: {pair_info_file}")
+        raise SystemExit(f"pair_info not found: {pair_info_file}")
 
     k = int(cfg.get("true_jaccard", {}).get("kmerlen", 64))
 
@@ -70,18 +70,18 @@ def main() -> None:
                 f"--pair-info={pair_info_file}",
                 f"--out={output_file}",
             ]
-            print(f"C++ true_jaccard を起動します: {' '.join(cmd)}")
+            print(f"Launching C++ true_jaccard: {' '.join(cmd)}")
             subprocess.run(cmd, check=True)
-            print("C++ 実装での計算が完了しました。")
+            print("C++ implementation completed.")
             return
     except Exception as exc:
-        print(f"C++ 実装の起動に失敗したため、Python実装で継続します: {exc}")
+        print(f"Failed to launch the C++ implementation; continuing with the Python implementation: {exc}")
 
-    print("多様性データセットでの真のJaccard係数計算開始...")
-    print(f"設定ファイル: {config_path}")
-    print(f"k-mer長: {k}")
-    print(f"入力: {pair_info_file}")
-    print(f"出力: {output_file}")
+    print("Starting exact Jaccard calculation for the synthetic dataset...")
+    print(f"Config file: {config_path}")
+    print(f"k-mer length: {k}")
+    print(f"Input: {pair_info_file}")
+    print(f"Output: {output_file}")
     print()
 
     results = []
@@ -96,7 +96,7 @@ def main() -> None:
             mutation_count = int(mutation_count)
             genome_length = int(genome_length)
 
-            print(f"ペア {pair_id:3d}: 変異数 {mutation_count:5,} ", end="")
+            print(f"Pair {pair_id:3d}: mutations {mutation_count:5,} ", end="")
             try:
                 kmers1 = get_kmers(read_fasta(file1), k)
                 kmers2 = get_kmers(read_fasta(file2), k)
@@ -114,7 +114,7 @@ def main() -> None:
                 })
                 print(f"-> Jaccard: {jaccard:.6f}")
             except Exception as exc:
-                print(f"-> エラー: {exc}")
+                print(f"-> error: {exc}")
 
     with output_file.open("w") as f:
         f.write("pair_id\tmutation_count\tgenome_length\tmutation_rate\tjaccard_true\tkmers1_count\tkmers2_count\tintersection\tunion\n")
@@ -126,9 +126,9 @@ def main() -> None:
                 f"{result['intersection']}\t{result['union']}\n"
             )
 
-    print("\n計算完了!")
-    print(f"処理ペア数: {len(results)}")
-    print(f"結果ファイル: {output_file}")
+    print("\nCalculation complete.")
+    print(f"Processed pairs: {len(results)}")
+    print(f"Result file: {output_file}")
 
 
 if __name__ == "__main__":

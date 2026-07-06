@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
 """
 compute_rmse.py
-comparison_results_*.csv から RMSE / MAE を計算します。
+Compute RMSE / MAE from comparison_results_*.csv files.
 
-計算内容:
-- 全体の RMSE / MAE
-- 類似度ビンごとの RMSE / MAE と 95%CI（ブートストラップ）
+Metrics:
+- Overall RMSE / MAE
+- RMSE / MAE and 95% CI per similarity bin, estimated by bootstrap
 
-入力CSV 必須列:
-- pair_id, jaccard_true, <推定列>
-  推定列は既定で自動検出（優先順: jaccard_oddsketch, jaccard_bindash, jaccard_estimate）
-  明示したい場合は --est-col で指定。
+Required input CSV columns:
+- pair_id, jaccard_true, <estimate column>
+  The estimate column is auto-detected by default, in this order:
+  jaccard_oddsketch, jaccard_bindash, jaccard_estimate.
+  Use --est-col to specify it explicitly.
 
-使用例:
+Examples:
 - OddSketch:  python analysis/compute_rmse.py --csv outputs/default/results/comparison_results_oddsketch.csv
 - BinDash:    python analysis/compute_rmse.py --csv outputs/default/results/comparison_results_bindash.csv --est-col jaccard_bindash
-- 複数CSV:    python compute_rmse.py --csv file1.csv --csv file2.csv
-- ビン指定:   python compute_rmse.py --bins 0.5,0.6,0.7,0.8,0.9,1.0 --bootstrap 1000
+- Multiple CSVs: python compute_rmse.py --csv file1.csv --csv file2.csv
+- Custom bins:   python compute_rmse.py --bins 0.5,0.6,0.7,0.8,0.9,1.0 --bootstrap 1000
 """
 
 import argparse
@@ -32,7 +33,7 @@ import matplotlib.pyplot as plt
 def load_pairs(path: Path, est_col: Optional[str]):
     with path.open() as f:
         r = csv.DictReader(f)
-        # 推定列の自動検出
+        # Auto-detect the estimate column.
         if est_col is None:
             for c in ("jaccard_oddsketch", "jaccard_bindash", "jaccard_estimate"):
                 if c in r.fieldnames:
@@ -59,29 +60,29 @@ def rmse(xs: list[float], ys: list[float]) -> float:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--csv", action="append", required=True, help="入力CSV（複数可）")
-    ap.add_argument("--est-col", default=None, help="推定列名（例: jaccard_oddsketch, jaccard_bindash）")
-    ap.add_argument("--threshold", type=float, default=0.75, help="高類似度RMSEのしきい値（真値>threshold）")
-    ap.add_argument("--bins", default="0.5,0.6,0.7,0.8,0.9,1.0", help="類似度ビンの端点CSV（例: 0.5,0.6,0.7,0.8,0.9,1.0）")
-    ap.add_argument("--bootstrap", type=int, default=1000, help="95%%CI推定のブートストラップ反復回数")
-    ap.add_argument("--min-n", type=int, default=1, help="各ビンの最低サンプル数（0のみスキップ）")
-    ap.add_argument("--plot-out", default=None, help="図の出力パス（例: rmse_comparison.png）")
-    ap.add_argument("--title", default=None, help="図のタイトル")
+    ap.add_argument("--csv", action="append", required=True, help="Input CSV path; may be specified multiple times")
+    ap.add_argument("--est-col", default=None, help="Estimate column name, e.g. jaccard_oddsketch or jaccard_bindash")
+    ap.add_argument("--threshold", type=float, default=0.75, help="Threshold for high-similarity RMSE using true Jaccard > threshold")
+    ap.add_argument("--bins", default="0.5,0.6,0.7,0.8,0.9,1.0", help="Comma-separated similarity-bin edges, e.g. 0.5,0.6,0.7,0.8,0.9,1.0")
+    ap.add_argument("--bootstrap", type=int, default=1000, help="Number of bootstrap iterations for 95%% CI estimation")
+    ap.add_argument("--min-n", type=int, default=1, help="Minimum sample count per bin; bins with zero samples are always skipped")
+    ap.add_argument("--plot-out", default=None, help="Output path for the plot, e.g. rmse_comparison.png")
+    ap.add_argument("--title", default=None, help="Plot title")
     args = ap.parse_args()
 
-    # 乱数シード（再現性確保したい場合は固定）
+    # Fixed random seed for reproducible bootstrap intervals.
     random.seed(42)
 
-    # ビン端点
+    # Bin edges.
     try:
         edges = [float(x.strip()) for x in args.bins.split(',') if x.strip()]
         assert len(edges) >= 2
     except Exception:
-        raise SystemExit("--bins の形式が不正です。例: 0.5,0.6,0.7,0.8,0.9,1.0")
+        raise SystemExit("Invalid --bins format. Example: 0.5,0.6,0.7,0.8,0.9,1.0")
 
-    # プロット用の集計バッファ
+    # Aggregation buffer for plotting.
     series = []  # list of dict(label, bins:list[str], rmse:list[float], rm_lo:list[float], rm_hi:list[float])
-    base_dir = None  # 最初に見つかったCSVの親ディレクトリ（例: test_genomes）
+    base_dir = None  # Parent directory of the first CSV found, e.g. test_genomes.
 
     for csv_path in args.csv:
         p = Path(csv_path)
@@ -106,15 +107,15 @@ def main():
         print(f"  N(true>{args.threshold:.2f}): {n_hi}")
         print(f"  RMSE(true>{args.threshold:.2f}): {r_hi:.6f}")
 
-        # 類似度ビンごとの RMSE/MAE (+ 95%CI)
-        print("  Binned metrics (mean ± 95%CI):")
+        # RMSE/MAE per similarity bin, with 95% CI.
+        print("  Binned metrics (mean +/- 95%CI):")
         bins_labels: List[str] = []
         rm_vals: List[float] = []
         rm_lo_vals: List[float] = []
         rm_hi_vals: List[float] = []
         for i in range(len(edges) - 1):
             lo, hi = edges[i], edges[i+1]
-            # 最後のビンは上端含む
+            # Include the upper edge in the final bin.
             if i == len(edges) - 2:
                 sel = [j for j, x in enumerate(xs) if (x >= lo and x <= hi)]
             else:
@@ -125,12 +126,12 @@ def main():
                 continue
             xe = [xs[j] for j in sel]
             ye = [ys[j] for j in sel]
-            # 誤差系列
+            # Error series.
             abs_err = [abs(ye[k]-xe[k]) for k in range(n)]
             sq_err  = [(ye[k]-xe[k])**2 for k in range(n)]
             mae = sum(abs_err)/n
             rmse_bin = math.sqrt(sum(sq_err)/n)
-            # 95%CI（ブートストラップ）
+            # 95% CI by bootstrap.
             def boot_ci(vals, is_rmse=False):
                 B = args.bootstrap
                 if B <= 0:
@@ -149,7 +150,7 @@ def main():
                 return (lo_p, hi_p)
             mae_lo, mae_hi = boot_ci(abs_err, is_rmse=False)
             rm_lo, rm_hi   = boot_ci(sq_err, is_rmse=True)
-            # 表示
+            # Display.
             bracket = ']' if i == len(edges)-2 else ')'
             print(f"    [{lo:.2f},{hi:.2f}{bracket}: N={n}  RMSE={rmse_bin:.6f} (95% CI: {rm_lo:.6f}-{rm_hi:.6f}),  "
                   f"MAE={mae:.6f} (95% CI: {mae_lo:.6f}-{mae_hi:.6f})")
@@ -173,9 +174,9 @@ def main():
                 'est_col': est_col,
             })
 
-    # 図の作成
+    # Build the plot.
     if args.plot_out and series:
-        # すべてのシリーズでビンが空ならフォールバック（全体/高類似のみ）
+        # Fallback to overall/high-similarity metrics if every bin is empty.
         if all(len(s['rmse']) == 0 for s in series):
             xlabels = [f"all", f"true>{args.threshold:.2f}"]
             x = list(range(len(xlabels)))
@@ -195,7 +196,7 @@ def main():
             fig.tight_layout()
             outp = Path(args.plot_out)
             if not outp.is_absolute():
-                # 相対パスは最初のCSVの親（test_genomes など）基準に出力
+                # Resolve relative output paths against the first CSV's parent directory.
                 if outp.parent == Path('.') and base_dir is not None:
                     outp = base_dir / outp.name
                 elif base_dir is not None:
@@ -204,7 +205,7 @@ def main():
             fig.savefig(outp, dpi=150)
             print(f"saved figure: {outp}")
         else:
-            # x 軸は最初のシリーズのラベルを採用（同じビン境界前提）
+            # Reuse labels from the first series; all series are expected to share bin edges.
             xlabels = series[0]['bins']
             x = list(range(len(xlabels)))
             width = 0.8 / max(1, len(series))
@@ -212,7 +213,7 @@ def main():
         for i, s in enumerate(series):
             offs = [xi + (i - (len(series)-1)/2)*width for xi in x]
             y = s['rmse']
-            # 単純なRMSEのみ（誤差バーなし）
+            # Plot RMSE values without error bars.
             ax.bar(offs, y, width=width, label=f"{s['label']} ({s['est_col']})")
             ax.set_xticks(x)
             ax.set_xticklabels(xlabels, rotation=0)

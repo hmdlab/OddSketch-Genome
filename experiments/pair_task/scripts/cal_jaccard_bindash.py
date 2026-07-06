@@ -95,7 +95,7 @@ def main() -> None:
     results_dir.mkdir(parents=True, exist_ok=True)
 
     if not pair_info.exists():
-        raise SystemExit(f"pair_info が見つかりません: {pair_info}")
+        raise SystemExit(f"pair_info not found: {pair_info}")
 
     bindash_bin = resolve_bindash_bin(cfg.get("bindash_bin"))
     threads = int(cfg.get("threads", 8))

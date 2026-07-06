@@ -49,12 +49,12 @@ def generate_diverse_genome_pair(
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="config.json", help="Path to task config JSON")
-    ap.add_argument("--genome-length", type=int, default=None, help="1配列の塩基長")
-    ap.add_argument("--num-pairs", type=int, default=None, help="生成するペア数")
-    ap.add_argument("--mutation-min", type=int, default=None, help="変異数の最小値")
-    ap.add_argument("--mutation-max", type=int, default=None, help="変異数の最大値")
-    ap.add_argument("--outdir", default=None, help="出力ルートディレクトリ")
-    ap.add_argument("--seed-base", type=int, default=None, help="pair_idに加える乱数シードの基準値")
+    ap.add_argument("--genome-length", type=int, default=None, help="Length of each generated sequence in base pairs")
+    ap.add_argument("--num-pairs", type=int, default=None, help="Number of genome pairs to generate")
+    ap.add_argument("--mutation-min", type=int, default=None, help="Minimum number of mutations per pair")
+    ap.add_argument("--mutation-max", type=int, default=None, help="Maximum number of mutations per pair")
+    ap.add_argument("--outdir", default=None, help="Output root directory")
+    ap.add_argument("--seed-base", type=int, default=None, help="Base random seed added to pair_id")
     args = ap.parse_args()
 
     task_root = resolve_task_root()
@@ -75,12 +75,12 @@ def main() -> None:
 
     output_root.mkdir(parents=True, exist_ok=True)
 
-    print("多様性ゲノムペア生成開始...")
-    print(f"設定ファイル: {config_path}")
-    print(f"ゲノム長: {genome_length:,} bp")
-    print(f"総ペア数: {num_pairs}")
-    print(f"変異数範囲: {mutation_min:,} - {mutation_max:,}（ランダム）")
-    print(f"出力ルート: {output_root}")
+    print("Starting synthetic genome-pair generation...")
+    print(f"Config file: {config_path}")
+    print(f"Genome length: {genome_length:,} bp")
+    print(f"Number of pairs: {num_pairs}")
+    print(f"Mutation count range: {mutation_min:,} - {mutation_max:,} (random)")
+    print(f"Output root: {output_root}")
     print()
 
     all_pairs: list[dict] = []
@@ -104,7 +104,7 @@ def main() -> None:
         })
         mutation_counts.append(actual_mutations)
         if pair_id % 20 == 0:
-            print(f"生成済み: {pair_id}/{num_pairs} ペア")
+            print(f"Generated: {pair_id}/{num_pairs} pairs")
 
     with pair_info_path.open("w") as f:
         f.write("pair_id\tfile1\tfile2\tmutation_count\tgenome_length\n")
@@ -118,17 +118,17 @@ def main() -> None:
         for pair in all_pairs:
             f.write(f"{pair['file1']}\n{pair['file2']}\n")
 
-    print("\n生成完了!")
-    print("\n変異数統計:")
-    print(f"  最小: {min(mutation_counts):,}")
-    print(f"  最大: {max(mutation_counts):,}")
-    print(f"  平均: {sum(mutation_counts) / len(mutation_counts):,.1f}")
-    print(f"  中央値: {sorted(mutation_counts)[len(mutation_counts) // 2]:,}")
+    print("\nGeneration complete.")
+    print("\nMutation count statistics:")
+    print(f"  Minimum: {min(mutation_counts):,}")
+    print(f"  Maximum: {max(mutation_counts):,}")
+    print(f"  Mean: {sum(mutation_counts) / len(mutation_counts):,.1f}")
+    print(f"  Median: {sorted(mutation_counts)[len(mutation_counts) // 2]:,}")
 
-    print("\nファイル出力:")
-    print(f"  ペア情報: {pair_info_path}")
-    print(f"  パスリスト: {genome_paths_path}")
-    print(f"  ゲノムディレクトリ: {genomes_dir}")
+    print("\nOutput files:")
+    print(f"  Pair information: {pair_info_path}")
+    print(f"  Genome path list: {genome_paths_path}")
+    print(f"  Genome directory: {genomes_dir}")
 
 
 if __name__ == "__main__":

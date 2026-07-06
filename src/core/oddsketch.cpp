@@ -41,9 +41,9 @@ constexpr uint64_t kBaseSeeds[4] = {
 
 enum class PosMode { Value = 0, Mix = 1, Stripe = 2 };
 
-// CLI / 実験スクリプトから与えられる実行時パラメータ。
+// Runtime parameters supplied by the CLI or experiment scripts.
 struct OddsketchOptions {
-    size_t sketch_size = 8192; // 64 の倍数
+    size_t sketch_size = 8192; // Multiple of 64.
     size_t kmer = 64;
     bool canonical = true;
     double j0 = 0.75;
@@ -69,19 +69,19 @@ struct SketchInput {
     std::string sequence_path;
 };
 
-// OPH で得た稠密 MinHash と、そのとき実際に使ったバケット数。
+// Densified MinHash values from OPH and the actual bucket count used.
 struct MinhashResult {
     std::vector<uint64_t> values;
     size_t num_buckets = 0;
 };
 
-// sketch 本体に加え、後段の距離推定で使うメタ情報も返す。
+// Sketch words plus metadata used by downstream distance estimation.
 struct SketchBuildResult {
     std::vector<uint64_t> words;
     size_t num_buckets = 0;
 };
 
-// on-disk 形式の簡易ヘッダ。旧形式との互換のため version を持つ。
+// Compact on-disk header. The version field keeps compatibility explicit.
 struct SketchHeader {
     char magic[4];
     uint32_t version;
@@ -210,8 +210,8 @@ bool ends_with(const std::string& value, const std::string& suffix) {
 }
 
 size_t compute_num_buckets(const OddsketchOptions& options) {
-    // OddSketch 論文の L = n / (4 * (1 - J0)) に基づいて OPH バケット数を決める。
-    // 実装では均等性と扱いやすさのため 2 の冪に丸める。
+    // Choose the OPH bucket count from L = n / (4 * (1 - J0)) in the OddSketch paper.
+    // Round down to a power of two for uniformity and simpler indexing.
     const double denom = 4.0 * (1.0 - options.j0);
     const size_t desired = (denom > 0.0)
         ? static_cast<size_t>(std::max(1.0, std::round(static_cast<double>(options.sketch_size) / denom)))
@@ -296,7 +296,7 @@ std::vector<uint64_t> densify_optimal(const std::vector<uint64_t>& buckets) {
         return out;
     }
 
-    // 空バケットは Shrivastava 2017 の optimal densification に従って埋める。
+    // Fill empty buckets using optimal densification from Shrivastava 2017.
     const UnivHash huniv(k);
     for (uint32_t i = 0; i < static_cast<uint32_t>(k); ++i) {
         if (buckets[i] != kEmptyBucket) {
@@ -377,7 +377,7 @@ size_t map_position(uint32_t idx, uint64_t hv, size_t nbits, size_t kbuckets, Po
     }
 
     if (pos_mode == PosMode::Stripe) {
-        // bucket ごとに担当領域を割り当て、局所的に bit を立てる。
+        // Assign each bucket a local stripe of bit positions.
         const size_t stride = (kbuckets > 0) ? (nbits / kbuckets) : 0;
         if (stride >= 2) {
             const size_t base = static_cast<size_t>(idx) * stride;
@@ -387,7 +387,7 @@ size_t map_position(uint32_t idx, uint64_t hv, size_t nbits, size_t kbuckets, Po
         }
     }
 
-    // Mix は bucket index と hash 値を再混合して位置相関を弱める。
+    // Mix recombines the bucket index and hash value to reduce positional correlation.
     uint64_t buf[2];
     buf[0] = hv;
     buf[1] = static_cast<uint64_t>(idx);
@@ -596,7 +596,7 @@ SketchBuildResult make_odd_sketch_from_fasta(const std::string& fname, const Odd
             minhash.values.size(),
             options.pos_mode
         );
-        // OddSketch の本体は「該当 bit を反転する」操作。
+        // OddSketch updates the sketch by flipping the selected bit.
         flip_bit(words, pos);
     }
 
@@ -612,7 +612,7 @@ bool has_valid_sketch_header(const SketchHeader& h) {
 }
 
 Sketch load_legacy_sketch(std::ifstream& ifs, const std::string& fname) {
-    // 旧形式はヘッダ無しで word 配列だけが並んでいる前提で読む。
+    // The legacy format is just the word array without a header.
     ifs.clear();
     ifs.seekg(0, std::ios::end);
     const std::streampos end = ifs.tellg();
@@ -672,7 +672,7 @@ Sketch load_sketch(const std::string& fname) {
 
     SketchHeader h{};
     ifs.read(reinterpret_cast<char*>(&h), sizeof(h));
-    // 先頭が新形式ヘッダでなければ、旧形式 reader にフォールバックする。
+    // Fall back to the legacy reader if the file does not start with a valid header.
     if (!ifs || !has_valid_sketch_header(h)) {
         return load_legacy_sketch(ifs, fname);
     }
@@ -713,7 +713,7 @@ double jaccard_distance(const Sketch& a, const Sketch& b, const OddsketchOptions
         throw std::runtime_error("Sketch size mismatch");
     }
 
-    // XOR した bit 差分数から論文の推定式を評価する。
+    // Evaluate the paper's estimator from the number of differing XOR bits.
     uint64_t popcnt = 0;
     for (size_t w = 0; w < a.words.size(); ++w) {
         popcnt += __builtin_popcountll(a.words[w] ^ b.words[w]);
@@ -725,7 +725,7 @@ double jaccard_distance(const Sketch& a, const Sketch& b, const OddsketchOptions
         : (a.k_buckets > 0 ? a.k_buckets : b.k_buckets);
 
     double k = 0.0;
-    // 生成時の k がヘッダにあればそれを優先し、無ければ j0 から再推定する。
+    // Prefer the generation-time k from the header; otherwise re-estimate it from j0.
     if (k_header > 0) {
         k = static_cast<double>(k_header);
     } else {

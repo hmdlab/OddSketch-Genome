@@ -149,11 +149,11 @@ def main() -> None:
     out_csv = results_dir / "comparison_results_oddsketch.csv"
 
     if not pair_info_file.exists():
-        raise SystemExit(f"pair_info が見つかりません: {pair_info_file}")
+        raise SystemExit(f"pair_info not found: {pair_info_file}")
 
-    print(f"設定ファイル: {config_path}")
-    print(f"入力: {pair_info_file}")
-    print(f"結果出力: {output_file}")
+    print(f"Config file: {config_path}")
+    print(f"Input: {pair_info_file}")
+    print(f"Result output: {output_file}")
 
     pairs = read_pair_info(pair_info_file)
     genome_files = unique_genome_files(pairs)
