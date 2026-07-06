@@ -230,7 +230,7 @@ wheels = [
 ]
 
 [[package]]
-name = "genome-oddsketch-workflow"
+name = "OddSketch-Genome"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

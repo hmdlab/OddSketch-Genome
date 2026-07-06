@@ -1,7 +1,7 @@
 [project]
-name = "genome-oddsketch-workflow"
+name = "OddSketch-Genome"
 version = "0.1.0"
-description = "Synthetic-genome evaluation workflow for OddSketch and BinDash"
+description = "Synthetic-genome evaluation workflow for OddSketch-Genome and BinDash"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

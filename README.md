@@ -12,19 +12,28 @@ OddSketch-Genome is a standalone command-line tool for sketching genome FASTA fi
 
 Requirements:
 
-- C++17 compiler
-- zlib development headers
+For building the OddSketch-Genome CLI:
+- C++17 compiler, such as `g++` or `clang++`
+- `make`
+- zlib development package, needed to read `.fna.gz` FASTA files directly
+
+For reproducing benchmark workflows:
 - Python 3.10+
-- uv
+- `uv`, used to install and run Python workflow dependencies
 
 Build OddSketch-Genome and the benchmark helper binaries:
 
 ```bash
 make -C src CXX=g++ LDFLAGS=-lstdc++fs
+```
+
+Set up the Python workflow environment when reproducing experiments:
+
+```bash
 uv sync
 ```
 
-BinDash is not required for the OddSketch-Genome CLI, the quick tutorial, or OddSketch-only benchmark runs. It is required only for benchmark workflows that compare against the BinDash baseline, such as the pair-task BinDash step and the RefSeq BinDash sketch benchmark:
+Install BinDash when reproducing the benchmark workflows that compare against the BinDash baseline:
 
 ```bash
 bash scripts/bootstrap.sh
@@ -96,6 +105,8 @@ src/oddsketch dist --all-to-all < sketches.list
 src/oddsketch dist --bipartite --qlist queries.list --dblist db.list
 src/oddsketch dist --pairlist pairs.tsv
 ```
+
+`dist` writes tab-separated rows with the two compared sketch paths followed by the estimated Jaccard similarity.
 
 ## Reproducing Experiments
 

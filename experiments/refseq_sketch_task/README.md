@@ -61,7 +61,7 @@ make -C src CXX=g++ LDFLAGS=-lstdc++fs
 qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh
 ```
 
-Outputs are written under `experiments/refseq_sketch_task/data/sketch_runs/runs/<run_id>/` by default. In this environment `experiments/refseq_sketch_task/data` may be a symlink to a large filesystem such as `/data1`. Each run saves the used config, RefSeq `assembly_summary_refseq.txt`, selected assemblies, input/sketch manifests, `.sketch` files, and `results/oddsketch_sketch_metrics.tsv`.
+Outputs are written under `experiments/refseq_sketch_task/data/sketch_runs/runs/<run_id>/` by default. In a large run, `experiments/refseq_sketch_task/data` may be a symlink to a large external filesystem. Each run saves the used config, RefSeq `assembly_summary_refseq.txt`, selected assemblies, input/sketch manifests, `.sketch` files, and `results/oddsketch_sketch_metrics.tsv`.
 
 In `oddsketch_sketch_metrics.tsv`, `elapsed_sec` is the OddSketch runtime, while `workflow_elapsed_sec` includes runner-side setup and manifest handling.
 
