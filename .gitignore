@@ -38,10 +38,6 @@ experiments/refseq_sketch_task/data.bak
 # Private or exploratory experiment workspaces
 experiments/search_task/
 
-# Temporary local analysis helpers
-experiments/pair_task/analysis/plot_bbits_rmse_by_true_jaccard.py
-experiments/pair_task/analysis/plot_sketchsize_summary.py
-
 # Object files
 src/*.o
 experiments/**/*.fna
