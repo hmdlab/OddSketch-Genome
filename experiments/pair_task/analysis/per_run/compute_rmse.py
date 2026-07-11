@@ -14,10 +14,10 @@ Required input CSV columns:
   Use --est-col to specify it explicitly.
 
 Examples:
-- OddSketch:  python analysis/compute_rmse.py --csv outputs/default/results/comparison_results_oddsketch.csv
-- BinDash:    python analysis/compute_rmse.py --csv outputs/default/results/comparison_results_bindash.csv --est-col jaccard_bindash
-- Multiple CSVs: python compute_rmse.py --csv file1.csv --csv file2.csv
-- Custom bins:   python compute_rmse.py --bins 0.5,0.6,0.7,0.8,0.9,1.0 --bootstrap 1000
+- OddSketch:  python analysis/per_run/compute_rmse.py --csv outputs/default/<run>/results/comparison_results_oddsketch.csv
+- BinDash:    python analysis/per_run/compute_rmse.py --csv outputs/default/<run>/results/comparison_results_bindash.csv --est-col jaccard_bindash
+- Multiple CSVs: python analysis/per_run/compute_rmse.py --csv file1.csv --csv file2.csv
+- Custom bins:   python analysis/per_run/compute_rmse.py --bins 0.5,0.6,0.7,0.8,0.9,1.0 --bootstrap 1000
 """
 
 import argparse

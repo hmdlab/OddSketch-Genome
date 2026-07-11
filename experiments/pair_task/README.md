@@ -19,7 +19,8 @@ For the benchmark baseline reported here, tag `v2.6` corresponds to commit `ce2d
 ## Layout
 - `config.json`: task settings
 - `scripts/`: genome generation, Jaccard calculation, and task runner
-- `analysis/`: plotting, RMSE utilities, and figure generation
+- `analysis/per_run/`: per-run plotting, RMSE, and sketch-memory utilities
+- `analysis/aggregate/`: summary plots across multiple runs
 - `outputs/default/`: default generated data
 
 ## Quick Start
@@ -55,9 +56,37 @@ OddSketch in this task now runs in batch mode:
 RMSE summary:
 
 ```bash
-uv run python analysis/compute_rmse.py \
+uv run python analysis/per_run/compute_rmse.py \
   --csv outputs/default/<run>/results/comparison_results_oddsketch.csv \
   --csv outputs/default/<run>/results/comparison_results_bindash.csv
+```
+
+## Reproducing Paper Figures
+The paper figures based on the sketch-size sweep are generated from completed runs under `outputs/sketchsize/`.
+The `report_sketch_memory.py` helper is intended for this purpose: run it on a sketch-size run directory when checking the sketch storage values used for the paper figures.
+
+Run the sketch-size workflow:
+
+```bash
+uv run python scripts/batch_project_runner.py --config-dir configs/sketchsize
+```
+
+Regenerate the sketch-size figures after the summary TSV has been prepared:
+
+```bash
+uv run python analysis/aggregate/plot_sketchsize_summary.py \
+  --tsv outputs/sketchsize/RMSEvsSKETCHSIZE.tsv \
+  --outdir outputs/sketchsize
+
+uv run python analysis/aggregate/plot_sketchsize_rmse_panels.py \
+  --output-root outputs/sketchsize
+```
+
+Report sketch storage for one sketch-size run:
+
+```bash
+uv run python analysis/per_run/report_sketch_memory.py \
+  --run-dir outputs/sketchsize/<run>
 ```
 
 ## Config

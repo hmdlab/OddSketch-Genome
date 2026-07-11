@@ -1,15 +1,31 @@
 #!/usr/bin/env python3
 
+import argparse
 import math
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 from common import load_config as load_config_file, resolve_output_root, resolve_task_root
 
 
-def load_config() -> dict:
-    return load_config_file(resolve_task_root() / "config.json")
+def parse_args() -> argparse.Namespace:
+    ap = argparse.ArgumentParser(
+        description="Report sketch storage for one pair_task run, mainly for reproducing paper figure inputs."
+    )
+    ap.add_argument(
+        "--run-dir",
+        type=Path,
+        default=None,
+        help="Run directory, e.g. outputs/sketchsize/<run>. Defaults to the output root in --config.",
+    )
+    ap.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help="Config JSON path. Defaults to <run-dir>/metadata/used_config.json when --run-dir is set, otherwise config.json.",
+    )
+    return ap.parse_args()
 
 
 def count_genomes(base: Path) -> int:
@@ -44,9 +60,28 @@ def resolve_bindash_total_bits(bindash_cfg: dict) -> int:
     return 64 * sketchsize64 * bbits
 
 
+def resolve_run_dir(raw: Path, task_root: Path) -> Path:
+    path = raw.expanduser()
+    if path.is_absolute():
+        return path.resolve()
+    if path.exists():
+        return path.resolve()
+    return (task_root / path).resolve()
+
+
 def main() -> None:
-    cfg = load_config()
-    output_root = resolve_output_root(resolve_task_root(), cfg)
+    args = parse_args()
+    task_root = resolve_task_root()
+
+    if args.run_dir is not None:
+        output_root = resolve_run_dir(args.run_dir, task_root)
+        config_path = args.config or output_root / "metadata" / "used_config.json"
+    else:
+        config_path = args.config or task_root / "config.json"
+        cfg_for_output = load_config_file(config_path)
+        output_root = resolve_output_root(task_root, cfg_for_output)
+
+    cfg = load_config_file(config_path) if config_path.exists() else {}
     results_dir = output_root / "results"
     genomes_dir = output_root / "genomes"
     n_genomes = count_genomes(output_root)

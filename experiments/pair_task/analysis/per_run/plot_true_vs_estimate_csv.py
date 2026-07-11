@@ -12,11 +12,11 @@ Use --est-col to specify it explicitly.
 
 Examples:
   cd experiments/pair_task
-  python analysis/plot_true_vs_estimate_csv.py \
-      --csv outputs/default/results/comparison_results_oddsketch.csv
+  python analysis/per_run/plot_true_vs_estimate_csv.py \
+      --csv outputs/default/<run>/results/comparison_results_oddsketch.csv
   Specify another estimate column, such as BinDash:
-      python analysis/plot_true_vs_estimate_csv.py --est-col jaccard_bindash \
-        --csv outputs/default/results/comparison_results_bindash.csv
+      python analysis/per_run/plot_true_vs_estimate_csv.py --est-col jaccard_bindash \
+        --csv outputs/default/<run>/results/comparison_results_bindash.csv
 
 Output:
   - jaccard_comparison_<estimate column>.png by default
@@ -34,7 +34,7 @@ import pandas as pd
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--csv', default=str(Path(__file__).resolve().parent.parent / 'outputs' / 'default' / 'results' / 'comparison_results_oddsketch.csv'))
+    ap.add_argument('--csv', required=True, help='Input comparison_results CSV path')
     ap.add_argument('--out', default=None, help='Output PNG path; auto-derived from the estimate column when omitted')
     ap.add_argument('--est-col', default=None, help='Estimate column name, e.g. jaccard_oddsketch, jaccard_bindash, jaccard_estimate')
     args = ap.parse_args()
@@ -110,7 +110,7 @@ def main():
     err = (df[est_col] - df[true_col]).values
     ax4.hist(err, bins=30, alpha=0.7, color='lightgreen', edgecolor='black')
     ax4.axvline(0, color='red', linestyle='--', linewidth=2)
-    ax4.set_xlabel('Error (OddSketch - True)')
+    ax4.set_xlabel(f'Error ({est_col} - True)')
     ax4.set_ylabel('Frequency')
     ax4.set_title('Error Distribution')
     ax4.grid(True, alpha=0.3)

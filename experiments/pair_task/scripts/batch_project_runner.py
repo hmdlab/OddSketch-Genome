@@ -76,7 +76,7 @@ def resolve_jobs(raw_jobs: int | None) -> int:
 
 def generate_figures(used_config_path: Path) -> None:
     task_root = resolve_task_root()
-    analysis_dir = task_root / "analysis"
+    per_run_analysis_dir = task_root / "analysis" / "per_run"
     out_dir = resolve_output_root(task_root, load_config(used_config_path))
     results_dir = out_dir / "results"
     figures_dir = out_dir / "figures"
@@ -88,9 +88,11 @@ def generate_figures(used_config_path: Path) -> None:
     if odd_csv.exists():
         run([
             sys.executable,
-            str(analysis_dir / "plot_true_vs_oddsketch.py"),
+            str(per_run_analysis_dir / "plot_true_vs_estimate_csv.py"),
             "--csv",
             str(odd_csv),
+            "--est-col",
+            "jaccard_oddsketch",
             "--out",
             str(figures_dir / "oddsketch_true_vs_estimate.png"),
         ])
@@ -98,9 +100,11 @@ def generate_figures(used_config_path: Path) -> None:
     if bindash_csv.exists():
         run([
             sys.executable,
-            str(analysis_dir / "plot_true_vs_bindash.py"),
+            str(per_run_analysis_dir / "plot_true_vs_estimate_csv.py"),
             "--csv",
             str(bindash_csv),
+            "--est-col",
+            "jaccard_bindash",
             "--out",
             str(figures_dir / "bindash_true_vs_estimate.png"),
         ])
@@ -109,7 +113,7 @@ def generate_figures(used_config_path: Path) -> None:
         rmse = subprocess.run(
             [
                 sys.executable,
-                str(analysis_dir / "compute_rmse.py"),
+                str(per_run_analysis_dir / "compute_rmse.py"),
                 "--csv",
                 str(odd_csv),
                 "--csv",

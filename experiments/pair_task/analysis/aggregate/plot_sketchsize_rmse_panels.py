@@ -46,11 +46,11 @@ def parse_edges(raw: str) -> list[float]:
 
 
 def repo_root() -> Path:
-    return Path(__file__).resolve().parents[3]
+    return Path(__file__).resolve().parents[4]
 
 
 def default_output_root() -> Path:
-    return Path(__file__).resolve().parents[1] / "outputs" / "sketchsize"
+    return Path(__file__).resolve().parents[2] / "outputs" / "sketchsize"
 
 
 def read_sketch_size(run_dir: Path) -> int | None:
