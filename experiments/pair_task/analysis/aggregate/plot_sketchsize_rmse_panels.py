@@ -63,19 +63,39 @@ def read_sketch_size(run_dir: Path) -> int | None:
     return int(value) if value is not None else None
 
 
-def discover_runs(output_root: Path, run_glob: str) -> list[tuple[int, Path]]:
+def discover_runs(
+    output_root: Path,
+    run_glob: str,
+    requested_run_dirs: list[Path],
+) -> list[tuple[int, Path]]:
     runs: list[tuple[int, Path]] = []
-    for run_dir in output_root.glob(run_glob):
+    candidates = requested_run_dirs or list(output_root.glob(run_glob))
+    for run_dir in candidates:
         if not run_dir.is_dir():
-            continue
+            raise SystemExit(f"run directory not found: {run_dir}")
         sketch_size = read_sketch_size(run_dir)
         if sketch_size is None:
-            continue
-        if all((run_dir / "results" / method["csv_name"]).exists() for method in METHODS):
-            runs.append((sketch_size, run_dir))
+            raise SystemExit(f"sketch size not found in used config: {run_dir}")
+        missing = [
+            method["csv_name"]
+            for method in METHODS
+            if not (run_dir / "results" / method["csv_name"]).exists()
+        ]
+        if missing:
+            raise SystemExit(f"incomplete run {run_dir}; missing: {', '.join(missing)}")
+        runs.append((sketch_size, run_dir))
     if not runs:
         raise SystemExit(f"No completed sketch-size runs found under {output_root}")
-    return sorted(runs, key=lambda item: item[0])
+
+    runs.sort(key=lambda item: item[0])
+    for previous, current in zip(runs, runs[1:]):
+        if previous[0] == current[0]:
+            raise SystemExit(
+                f"multiple runs found for sketch size {current[0]}: "
+                f"{previous[1].name}, {current[1].name}. "
+                "Pass one --run-dir per sketch size."
+            )
+    return runs
 
 
 def rmse_by_bin(csv_path: Path, estimate_col: str, edges: list[float]) -> tuple[list[float], list[float], list[int]]:
@@ -231,6 +251,13 @@ def main() -> None:
     ap.add_argument("--title", default="RMSE by true Jaccard bin for each sketch size")
     ap.add_argument("--logy", action="store_true")
     ap.add_argument(
+        "--run-dir",
+        action="append",
+        type=Path,
+        default=[],
+        help="Completed run directory; may be specified multiple times.",
+    )
+    ap.add_argument(
         "--run-glob",
         default="run_*",
         help="Glob for run directories under --output-root.",
@@ -255,7 +282,16 @@ def main() -> None:
     if out_pdf is not None and not out_pdf.is_absolute():
         out_pdf = (repo_root() / out_pdf).resolve()
 
-    runs = discover_runs(output_root, args.run_glob)
+    requested_run_dirs = []
+    for run_dir in args.run_dir:
+        if run_dir.is_absolute():
+            requested_run_dirs.append(run_dir.resolve())
+        elif run_dir.exists():
+            requested_run_dirs.append(run_dir.resolve())
+        else:
+            requested_run_dirs.append((output_root / run_dir).resolve())
+
+    runs = discover_runs(output_root, args.run_glob, requested_run_dirs)
     edges = parse_edges(args.bins)
     plot_panels(runs, edges, out_png, out_pdf, args.title, args.logy, args.share_y)
     print(f"saved: {out_png}")

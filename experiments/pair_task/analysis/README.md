@@ -9,6 +9,7 @@ Use `aggregate/` for scripts that summarize multiple completed runs.
 - `report_sketch_memory.py`: report OddSketch and BinDash sketch sizes for one run, mainly for paper-figure reproduction.
 
 ## aggregate
+- `summarize_sketchsize_runs.py`: create `RMSEvsSKETCHSIZE.tsv` from completed sketch-size runs.
 - `plot_sketchsize_summary.py`: summarize sketch-size sweeps.
 - `plot_sketchsize_rmse_panels.py`: plot RMSE panels for sketch-size sweeps.
 - `plot_bbits_rmse_by_true_jaccard.py`: plot BinDash bbits sweep results.

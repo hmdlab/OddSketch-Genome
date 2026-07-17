@@ -6,6 +6,7 @@ import argparse
 import os
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -127,7 +128,7 @@ def generate_figures(used_config_path: Path) -> None:
         (figures_dir / "rmse_summary.txt").write_text(rmse.stdout)
 
 
-def run_one_config(config_path: Path) -> None:
+def run_one_config(config_path: Path) -> Path:
     scripts_dir = Path(__file__).resolve().parent
     run_dir, used_config_path = prepare_run_config(config_path)
     use_bindash = bindash_enabled(used_config_path)
@@ -141,42 +142,128 @@ def run_one_config(config_path: Path) -> None:
     if use_bindash:
         run([sys.executable, str(scripts_dir / "cal_jaccard_bindash.py"), "--config", str(used_config_path)])
     generate_figures(used_config_path)
+    return run_dir
 
 
-def run_configs(config_paths: list[Path], jobs: int, continue_on_error: bool) -> list[tuple[Path, int]]:
+def run_configs(
+    config_paths: list[Path],
+    jobs: int,
+    continue_on_error: bool,
+) -> tuple[list[tuple[Path, int]], list[Path]]:
     failures: list[tuple[Path, int]] = []
     pending = list(enumerate(config_paths, start=1))
-    active: list[tuple[int, Path, subprocess.Popen]] = []
+    active: list[tuple[int, Path, Path, subprocess.Popen]] = []
+    completed: dict[int, Path] = {}
     total = len(config_paths)
     runner = Path(__file__).resolve()
 
-    while pending or active:
-        while pending and len(active) < jobs:
-            index, config_path = pending.pop(0)
-            cmd = [sys.executable, str(runner), "--single-config", str(config_path)]
-            print(f"\n=== Config {index}/{total} ===")
-            print(f"[config] {display_path(config_path)}")
-            print("[run]", display_cmd(cmd))
-            active.append((index, config_path, subprocess.Popen(cmd)))
+    with tempfile.TemporaryDirectory(prefix="pair-task-batch-") as record_dir_raw:
+        record_dir = Path(record_dir_raw)
+        while pending or active:
+            while pending and len(active) < jobs:
+                index, config_path = pending.pop(0)
+                record_path = record_dir / f"run_{index:04d}.txt"
+                cmd = [
+                    sys.executable,
+                    str(runner),
+                    "--single-config",
+                    str(config_path),
+                    "--run-record",
+                    str(record_path),
+                ]
+                print(f"\n=== Config {index}/{total} ===")
+                print(f"[config] {display_path(config_path)}")
+                print("[run]", display_cmd(cmd))
+                active.append((index, config_path, record_path, subprocess.Popen(cmd)))
 
-        made_progress = False
-        for item in list(active):
-            index, config_path, process = item
-            exit_code = process.poll()
-            if exit_code is None:
-                continue
-            active.remove(item)
-            made_progress = True
-            print(f"[done] Config {index}/{total}: exit={exit_code} {display_path(config_path)}")
-            if exit_code != 0:
-                failures.append((config_path, exit_code))
-                if not continue_on_error:
-                    pending.clear()
+            made_progress = False
+            for item in list(active):
+                index, config_path, record_path, process = item
+                exit_code = process.poll()
+                if exit_code is None:
+                    continue
+                active.remove(item)
+                made_progress = True
+                print(f"[done] Config {index}/{total}: exit={exit_code} {display_path(config_path)}")
+                if exit_code != 0:
+                    failures.append((config_path, exit_code))
+                    if not continue_on_error:
+                        pending.clear()
+                    continue
+                if not record_path.exists():
+                    print(f"[error] run record not found: {record_path}")
+                    failures.append((config_path, 1))
+                    if not continue_on_error:
+                        pending.clear()
+                    continue
+                completed[index] = Path(record_path.read_text().strip()).resolve()
 
-        if active and not made_progress:
-            time.sleep(0.5)
+            if active and not made_progress:
+                time.sleep(0.5)
 
-    return failures
+    run_dirs = [completed[index] for index in sorted(completed)]
+    return failures, run_dirs
+
+
+def sketchsize_output_root(config_dir: str | None, config_paths: list[Path]) -> Path | None:
+    if config_dir is None:
+        return None
+
+    config_base = Path(config_dir)
+    if not config_base.is_absolute():
+        config_base = (resolve_task_root() / config_base).resolve()
+    if config_base.name != "sketchsize":
+        return None
+    if any(path.parent != config_base for path in config_paths):
+        return None
+
+    output_roots = {
+        resolve_output_root(resolve_task_root(), load_config(config_path))
+        for config_path in config_paths
+    }
+    if len(output_roots) != 1:
+        raise SystemExit("sketch-size configs must use one shared output root")
+    return output_roots.pop()
+
+
+def generate_sketchsize_outputs(output_root: Path, run_dirs: list[Path]) -> None:
+    aggregate_dir = resolve_task_root() / "analysis" / "aggregate"
+    summary_path = output_root / "RMSEvsSKETCHSIZE.tsv"
+
+    summarize_cmd = [
+        sys.executable,
+        str(aggregate_dir / "summarize_sketchsize_runs.py"),
+        "--output-root",
+        str(output_root),
+        "--out",
+        str(summary_path),
+    ]
+    for run_dir in run_dirs:
+        summarize_cmd.extend(["--run-dir", str(run_dir)])
+    run(summarize_cmd)
+
+    run([
+        sys.executable,
+        str(aggregate_dir / "plot_sketchsize_summary.py"),
+        "--tsv",
+        str(summary_path),
+        "--outdir",
+        str(output_root),
+    ])
+
+    panels_cmd = [
+        sys.executable,
+        str(aggregate_dir / "plot_sketchsize_rmse_panels.py"),
+        "--output-root",
+        str(output_root),
+        "--out",
+        str(output_root / "sketchsize_rmse_by_true_jaccard_panels.png"),
+        "--pdf-out",
+        str(output_root / "sketchsize_rmse_by_true_jaccard_panels.pdf"),
+    ]
+    for run_dir in run_dirs:
+        panels_cmd.extend(["--run-dir", str(run_dir)])
+    run(panels_cmd)
 
 
 def main() -> None:
@@ -188,12 +275,15 @@ def main() -> None:
     ap.add_argument("--jobs", type=int, default=None, help="Number of config runs to execute concurrently")
     ap.add_argument("--continue-on-error", action="store_true", help="Keep running later configs after a failure")
     ap.add_argument("--single-config", default=None, help=argparse.SUPPRESS)
+    ap.add_argument("--run-record", default=None, help=argparse.SUPPRESS)
     args = ap.parse_args()
 
     task_root = resolve_task_root()
 
     if args.single_config:
-        run_one_config(resolve_config_path(args.single_config))
+        run_dir = run_one_config(resolve_config_path(args.single_config))
+        if args.run_record:
+            Path(args.run_record).write_text(f"{run_dir}\n")
         return
 
     config_args = [*args.config, *args.configs]
@@ -201,13 +291,18 @@ def main() -> None:
     jobs = min(resolve_jobs(args.jobs), len(config_paths))
 
     print(f"[batch] configs={len(config_paths)} jobs={jobs}")
-    failures = run_configs(config_paths, jobs, args.continue_on_error)
+    failures, run_dirs = run_configs(config_paths, jobs, args.continue_on_error)
 
     if failures:
         print("\n=== Failed Configs ===")
         for path, exit_code in failures:
             print(f"{display_path(path)}\texit={exit_code}")
         raise SystemExit(1)
+
+    output_root = sketchsize_output_root(args.config_dir, config_paths)
+    if output_root is not None:
+        print("\n=== Sketch-size Summary ===")
+        generate_sketchsize_outputs(output_root, run_dirs)
 
     print(f"\nCompleted {len(config_paths)} config runs under {task_root}")
 

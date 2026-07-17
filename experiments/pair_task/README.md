@@ -69,27 +69,19 @@ uv run python analysis/per_run/compute_rmse.py \
 ```
 
 ## Reproducing Paper Figures
-The paper figures based on the sketch-size sweep are generated from completed runs under `outputs/sketchsize/`.
-The `report_sketch_memory.py` helper is intended for this purpose: run it on a sketch-size run directory when checking the sketch storage values used for the paper figures.
-
-Run the sketch-size workflow:
+Run the complete sketch-size workflow:
 
 ```bash
 uv run python scripts/batch_project_runner.py --config-dir configs/sketchsize
 ```
 
-Regenerate the sketch-size figures after the summary TSV has been prepared:
+After all configurations finish successfully, `batch_project_runner.py`
+automatically creates `outputs/sketchsize/RMSEvsSKETCHSIZE.tsv` and regenerates
+the sketch-size summary and RMSE-by-true-Jaccard figures. Only runs created by
+the current batch are included, so earlier runs under the same output directory
+do not affect the figures.
 
-```bash
-uv run python analysis/aggregate/plot_sketchsize_summary.py \
-  --tsv outputs/sketchsize/RMSEvsSKETCHSIZE.tsv \
-  --outdir outputs/sketchsize
-
-uv run python analysis/aggregate/plot_sketchsize_rmse_panels.py \
-  --output-root outputs/sketchsize
-```
-
-Report sketch storage for one sketch-size run:
+To inspect sketch storage for one completed run:
 
 ```bash
 uv run python analysis/per_run/report_sketch_memory.py \
