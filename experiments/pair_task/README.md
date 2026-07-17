@@ -19,6 +19,7 @@ For the benchmark baseline reported here, tag `v2.6` corresponds to commit `ce2d
 ## Layout
 - `config.json`: task settings
 - `scripts/`: genome generation, Jaccard calculation, and task runner
+- `jobs/`: Grid Engine job script used for the paper experiments
 - `analysis/per_run/`: per-run plotting, RMSE, and sketch-memory utilities
 - `analysis/aggregate/`: summary plots across multiple runs
 - `outputs/default/`: default generated data
@@ -27,6 +28,12 @@ For the benchmark baseline reported here, tag `v2.6` corresponds to commit `ce2d
 ```bash
 cd experiments/pair_task
 uv run python scripts/batch_project_runner.py --config config.json
+```
+
+For the Grid Engine execution used in the paper experiments:
+
+```bash
+qsub jobs/qsub_project_runner.sh
 ```
 
 Batch runs over config groups:

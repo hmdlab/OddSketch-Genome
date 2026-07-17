@@ -52,6 +52,16 @@ Or submit it to Grid Engine:
 qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh
 ```
 
+## Cluster Jobs
+
+The Grid Engine scripts under each task's `jobs/` directory were used for the
+paper experiments. They are provided to document the original execution setup
+and may also serve as examples for cluster execution.
+
+Queue names, parallel environments, resource directives, runtime limits, and
+software paths are specific to the original computing environment and may
+require modification before reuse.
+
 ## Notes
 - To use a specific OddSketch binary, set `ODDSKETCH_BIN`.
 - BinDash is external and is not vendored in this repository. The default helper script builds it from `https://github.com/zhaoxiaofei/bindash.git` at tag `v2.6`.
