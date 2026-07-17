@@ -2,7 +2,10 @@
 
 This task generates synthetic genome pairs and compares exact Jaccard, OddSketch, and BinDash.
 
-This is the lighter benchmark workflow in this repository. For a quick local smoke test, reduce `make_genomes.genome_length` and `make_genomes.num_pairs` in `config.json`.
+This is the lighter benchmark workflow in this repository. The default
+`config.json` generates 10 pairs of 1 Mbp synthetic genomes. The paper's
+sketch-size experiment is substantially heavier: it evaluates eight sketch
+sizes with 1,000 genome pairs per configuration.
 
 BinDash is an external dependency and is not vendored in this repository. The default helper script installs it from:
 
@@ -16,60 +19,10 @@ BinDash is required only for `cal_jaccard_bindash.py` or task runs with `bindash
 
 For the benchmark baseline reported here, tag `v2.6` corresponds to commit `ce2d16816beade65db992b8cd6eced00b54ca9ef`, and the executable reports `version 2.2.0 commit ce2d168-clean`.
 
-## Layout
-- `config.json`: task settings
-- `scripts/`: genome generation, Jaccard calculation, and task runner
-- `jobs/`: Grid Engine job script used for the paper experiments
-- `analysis/per_run/`: per-run plotting, RMSE, and sketch-memory utilities
-- `analysis/aggregate/`: summary plots across multiple runs
-- `outputs/default/`: default generated data
-
-## Quick Start
-```bash
-cd experiments/pair_task
-uv run python scripts/batch_project_runner.py --config config.json
-```
-
-For the Grid Engine execution used in the paper experiments:
-
-```bash
-qsub jobs/qsub_project_runner.sh
-```
-
-Batch runs over config groups:
-
-```bash
-uv run python scripts/batch_project_runner.py --config-dir configs/default
-uv run python scripts/batch_project_runner.py --config-dir configs/sketchsize
-uv run python scripts/batch_project_runner.py --config-dir configs/bbits
-```
-
-Step-by-step:
-
-```bash
-uv run python scripts/make_genomes.py --config config.json
-uv run python scripts/cal_jaccard_true.py --config config.json
-uv run python scripts/cal_jaccard_oddsketch.py --config config.json
-uv run python scripts/cal_jaccard_bindash.py --config config.json
-```
-
-`batch_project_runner.py` creates a unique run directory under the configured output root for each config, saves the resolved config to `<run>/metadata/used_config.json`, and generates figures for that run.
-When you use the default config, it also updates `outputs/default/latest_used_config.json` so you can easily inspect the latest resolved config.
-
-OddSketch in this task now runs in batch mode:
-- `sketch`: one `oddsketch sketch` invocation over all unique genomes in `pair_info.txt`
-- `dist`: one `oddsketch dist --pairlist=...` invocation over the generated sketch pairs
-
-RMSE summary:
-
-```bash
-uv run python analysis/per_run/compute_rmse.py \
-  --csv outputs/default/<run>/results/comparison_results_oddsketch.csv \
-  --csv outputs/default/<run>/results/comparison_results_bindash.csv
-```
-
 ## Reproducing Paper Figures
-Run the complete sketch-size workflow:
+The sketch-size workflow requires BinDash and sufficient compute time and
+storage for eight configurations of 1,000 genome pairs each. From this
+directory, run:
 
 ```bash
 uv run python scripts/batch_project_runner.py --config-dir configs/sketchsize
@@ -81,12 +34,23 @@ the sketch-size summary and RMSE-by-true-Jaccard figures. Only runs created by
 the current batch are included, so earlier runs under the same output directory
 do not affect the figures.
 
-To inspect sketch storage for one completed run:
+## Quick Start
+Run the default 10-pair configuration as a local smoke test:
 
 ```bash
-uv run python analysis/per_run/report_sketch_memory.py \
-  --run-dir outputs/sketchsize/<run>
+cd experiments/pair_task
+uv run python scripts/batch_project_runner.py --config config.json
 ```
+
+For a faster smoke test, reduce `make_genomes.genome_length` and
+`make_genomes.num_pairs` in `config.json`.
+
+`batch_project_runner.py` creates a unique run directory under the configured output root for each config, saves the resolved config to `<run>/metadata/used_config.json`, and generates figures for that run.
+When you use the default config, it also updates `outputs/default/latest_used_config.json` so you can easily inspect the latest resolved config.
+
+OddSketch in this task now runs in batch mode:
+- `sketch`: one `oddsketch sketch` invocation over all unique genomes in `pair_info.txt`
+- `dist`: one `oddsketch dist --pairlist=...` invocation over the generated sketch pairs
 
 ## Config
 `config.json` controls both the synthetic data generation and the estimation settings.
@@ -154,3 +118,45 @@ Default root: `outputs/default/<run>/`
 - `results/comparison_results_oddsketch.csv`
 - `results/comparison_results_bindash.csv`
 - `figures/`
+
+## Manual Execution
+Run the other bundled configuration groups with:
+
+```bash
+uv run python scripts/batch_project_runner.py --config-dir configs/default
+uv run python scripts/batch_project_runner.py --config-dir configs/bbits
+```
+
+Recompute RMSE summaries from the result CSV files of a completed run:
+
+```bash
+uv run python analysis/per_run/compute_rmse.py \
+  --csv outputs/default/<run>/results/comparison_results_oddsketch.csv \
+  --csv outputs/default/<run>/results/comparison_results_bindash.csv
+```
+
+Inspect sketch storage for one completed sketch-size run:
+
+```bash
+uv run python analysis/per_run/report_sketch_memory.py \
+  --run-dir outputs/sketchsize/<run>
+```
+
+The Grid Engine job script retained from the paper experiments can be submitted
+with:
+
+```bash
+qsub jobs/qsub_project_runner.sh
+```
+
+Review the queue, resource, environment, and path settings in the job script
+before using it on another cluster.
+
+## Layout
+- `config.json`: task settings
+- `configs/`: configuration groups for the bundled experiments
+- `scripts/`: genome generation, Jaccard calculation, and task runner
+- `jobs/`: Grid Engine job script used for the paper experiments
+- `analysis/per_run/`: per-run plotting, RMSE, and sketch-memory utilities
+- `analysis/aggregate/`: summary plots across multiple runs
+- `outputs/`: generated data, result tables, and figures
