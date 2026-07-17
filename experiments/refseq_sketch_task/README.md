@@ -129,6 +129,17 @@ Paths are resolved relative to `experiments/refseq_sketch_task/`.
 The downloader writes `.fna.gz` files to `data/assembly/gzip/` and does not
 retain decompressed FASTA files. OddSketch reads the gzip files directly.
 
+## Recorded Execution Environment
+
+The OddSketch and BinDash measurements used the retained Grid Engine job
+scripts with the following application and scheduler settings:
+
+| Tool | Threads | Grid Engine request |
+| --- | --- | --- |
+| OddSketch | `--threads=8` | queue `h.q`; `OpenMP` 8 slots; `mem_req=16g`; `h_vmem=16g` |
+| BinDash | `--nthreads=8` | queue `h.q`; `OpenMP` 8 slots; `mem_req=16g`; `h_vmem=16g` |
+
+
 ## Outputs
 
 Downloaded data and validation records are written under `data/assembly/`:
