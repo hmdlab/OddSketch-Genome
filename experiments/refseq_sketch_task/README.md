@@ -18,9 +18,11 @@ required while downloading the genome files.
 
 Run the following commands from the repository root.
 
-The original `assembly_summary.txt` is required at
-`experiments/refseq_sketch_task/data/refseq_bacteria/assembly_summary.txt`.
-Download the 496,080 compressed genome FASTA files selected by that summary:
+The exact assembly-summary snapshot used in the paper is included at
+`experiments/refseq_sketch_task/provenance/assembly_summary_refseq_bacteria_20260513.txt.gz`.
+The downloader reads this file directly and verifies the SHA256 of its
+uncompressed contents. Download the 496,080 compressed genome FASTA files
+selected by that summary:
 
 ```bash
 uv run python experiments/refseq_sketch_task/scripts/download_refseq_assemblies.py \
@@ -71,8 +73,10 @@ Recorded assembly-summary provenance:
 
 - acquisition date: 2026-05-13
 - source last-modified timestamp: 2026-05-11 09:19:56 JST
-- file size: 220,398,686 bytes
-- SHA256: `6b4541d82355ad719ebfa855d86f91f046c23edf1b15bd84aeeb643e1d836875`
+- uncompressed file size: 220,398,686 bytes
+- uncompressed SHA256: `6b4541d82355ad719ebfa855d86f91f046c23edf1b15bd84aeeb643e1d836875`
+- compressed file size: 33,860,120 bytes
+- compressed SHA256: `34af3e01f3fb79c166e59331e9f8bbb4c99f9bfe4abf373fbf3dc4095235b59c`
 
 The downloader verifies this SHA256 before starting. The summary contains
 496,081 rows with a usable `ftp_path`. Accession `GCF_039679095.1` returned
@@ -99,6 +103,8 @@ Public provenance is stored separately from the genome data:
 
 - [`provenance/refseq_bacteria_dataset.json`](provenance/refseq_bacteria_dataset.json):
   source URL, dates, counts, integrity results, and SHA256 values
+- [`provenance/assembly_summary_refseq_bacteria_20260513.txt.gz`](provenance/assembly_summary_refseq_bacteria_20260513.txt.gz):
+  exact compressed assembly-summary snapshot used to select the paper dataset
 - [`provenance/refseq_bacteria_genomes.tsv.gz`](provenance/refseq_bacteria_genomes.tsv.gz):
   `assembly_accession`, `ftp_path`, `genomic_fna_url`, `local_filename`, and
   `file_size` for all 496,080 genomes
@@ -115,7 +121,7 @@ uv run python experiments/refseq_sketch_task/scripts/build_refseq_provenance.py
 Paths are resolved relative to `experiments/refseq_sketch_task/`.
 
 - `paths.data_root`: run output root
-- `paths.assembly_summary`: local paper-version assembly summary
+- `paths.assembly_summary`: bundled paper-version assembly summary
 - `paths.local_genome_list`: downloaded gzip-file list
 - `download`: source provenance, exclusions, expected genome count, download
   concurrency, retry behavior, and output location
@@ -235,5 +241,6 @@ settings in each job script before submitting it on another cluster.
 - `config.json`: dataset, OddSketch, and BinDash settings
 - `scripts/`: download, validation, provenance, and sketch runners
 - `jobs/`: Grid Engine scripts used for the paper experiments
-- `provenance/`: public dataset metadata and the compressed genome manifest
+- `provenance/`: assembly-summary snapshot, dataset metadata, and compressed
+  genome manifest
 - `data/`: downloaded genomes, validation records, and generated sketch runs

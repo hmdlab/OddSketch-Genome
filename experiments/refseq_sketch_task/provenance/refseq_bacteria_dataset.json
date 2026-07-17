@@ -5,9 +5,12 @@
     "source_url": "https://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt",
     "acquired_on": "2026-05-13",
     "source_last_modified_at": "2026-05-11T09:19:56+09:00",
-    "local_path": "data/refseq_bacteria/assembly_summary.txt",
+    "local_path": "provenance/assembly_summary_refseq_bacteria_20260513.txt.gz",
+    "compression": "gzip",
     "file_size": 220398686,
     "sha256": "6b4541d82355ad719ebfa855d86f91f046c23edf1b15bd84aeeb643e1d836875",
+    "compressed_file_size": 33860120,
+    "compressed_sha256": "34af3e01f3fb79c166e59331e9f8bbb4c99f9bfe4abf373fbf3dc4095235b59c",
     "total_rows": 496682,
     "eligible_rows": 496081,
     "excluded_accessions": [

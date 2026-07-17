@@ -50,9 +50,9 @@ license and citation requirements.
 
 ### NCBI RefSeq
 
-RefSeq genome FASTA files and the downloaded RefSeq assembly summary used in
-the large benchmark are not included in this repository. The benchmark scripts
-download RefSeq data from NCBI using:
+RefSeq genome FASTA files are not included in this repository. The exact
+compressed RefSeq assembly summary used in the large benchmark is included for
+dataset reproducibility. The source URL is:
 
 ```text
 https://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt
@@ -61,9 +61,12 @@ https://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt
 RefSeq acquisition dates, URL construction, and integrity-check details are
 documented in `experiments/refseq_sketch_task/README.md`.
 
-The repository includes a compressed provenance manifest derived from the
+The repository also includes a compressed provenance manifest derived from the
 paper experiment metadata. It records accessions, NCBI paths and URLs, local
 filenames, and file sizes, but does not include RefSeq genome sequences.
+
+The bundled assembly-summary snapshot is third-party data and is not
+relicensed under the OddSketch-Genome software license.
 
 NCBI states that it places no restrictions on use or distribution of molecular
 data in its databases, but also notes that some original submitters or countries

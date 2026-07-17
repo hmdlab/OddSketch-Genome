@@ -1,11 +1,11 @@
 {
   "paths": {
     "data_root": "data/sketch_runs",
-    "assembly_summary": "data/refseq_bacteria/assembly_summary.txt",
+    "assembly_summary": "provenance/assembly_summary_refseq_bacteria_20260513.txt.gz",
     "local_genome_list": "data/assembly/manifests/gzip_paths.txt"
   },
   "download": {
-    "assembly_summary": "data/refseq_bacteria/assembly_summary.txt",
+    "assembly_summary": "provenance/assembly_summary_refseq_bacteria_20260513.txt.gz",
     "assembly_summary_source_url": "https://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt",
     "assembly_summary_acquired_on": "2026-05-13",
     "assembly_summary_source_last_modified_at": "2026-05-11T09:19:56+09:00",

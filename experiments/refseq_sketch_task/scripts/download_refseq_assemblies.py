@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import csv
 import gzip
-import hashlib
 import json
 import shutil
 import time
@@ -13,6 +12,8 @@ import urllib.request
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from datetime import datetime, timezone
 from pathlib import Path
+
+from assembly_summary_io import content_sha256, copy_uncompressed, open_text
 
 
 def task_root() -> Path:
@@ -38,19 +39,11 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def sha256_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
 def read_assembly_summary(path: Path) -> tuple[list[str], list[str], list[dict[str, str]]]:
     comments: list[str] = []
     header: list[str] | None = None
     rows: list[dict[str, str]] = []
-    with path.open() as f:
+    with open_text(path) as f:
         for raw in f:
             line = raw.rstrip("\n")
             if not line:
@@ -217,12 +210,12 @@ def main() -> None:
         task_root(),
         args.assembly_summary
         or download_cfg.get("assembly_summary")
-        or "data/refseq_bacteria/assembly_summary.txt",
+        or "provenance/assembly_summary_refseq_bacteria_20260513.txt.gz",
     )
     if assembly_summary is None or not assembly_summary.exists():
         raise SystemExit(f"assembly_summary not found: {assembly_summary}")
 
-    summary_sha256 = sha256_file(assembly_summary)
+    summary_sha256 = content_sha256(assembly_summary)
     expected_summary_sha256 = download_cfg.get("assembly_summary_sha256")
     if expected_summary_sha256 and summary_sha256 != expected_summary_sha256:
         raise SystemExit(
@@ -254,7 +247,7 @@ def main() -> None:
 
     started_at = utc_now()
     saved_summary = metadata_dir / "assembly_summary.txt"
-    shutil.copy2(assembly_summary, saved_summary)
+    copy_uncompressed(assembly_summary, saved_summary)
     comments, header, rows = read_assembly_summary(saved_summary)
     selected = select_rows(rows, limit, excluded_accessions)
     expected_genome_count = download_cfg.get("expected_genome_count")

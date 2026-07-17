@@ -126,6 +126,10 @@ The RefSeq benchmark uses the NCBI RefSeq bacteria assembly summary:
 https://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt
 ```
 
+The exact gzip-compressed snapshot acquired for the paper experiments is
+included under `experiments/refseq_sketch_task/provenance/`, together with its
+SHA256 and the selected-genome manifest.
+
 BinDash baseline:
 
 ```text

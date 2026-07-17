@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
 
+from assembly_summary_io import content_sha256, copy_uncompressed, open_text
+
 
 ASSEMBLY_COLUMNS = [
     "assembly_accession",
@@ -86,13 +88,20 @@ def copy_assembly_summary(cfg: dict, metadata_dir: Path) -> Path:
 
     if not source or not source.exists():
         raise SystemExit("assembly_summary not found. Set paths.assembly_summary.")
-    shutil.copy2(source, saved)
+    expected_sha256 = cfg.get("download", {}).get("assembly_summary_sha256")
+    actual_sha256 = content_sha256(source)
+    if expected_sha256 and actual_sha256 != expected_sha256:
+        raise SystemExit(
+            "assembly_summary SHA256 mismatch: "
+            f"expected={expected_sha256}, actual={actual_sha256}"
+        )
+    copy_uncompressed(source, saved)
     return saved
 
 
 def assembly_comments(path: Path) -> list[str]:
     comments: list[str] = []
-    with path.open() as f:
+    with open_text(path) as f:
         for line in f:
             if line.startswith("#"):
                 comments.append(line.rstrip("\n"))
@@ -103,7 +112,7 @@ def assembly_comments(path: Path) -> list[str]:
 
 def read_assembly_summary(path: Path) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
-    with path.open() as f:
+    with open_text(path) as f:
         for line in f:
             if not line.strip() or line.startswith("#"):
                 continue

@@ -11,6 +11,8 @@ import io
 import json
 from pathlib import Path
 
+from assembly_summary_io import content_sha256, content_size, open_text
+
 
 MANIFEST_COLUMNS = (
     "assembly_accession",
@@ -55,7 +57,7 @@ def read_assembly_summary(path: Path) -> tuple[dict[str, str], int, int]:
     total_rows = 0
     eligible_rows = 0
 
-    with path.open() as f:
+    with open_text(path) as f:
         for raw in f:
             line = raw.rstrip("\n")
             if line.startswith("#assembly_accession"):
@@ -217,7 +219,7 @@ def main() -> None:
     manifest_out = resolve_path(args.manifest_out)
     metadata_out = resolve_path(args.metadata_out)
 
-    summary_sha256 = sha256_file(assembly_summary)
+    summary_sha256 = content_sha256(assembly_summary)
     expected_summary_sha256 = download_cfg.get("assembly_summary_sha256")
     if expected_summary_sha256 and summary_sha256 != expected_summary_sha256:
         raise SystemExit(
@@ -265,8 +267,19 @@ def main() -> None:
                 "assembly_summary_source_last_modified_at"
             ),
             "local_path": download_cfg.get("assembly_summary"),
-            "file_size": assembly_summary.stat().st_size,
+            "compression": "gzip" if assembly_summary.suffix == ".gz" else "none",
+            "file_size": content_size(assembly_summary),
             "sha256": summary_sha256,
+            "compressed_file_size": (
+                assembly_summary.stat().st_size
+                if assembly_summary.suffix == ".gz"
+                else None
+            ),
+            "compressed_sha256": (
+                sha256_file(assembly_summary)
+                if assembly_summary.suffix == ".gz"
+                else None
+            ),
             "total_rows": total_rows,
             "eligible_rows": eligible_rows,
             "excluded_accessions": sorted(excluded_accessions),
