@@ -61,6 +61,10 @@ https://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt
 RefSeq acquisition dates, URL construction, and integrity-check details are
 documented in `experiments/refseq_sketch_task/README.md`.
 
+The repository includes a compressed provenance manifest derived from the
+paper experiment metadata. It records accessions, NCBI paths and URLs, local
+filenames, and file sizes, but does not include RefSeq genome sequences.
+
 NCBI states that it places no restrictions on use or distribution of molecular
 data in its databases, but also notes that some original submitters or countries
 of origin may claim intellectual-property rights and that NCBI cannot transfer

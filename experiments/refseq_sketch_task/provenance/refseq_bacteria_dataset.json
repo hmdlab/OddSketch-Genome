@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "dataset": "NCBI RefSeq bacteria genomes used in the OddSketch-Genome paper experiments",
+  "assembly_summary": {
+    "source_url": "https://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt",
+    "acquired_on": "2026-05-13",
+    "source_last_modified_at": "2026-05-11T09:19:56+09:00",
+    "local_path": "data/refseq_bacteria/assembly_summary.txt",
+    "file_size": 220398686,
+    "sha256": "6b4541d82355ad719ebfa855d86f91f046c23edf1b15bd84aeeb643e1d836875",
+    "total_rows": 496682,
+    "eligible_rows": 496081,
+    "excluded_accessions": [
+      "GCF_039679095.1"
+    ],
+    "expected_genome_count": 496080
+  },
+  "genome_download": {
+    "started_at_utc": "2026-05-13T06:42:11.154701+00:00",
+    "finished_at_utc": "2026-05-15T01:11:13.741995+00:00",
+    "successful_files": 496080,
+    "failed_assemblies": [
+      {
+        "assembly_accession": "GCF_039679095.1",
+        "ftp_path": "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/039/679/095/GCF_039679095.1_Micromonospora_sp._nov/",
+        "genomic_fna_url": "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/039/679/095/GCF_039679095.1_Micromonospora_sp._nov/GCF_039679095.1_Micromonospora_sp._nov_genomic.fna.gz",
+        "error": "download failed after 3 attempts: https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/039/679/095/GCF_039679095.1_Micromonospora_sp._nov/GCF_039679095.1_Micromonospora_sp._nov_genomic.fna.gz: HTTP Error 404: Not Found"
+      }
+    ]
+  },
+  "gzip_integrity_check": {
+    "started_at_utc": "2026-05-28T06:51:52.918486+00:00",
+    "finished_at_utc": "2026-05-28T07:18:24.086055+00:00",
+    "checked": 496080,
+    "remaining_invalid": 0
+  },
+  "genome_manifest": {
+    "path": "experiments/refseq_sketch_task/provenance/refseq_bacteria_genomes.tsv.gz",
+    "compression": "gzip",
+    "columns": [
+      "assembly_accession",
+      "ftp_path",
+      "genomic_fna_url",
+      "local_filename",
+      "file_size"
+    ],
+    "rows": 496080,
+    "total_file_size": 637090865486,
+    "compressed_file_size": 12562960,
+    "sha256": "78bb98f8a76ffc7cc737e52b82d3d6f83468b2b2452755410a5fb16c5b1c70c1"
+  }
+}

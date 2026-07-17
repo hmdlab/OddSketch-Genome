@@ -116,9 +116,23 @@ def read_assembly_summary(path: Path) -> list[dict[str, str]]:
 
 def select_assemblies(summary_path: Path, cfg: dict) -> list[dict[str, str]]:
     limit = refseq_sketch_cfg(cfg).get("limit")
-    rows = [row for row in read_assembly_summary(summary_path) if row.get("ftp_path", "") not in ("", "na")]
+    excluded = {
+        str(value)
+        for value in cfg.get("download", {}).get("excluded_accessions", [])
+    }
+    rows = [
+        row
+        for row in read_assembly_summary(summary_path)
+        if row.get("ftp_path", "") not in ("", "na")
+        and row.get("assembly_accession", "") not in excluded
+    ]
     if limit is not None:
         rows = rows[: int(limit)]
+    expected = cfg.get("download", {}).get("expected_genome_count")
+    if limit is None and expected is not None and len(rows) != int(expected):
+        raise SystemExit(
+            f"selected assembly count mismatch: expected={expected}, actual={len(rows)}"
+        )
     return rows
 
 

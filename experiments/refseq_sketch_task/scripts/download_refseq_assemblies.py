@@ -183,8 +183,17 @@ def write_json(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
 
 
-def select_rows(rows: list[dict[str, str]], limit: int | None) -> list[dict[str, str]]:
-    selected = [row for row in rows if row.get("ftp_path", "") not in ("", "na")]
+def select_rows(
+    rows: list[dict[str, str]],
+    limit: int | None,
+    excluded_accessions: set[str],
+) -> list[dict[str, str]]:
+    selected = [
+        row
+        for row in rows
+        if row.get("ftp_path", "") not in ("", "na")
+        and row.get("assembly_accession", "") not in excluded_accessions
+    ]
     if limit is not None:
         selected = selected[:limit]
     return selected
@@ -213,6 +222,14 @@ def main() -> None:
     if assembly_summary is None or not assembly_summary.exists():
         raise SystemExit(f"assembly_summary not found: {assembly_summary}")
 
+    summary_sha256 = sha256_file(assembly_summary)
+    expected_summary_sha256 = download_cfg.get("assembly_summary_sha256")
+    if expected_summary_sha256 and summary_sha256 != expected_summary_sha256:
+        raise SystemExit(
+            f"assembly_summary SHA256 mismatch: "
+            f"expected={expected_summary_sha256}, actual={summary_sha256}"
+        )
+
     outdir = resolve_path(task_root(), args.outdir or download_cfg.get("outdir") or "data/assembly")
     if outdir is None:
         raise SystemExit("download output directory could not be resolved")
@@ -224,6 +241,9 @@ def main() -> None:
     limit = args.limit
     if limit is None and download_cfg.get("limit") is not None:
         limit = int(download_cfg["limit"])
+    excluded_accessions = {
+        str(value) for value in download_cfg.get("excluded_accessions", [])
+    }
 
     metadata_dir = outdir / "metadata"
     manifests_dir = outdir / "manifests"
@@ -236,7 +256,17 @@ def main() -> None:
     saved_summary = metadata_dir / "assembly_summary.txt"
     shutil.copy2(assembly_summary, saved_summary)
     comments, header, rows = read_assembly_summary(saved_summary)
-    selected = select_rows(rows, limit)
+    selected = select_rows(rows, limit, excluded_accessions)
+    expected_genome_count = download_cfg.get("expected_genome_count")
+    if (
+        limit is None
+        and expected_genome_count is not None
+        and len(selected) != int(expected_genome_count)
+    ):
+        raise SystemExit(
+            f"selected genome count mismatch: "
+            f"expected={expected_genome_count}, actual={len(selected)}"
+        )
 
     write_json(
         metadata_dir / "download_metadata.json",
@@ -245,13 +275,19 @@ def main() -> None:
             "started_at_utc": started_at,
             "version_label": download_cfg.get("version_label", "RefSeq bacteria assembly_summary.txt"),
             "assembly_summary_source_url": download_cfg.get("assembly_summary_source_url", ""),
+            "assembly_summary_acquired_on": download_cfg.get("assembly_summary_acquired_on"),
+            "assembly_summary_source_last_modified_at": download_cfg.get(
+                "assembly_summary_source_last_modified_at"
+            ),
             "assembly_summary_source": str(assembly_summary),
             "assembly_summary_saved": str(saved_summary),
-            "assembly_summary_sha256": sha256_file(saved_summary),
+            "assembly_summary_sha256": summary_sha256,
             "assembly_summary_comments": comments,
             "assembly_summary_columns": header,
             "total_rows": len(rows),
             "selected_rows": len(selected),
+            "excluded_accessions": sorted(excluded_accessions),
+            "expected_genome_count": expected_genome_count,
             "outdir": str(outdir),
             "threads": threads,
             "decompress": decompress,
@@ -352,13 +388,19 @@ def main() -> None:
             "finished_at_utc": finished_at,
             "version_label": download_cfg.get("version_label", "RefSeq bacteria assembly_summary.txt"),
             "assembly_summary_source_url": download_cfg.get("assembly_summary_source_url", ""),
+            "assembly_summary_acquired_on": download_cfg.get("assembly_summary_acquired_on"),
+            "assembly_summary_source_last_modified_at": download_cfg.get(
+                "assembly_summary_source_last_modified_at"
+            ),
             "assembly_summary_source": str(assembly_summary),
             "assembly_summary_saved": str(saved_summary),
-            "assembly_summary_sha256": sha256_file(saved_summary),
+            "assembly_summary_sha256": summary_sha256,
             "assembly_summary_comments": comments,
             "assembly_summary_columns": header,
             "total_rows": len(rows),
             "selected_rows": len(selected),
+            "excluded_accessions": sorted(excluded_accessions),
+            "expected_genome_count": expected_genome_count,
             "ok": ok,
             "failed": failed,
             "total_gzip_bytes": total_gzip_bytes,

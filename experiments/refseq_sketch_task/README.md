@@ -6,23 +6,56 @@ This is the heavy real-data benchmark in this repository. It is intended for an 
 
 BinDash is not required for the OddSketch RefSeq sketch run. It is needed only for the separate BinDash sketch benchmark described in [BinDash sketch run](#bindash-sketch-run).
 
-## RefSeq source
+## RefSeq dataset
 
-The RefSeq benchmark uses the NCBI RefSeq bacteria assembly summary file:
-
-```text
-https://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt
-```
-
-In this repository, the downloaded copy is expected at:
+This workflow reproduces the single RefSeq bacteria dataset used for the paper
+experiments. It requires the original local assembly summary at:
 
 ```text
 experiments/refseq_sketch_task/data/refseq_bacteria/assembly_summary.txt
 ```
 
-For the benchmark run reported here, the local `assembly_summary.txt` copy had a file timestamp of 2026-05-11 09:19:56 JST. RefSeq genome FASTA files were downloaded from 2026-05-13 15:42:11 JST to 2026-05-15 10:11:13 JST. A gzip integrity check was run from 2026-05-28 15:51:52 JST to 2026-05-28 16:18:24 JST; 496,080 gzip files were checked and no invalid files remained.
+The assembly summary was acquired from:
 
-Genome FASTA files are downloaded from the `ftp_path` column of that file. For each selected assembly, the downloader appends `<assembly_directory>_genomic.fna.gz` to the `ftp_path`. For example:
+```text
+https://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt
+```
+
+Recorded assembly-summary provenance:
+
+- acquisition date: 2026-05-13
+- source last-modified timestamp: 2026-05-11 09:19:56 JST
+- file size: 220,398,686 bytes
+- SHA256: `6b4541d82355ad719ebfa855d86f91f046c23edf1b15bd84aeeb643e1d836875`
+
+The downloader verifies this SHA256 before starting. The summary contains
+496,081 rows with a usable `ftp_path`. Accession `GCF_039679095.1` returned
+HTTP 404 during the paper data collection and is explicitly excluded in
+`config.json`, leaving the 496,080 genomes used in the experiments.
+
+Public provenance is stored separately from the genome data:
+
+- [`provenance/refseq_bacteria_dataset.json`](provenance/refseq_bacteria_dataset.json):
+  source URL, acquisition and execution dates, assembly-summary and manifest
+  SHA256 values, counts, and integrity-check results
+- [`provenance/refseq_bacteria_genomes.tsv.gz`](provenance/refseq_bacteria_genomes.tsv.gz):
+  `assembly_accession`, `ftp_path`, `genomic_fna_url`, `local_filename`, and
+  `file_size` for all 496,080 genomes
+
+The provenance files can be regenerated from the local dataset and validation
+outputs with:
+
+```bash
+uv run python experiments/refseq_sketch_task/scripts/build_refseq_provenance.py
+```
+
+RefSeq genome FASTA files were downloaded from 2026-05-13 15:42:11 JST to
+2026-05-15 10:11:13 JST. A gzip integrity check was run from 2026-05-28
+15:51:52 JST to 2026-05-28 16:18:24 JST; all 496,080 files were valid.
+
+Genome FASTA files are downloaded from the `ftp_path` column of the local
+assembly summary. For each selected assembly, the downloader appends
+`<assembly_directory>_genomic.fna.gz` to the `ftp_path`. For example:
 
 ```text
 ftp_path:
@@ -34,7 +67,7 @@ https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/036/600/855/GCF_036600855.1_ASM3660
 
 If an `ftp_path` starts with `ftp://`, the downloader converts it to `https://` before fetching.
 
-To download all assemblies listed in `data/refseq_bacteria/assembly_summary.txt` first:
+To download the paper dataset from the local assembly summary:
 
 ```bash
 qsub experiments/refseq_sketch_task/jobs/qsub_download_refseq_assemblies.sh

@@ -7,8 +7,15 @@
   "download": {
     "assembly_summary": "data/refseq_bacteria/assembly_summary.txt",
     "assembly_summary_source_url": "https://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt",
+    "assembly_summary_acquired_on": "2026-05-13",
+    "assembly_summary_source_last_modified_at": "2026-05-11T09:19:56+09:00",
+    "assembly_summary_sha256": "6b4541d82355ad719ebfa855d86f91f046c23edf1b15bd84aeeb643e1d836875",
     "outdir": "data/assembly",
     "version_label": "RefSeq bacteria assembly_summary.txt",
+    "excluded_accessions": [
+      "GCF_039679095.1"
+    ],
+    "expected_genome_count": 496080,
     "threads": 4,
     "retries": 3,
     "timeout_sec": 120,
