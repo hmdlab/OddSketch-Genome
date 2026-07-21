@@ -330,7 +330,7 @@ def main() -> None:
     metadata_dir = run_dir / "metadata"
     manifests_dir = run_dir / "manifests"
     input_dir = run_dir / "genome_inputs"
-    sketches_dir = run_dir / "sketches"
+    sketches_dir = run_dir / "oddsketch_sketches"
     logs_dir = run_dir / "logs"
     for d in (metadata_dir, manifests_dir, input_dir, sketches_dir, logs_dir):
         d.mkdir(parents=True, exist_ok=True)

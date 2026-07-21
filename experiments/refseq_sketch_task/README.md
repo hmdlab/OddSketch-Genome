@@ -163,7 +163,7 @@ directory may be a symlink to a large external filesystem.
 OddSketch runs include:
 
 - `results/oddsketch_sketch_metrics.tsv`
-- `sketches/`
+- `oddsketch_sketches/`
 - `manifests/sketch_paths.txt`
 - `logs/oddsketch_sketch_time.txt`
 - `logs/oddsketch_sketch_stdout.txt`
@@ -221,14 +221,14 @@ experiments. They wrap the same Python entry points documented above:
 ```bash
 qsub experiments/refseq_sketch_task/jobs/qsub_download_refseq_assemblies.sh
 qsub experiments/refseq_sketch_task/jobs/qsub_validate_refseq_gzip.sh
-qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh
+qsub experiments/refseq_sketch_task/jobs/qsub_refseq_oddsketch_sketch.sh
 qsub experiments/refseq_sketch_task/jobs/qsub_refseq_bindash_sketch.sh
 ```
 
 Resume an interrupted OddSketch job with:
 
 ```bash
-qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh \
+qsub experiments/refseq_sketch_task/jobs/qsub_refseq_oddsketch_sketch.sh \
   experiments/refseq_sketch_task/config.json \
   --run-id <run_id> --resume
 ```

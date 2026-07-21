@@ -12,7 +12,7 @@ set -euo pipefail
 REPO_ROOT=$(pwd)
 if [[ ! -f "${REPO_ROOT}/README.md" || ! -d "${REPO_ROOT}/experiments/refseq_sketch_task" ]]; then
   echo "Run this job from the repository root:" >&2
-  echo "  cd /path/to/genome-oddsketch && qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh" >&2
+  echo "  cd /path/to/genome-oddsketch && qsub experiments/refseq_sketch_task/jobs/qsub_refseq_oddsketch_sketch.sh" >&2
   exit 1
 fi
 
