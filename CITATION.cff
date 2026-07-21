@@ -14,6 +14,7 @@ authors:
     affiliation: "Waseda University"
 abstract: "OddSketch-Genome is a genome-oriented implementation of the Odd Sketch estimator for fast Jaccard similarity estimation from canonical k-mer sets. It is designed for accurate comparison of highly similar genomes using compact binary sketches."
 repository-code: "https://github.com/hmdlab/OddSketch-Genome"
+doi: "10.5281/zenodo.21469397"
 keywords:
   - genome sketching
   - Jaccard similarity

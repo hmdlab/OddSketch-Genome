@@ -143,7 +143,13 @@ Detailed provenance is recorded in [`experiments/refseq_sketch_task/README.md`](
 
 ## Citation
 
-If you use OddSketch-Genome, please cite the accompanying paper and this software repository. Citation metadata is available in [`CITATION.cff`](CITATION.cff).
+If you use OddSketch-Genome, please cite the archived software release:
+
+Kikuta, K. and Hamada, M. OddSketch-Genome v0.1.0. Zenodo.
+
+https://doi.org/10.5281/zenodo.21469397
+
+Please also cite the accompanying paper when applicable. Citation metadata is available in [`CITATION.cff`](CITATION.cff).
 
 ## License
 
