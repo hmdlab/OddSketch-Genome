@@ -1,20 +1,21 @@
 cff-version: 1.2.0
-message: "If you use OddSketch-Genome, please cite the accompanying paper and this software record."
+message: "If you use OddSketch-Genome, please cite this software record. If you use it in academic work, please also cite the accompanying paper when available."
 title: "OddSketch-Genome"
 type: software
 version: "0.1.0"
 date-released: "2026-06-21"
-license: "MIT AND BSD-2-Clause"
+license: "MIT"
 authors:
-  - name: "OddSketch-Genome contributors"
-abstract: "Standalone OddSketch-Genome CLI and benchmark workflows for evaluating genome Jaccard similarity estimation."
-
-# Before public release, replace the placeholders below with the final paper
-# title, authors, DOI or preprint URL, venue, and Zenodo DOI.
-preferred-citation:
-  type: article
-  title: "TODO: add accompanying paper title"
-  authors:
-    - name: "TODO: add paper authors"
-  year: 2026
-  notes: "TODO: add DOI, preprint URL, venue, and Zenodo DOI."
+  - family-names: "Kikuta"
+    given-names: "Kyohei"
+    affiliation: "Waseda University"
+  - family-names: "Hamada"
+    given-names: "Michiaki"
+    affiliation: "Waseda University"
+abstract: "OddSketch-Genome is a genome-oriented implementation of the Odd Sketch estimator for fast Jaccard similarity estimation from canonical k-mer sets. It is designed for accurate comparison of highly similar genomes using compact binary sketches."
+repository-code: "https://github.com/hmdlab/OddSketch-Genome"
+keywords:
+  - genome sketching
+  - Jaccard similarity
+  - bioinformatics
+  - Odd Sketch
