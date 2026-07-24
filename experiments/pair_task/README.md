@@ -4,8 +4,8 @@ This task generates synthetic genome pairs and compares exact Jaccard, OddSketch
 
 This is the lighter benchmark workflow in this repository. The default
 `config.json` generates 10 pairs of 1 Mbp synthetic genomes. The paper's
-sketch-size experiment is substantially heavier: it evaluates eight sketch
-sizes with 1,000 genome pairs per configuration.
+paired sketch-size experiment is substantially heavier: it evaluates eight
+sketch sizes over 20 independent replicates of 1,000 genome pairs each.
 
 BinDash is an external dependency and is not vendored in this repository. The default helper script installs it from:
 
@@ -20,19 +20,37 @@ BinDash is required only for `cal_jaccard_bindash.py` or task runs with `bindash
 For the benchmark baseline reported here, tag `v2.6` corresponds to commit `ce2d16816beade65db992b8cd6eced00b54ca9ef`, and the executable reports `version 2.2.0 commit ce2d168-clean`.
 
 ## Reproducing Paper Figures
-The sketch-size workflow requires BinDash and sufficient compute time and
-storage for eight configurations of 1,000 genome pairs each. From this
-directory, run:
+The default Grid Engine workflow is the paired sketch-size experiment used for
+the main accuracy comparison. It evaluates OddSketch-Genome and BinDash on the
+same 20 independent replicates, with 1,000 genome pairs per replicate, at all
+eight sketch sizes. From this directory, submit:
 
 ```bash
-uv run python scripts/batch_project_runner.py --config-dir configs/sketchsize
+qsub jobs/qsub_project_runner.sh
 ```
 
-After all configurations finish successfully, `batch_project_runner.py`
-automatically creates `outputs/sketchsize/RMSEvsSKETCHSIZE.tsv` and regenerates
-the sketch-size summary and RMSE-by-true-Jaccard figures. Only runs created by
-the current batch are included, so earlier runs under the same output directory
-do not affect the figures.
+This creates one run under `outputs/sketchsize_repeats/`. Each
+`replicate x sketch-size` checkpoint is committed only after both methods
+finish and pass validation. Resume an interrupted run with:
+
+```bash
+qsub -v PAIRED_SKETCHSIZE_RUN_DIR=/absolute/path/to/run \
+  jobs/qsub_project_runner.sh
+```
+
+The final run contains `paired_observations.tsv.gz`,
+`summary/main_metrics.tsv`, `summary/bin_metrics.tsv`, and
+`summary/RMSE_by_true_jaccard_panels.png`. Confidence intervals are reported in
+the TSV tables and are intentionally not drawn in the figure.
+
+For a small direct smoke test without Grid Engine:
+
+```bash
+uv run python scripts/run_paired_sketchsize_repeats.py \
+  --replicates 2 --num-pairs 20 --genome-length 20000 \
+  --mutation-min 1 --mutation-max 50 \
+  --sketch-sizes 1024,2048 --bootstrap 100 --chunk-size 10
+```
 
 ## Quick Start
 Run the default 10-pair configuration as a local smoke test:
@@ -142,15 +160,21 @@ uv run python analysis/per_run/report_sketch_memory.py \
   --run-dir outputs/sketchsize/<run>
 ```
 
-The Grid Engine job script retained from the paper experiments can be submitted
-with:
+The previous config-batch behavior remains available explicitly:
 
 ```bash
-qsub jobs/qsub_project_runner.sh
+qsub jobs/qsub_project_runner.sh --legacy-batch \
+  --config-dir configs/sketchsize
 ```
 
 Review the queue, resource, environment, and path settings in the job script
 before using it on another cluster.
+
+## Seeded Validation and Supplement Workflows
+
+Additional qsub workflows for independent-seed confidence intervals and clipping rates, k-mer sensitivity (`k=21,31,64`), and the internal OPH + densification baseline are documented in:
+
+- [`analysis/validation/README.md`](analysis/validation/README.md)
 
 ## Layout
 - `config.json`: task settings

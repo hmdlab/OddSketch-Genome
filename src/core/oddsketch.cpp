@@ -49,6 +49,8 @@ struct OddsketchOptions {
     double j0 = 0.75;
     PosMode pos_mode = PosMode::Value;
     size_t threads = 1;
+    uint64_t hash_seed = 0; // Zero preserves the historical hash streams.
+    size_t oph_num_buckets = 0; // Eval-only OPH bucket override; zero reuses OddSketch L.
 };
 
 struct CliArgs {
@@ -73,6 +75,7 @@ struct SketchInput {
 struct MinhashResult {
     std::vector<uint64_t> values;
     size_t num_buckets = 0;
+    size_t nonempty_buckets = 0;
 };
 
 // Sketch words plus metadata used by downstream distance estimation.
@@ -152,6 +155,13 @@ uint64_t mix64(uint64_t value) {
     value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9ULL;
     value = (value ^ (value >> 27)) * 0x94D049BB133111EBULL;
     return value ^ (value >> 31);
+}
+
+uint64_t seeded_hash_constant(uint64_t historical, uint64_t hash_seed, uint64_t stream) {
+    if (hash_seed == 0) {
+        return historical;
+    }
+    return mix64(historical ^ mix64(hash_seed ^ stream));
 }
 
 int base_index(char c) {
@@ -281,7 +291,7 @@ uint64_t pack_pair(uint32_t i, uint32_t attempt) {
     return (uint64_t(i) << 32) ^ uint64_t(attempt);
 }
 
-std::vector<uint64_t> densify_optimal(const std::vector<uint64_t>& buckets) {
+std::vector<uint64_t> densify_optimal(const std::vector<uint64_t>& buckets, uint64_t hash_seed) {
     const size_t k = buckets.size();
     std::vector<uint64_t> out(k);
     if (k == 0) {
@@ -297,7 +307,7 @@ std::vector<uint64_t> densify_optimal(const std::vector<uint64_t>& buckets) {
     }
 
     // Fill empty buckets using optimal densification from Shrivastava 2017.
-    const UnivHash huniv(k);
+    const UnivHash huniv(k, seeded_hash_constant(kHashSeed, hash_seed, 0x44454E53494659ULL));
     for (uint32_t i = 0; i < static_cast<uint32_t>(k); ++i) {
         if (buckets[i] != kEmptyBucket) {
             out[i] = buckets[i];
@@ -328,9 +338,19 @@ void update_minhash_buckets_from_sequence(
         return;
     }
 
+    const uint64_t bucket_seed = seeded_hash_constant(
+        kBucketHashSeed,
+        options.hash_seed,
+        0x4255434B4554ULL
+    );
+    const uint64_t rank_seed = seeded_hash_constant(
+        kRankHashSeed,
+        options.hash_seed,
+        0x52414E4BULL
+    );
     auto update_bucket = [&](uint64_t raw_hash) {
-        const uint64_t h_bucket = mix64(raw_hash ^ kBucketHashSeed);
-        uint64_t h_rank = mix64(raw_hash ^ kRankHashSeed);
+        const uint64_t h_bucket = mix64(raw_hash ^ bucket_seed);
+        uint64_t h_rank = mix64(raw_hash ^ rank_seed);
         if (h_rank == kEmptyBucket) {
             --h_rank;
         }
@@ -371,7 +391,14 @@ void flip_bit(std::vector<uint64_t>& words, size_t idx) {
     words[w] ^= (uint64_t(1) << b);
 }
 
-size_t map_position(uint32_t idx, uint64_t hv, size_t nbits, size_t kbuckets, PosMode pos_mode) {
+size_t map_position(
+    uint32_t idx,
+    uint64_t hv,
+    size_t nbits,
+    size_t kbuckets,
+    PosMode pos_mode,
+    uint64_t hash_seed
+) {
     if (pos_mode == PosMode::Value) {
         return static_cast<size_t>(hv % nbits);
     }
@@ -391,7 +418,12 @@ size_t map_position(uint32_t idx, uint64_t hv, size_t nbits, size_t kbuckets, Po
     uint64_t buf[2];
     buf[0] = hv;
     buf[1] = static_cast<uint64_t>(idx);
-    const uint64_t mixed = XXH64(reinterpret_cast<const void*>(buf), sizeof(buf), kHashSeed);
+    const uint64_t position_seed = seeded_hash_constant(
+        kHashSeed,
+        hash_seed,
+        0x504F534954494F4EULL
+    );
+    const uint64_t mixed = XXH64(reinterpret_cast<const void*>(buf), sizeof(buf), position_seed);
     return static_cast<size_t>(mixed % nbits);
 }
 
@@ -561,9 +593,12 @@ void update_minhash_from_gzip_sequence_file(
 
 MinhashResult get_minhash_one_permutation_from_sequence_file(
     const std::string& fname,
-    const OddsketchOptions& options
+    const OddsketchOptions& options,
+    size_t num_buckets_override = 0
 ) {
-    const size_t num_buckets = compute_num_buckets(options);
+    const size_t num_buckets = num_buckets_override > 0
+        ? num_buckets_override
+        : compute_num_buckets(options);
     std::vector<uint64_t> bucket_min_hash(num_buckets, kEmptyBucket);
 
     unsigned m = 0;
@@ -577,15 +612,26 @@ MinhashResult get_minhash_one_permutation_from_sequence_file(
     } else {
         update_minhash_from_plain_sequence_file(fname, options, shift, bucket_min_hash);
     }
-    return {densify_optimal(bucket_min_hash), num_buckets};
+    const size_t nonempty_buckets = static_cast<size_t>(std::count_if(
+        bucket_min_hash.begin(),
+        bucket_min_hash.end(),
+        [](uint64_t value) { return value != kEmptyBucket; }
+    ));
+    return {
+        densify_optimal(bucket_min_hash, options.hash_seed),
+        num_buckets,
+        nonempty_buckets,
+    };
 }
 
-SketchBuildResult make_odd_sketch_from_fasta(const std::string& fname, const OddsketchOptions& options) {
+std::vector<uint64_t> make_odd_sketch_words(
+    const MinhashResult& minhash,
+    const OddsketchOptions& options
+) {
     if (options.sketch_size == 0 || (options.sketch_size % 64) != 0) {
         throw std::runtime_error("Invalid sketch size (must be a positive multiple of 64)");
     }
 
-    const MinhashResult minhash = get_minhash_one_permutation_from_sequence_file(fname, options);
     std::vector<uint64_t> words(options.sketch_size / 64, 0);
     for (size_t i = 0; i < minhash.values.size(); ++i) {
         const uint64_t hv = minhash.values[i];
@@ -594,13 +640,19 @@ SketchBuildResult make_odd_sketch_from_fasta(const std::string& fname, const Odd
             hv,
             options.sketch_size,
             minhash.values.size(),
-            options.pos_mode
+            options.pos_mode,
+            options.hash_seed
         );
         // OddSketch updates the sketch by flipping the selected bit.
         flip_bit(words, pos);
     }
 
-    return {std::move(words), minhash.num_buckets};
+    return words;
+}
+
+SketchBuildResult make_odd_sketch_from_fasta(const std::string& fname, const OddsketchOptions& options) {
+    const MinhashResult minhash = get_minhash_one_permutation_from_sequence_file(fname, options);
+    return {make_odd_sketch_words(minhash, options), minhash.num_buckets};
 }
 
 bool has_valid_sketch_header(const SketchHeader& h) {
@@ -708,15 +760,47 @@ std::vector<Sketch> load_all_sketches(const std::vector<std::string>& paths) {
     return sketches;
 }
 
-double jaccard_distance(const Sketch& a, const Sketch& b, const OddsketchOptions& options) {
-    if (a.words.size() != b.words.size()) {
+struct OddEstimate {
+    uint64_t hamming_distance = 0;
+    double raw_estimate = 0.0;
+    double estimate = 0.0;
+    bool clipped = false;
+};
+
+OddEstimate estimate_odd_jaccard(
+    const std::vector<uint64_t>& a,
+    const std::vector<uint64_t>& b,
+    double num_buckets
+) {
+    if (a.size() != b.size()) {
         throw std::runtime_error("Sketch size mismatch");
     }
 
-    // Evaluate the paper's estimator from the number of differing XOR bits.
     uint64_t popcnt = 0;
-    for (size_t w = 0; w < a.words.size(); ++w) {
-        popcnt += __builtin_popcountll(a.words[w] ^ b.words[w]);
+    for (size_t w = 0; w < a.size(); ++w) {
+        popcnt += __builtin_popcountll(a[w] ^ b[w]);
+    }
+
+    const double n = static_cast<double>(a.size() * 64);
+    if (n <= 0.0 || num_buckets <= 0.0) {
+        throw std::runtime_error("Cannot estimate Jaccard from an empty sketch");
+    }
+
+    const double x = 1.0 - (2.0 * static_cast<double>(popcnt)) / n;
+    const double term = std::log(std::max(1e-12, x));
+    const double raw = 1.0 + (n / (4.0 * num_buckets)) * term;
+
+    OddEstimate result;
+    result.hamming_distance = popcnt;
+    result.raw_estimate = raw;
+    result.estimate = std::clamp(raw, 0.0, 1.0);
+    result.clipped = (2.0 * static_cast<double>(popcnt) >= n);
+    return result;
+}
+
+double jaccard_distance(const Sketch& a, const Sketch& b, const OddsketchOptions& options) {
+    if (a.words.size() != b.words.size()) {
+        throw std::runtime_error("Sketch size mismatch");
     }
 
     const double n = static_cast<double>(a.words.size() * 64);
@@ -736,11 +820,7 @@ double jaccard_distance(const Sketch& a, const Sketch& b, const OddsketchOptions
         k = static_cast<double>(k_est);
     }
 
-    const double x = 1.0 - (2.0 * static_cast<double>(popcnt)) / n;
-    const double term = std::log(std::max(1e-12, x));
-    double jacc = 1.0 + (n / (4.0 * k)) * term;
-    jacc = std::clamp(jacc, 0.0, 1.0);
-    return jacc;
+    return estimate_odd_jaccard(a.words, b.words, k).estimate;
 }
 
 std::vector<std::string> read_nonempty_lines(std::istream& input) {
@@ -992,6 +1072,136 @@ void run_dist_pairlist(const std::vector<SketchPair>& pairs, const OddsketchOpti
     }
 }
 
+struct PairEvaluation {
+    double jaccard_oddsketch = 0.0;
+    double jaccard_oph = 0.0;
+    double raw_oddsketch = 0.0;
+    uint64_t hamming_distance = 0;
+    size_t oph_mismatches = 0;
+    size_t num_buckets = 0;
+    size_t empty_buckets_left = 0;
+    size_t empty_buckets_right = 0;
+    size_t oph_num_buckets = 0;
+    size_t oph_empty_buckets_left = 0;
+    size_t oph_empty_buckets_right = 0;
+    bool clipped = false;
+};
+
+PairEvaluation evaluate_fasta_pair(const SketchPair& pair, const OddsketchOptions& options) {
+    const MinhashResult left = get_minhash_one_permutation_from_sequence_file(pair.left, options);
+    const MinhashResult right = get_minhash_one_permutation_from_sequence_file(pair.right, options);
+    if (left.num_buckets != right.num_buckets || left.values.size() != right.values.size()) {
+        throw std::runtime_error("OPH bucket count mismatch");
+    }
+
+    MinhashResult oph_left;
+    MinhashResult oph_right;
+    const MinhashResult* oph_left_ptr = &left;
+    const MinhashResult* oph_right_ptr = &right;
+    if (options.oph_num_buckets > 0 && options.oph_num_buckets != left.num_buckets) {
+        oph_left = get_minhash_one_permutation_from_sequence_file(
+            pair.left,
+            options,
+            options.oph_num_buckets
+        );
+        oph_right = get_minhash_one_permutation_from_sequence_file(
+            pair.right,
+            options,
+            options.oph_num_buckets
+        );
+        oph_left_ptr = &oph_left;
+        oph_right_ptr = &oph_right;
+    }
+    if (oph_left_ptr->num_buckets != oph_right_ptr->num_buckets ||
+        oph_left_ptr->values.size() != oph_right_ptr->values.size()) {
+        throw std::runtime_error("Memory-matched OPH bucket count mismatch");
+    }
+
+    size_t mismatches = 0;
+    for (size_t i = 0; i < oph_left_ptr->values.size(); ++i) {
+        mismatches += static_cast<size_t>(
+            oph_left_ptr->values[i] != oph_right_ptr->values[i]
+        );
+    }
+
+    const std::vector<uint64_t> left_words = make_odd_sketch_words(left, options);
+    const std::vector<uint64_t> right_words = make_odd_sketch_words(right, options);
+    const OddEstimate odd = estimate_odd_jaccard(
+        left_words,
+        right_words,
+        static_cast<double>(left.num_buckets)
+    );
+
+    PairEvaluation result;
+    result.jaccard_oddsketch = odd.estimate;
+    result.jaccard_oph = oph_left_ptr->values.empty()
+        ? 0.0
+        : 1.0 - static_cast<double>(mismatches) /
+            static_cast<double>(oph_left_ptr->values.size());
+    result.raw_oddsketch = odd.raw_estimate;
+    result.hamming_distance = odd.hamming_distance;
+    result.oph_mismatches = mismatches;
+    result.num_buckets = left.num_buckets;
+    result.empty_buckets_left = left.num_buckets - left.nonempty_buckets;
+    result.empty_buckets_right = right.num_buckets - right.nonempty_buckets;
+    result.oph_num_buckets = oph_left_ptr->num_buckets;
+    result.oph_empty_buckets_left =
+        oph_left_ptr->num_buckets - oph_left_ptr->nonempty_buckets;
+    result.oph_empty_buckets_right =
+        oph_right_ptr->num_buckets - oph_right_ptr->nonempty_buckets;
+    result.clipped = odd.clipped;
+    return result;
+}
+
+void run_eval_pairlist(const std::vector<SketchPair>& pairs, const OddsketchOptions& options) {
+    std::cerr << "[oddsketch] eval(pairlist): nbits=" << options.sketch_size
+              << ", pairs=" << pairs.size()
+              << ", threads=" << normalize_thread_count(options.threads, pairs.size())
+              << ", kbuckets=" << compute_num_buckets(options)
+              << ", kmer=" << options.kmer
+              << ", j0=" << std::fixed << std::setprecision(6) << options.j0
+              << ", hash-seed=" << options.hash_seed
+              << ", oph-buckets="
+              << (options.oph_num_buckets > 0
+                    ? options.oph_num_buckets
+                    : compute_num_buckets(options))
+              << "\n";
+
+    std::vector<PairEvaluation> results(pairs.size());
+    run_in_parallel(pairs.size(), options.threads, [&](size_t pair_index) {
+        results[pair_index] = evaluate_fasta_pair(pairs[pair_index], options);
+    });
+
+    std::cout
+        << "file1\tfile2\tjaccard_oddsketch\tjaccard_oph\todd_raw_estimate"
+        << "\thamming_distance\tsketch_bits\tnum_buckets\toph_mismatches"
+        << "\tempty_buckets_left\tempty_buckets_right"
+        << "\toph_num_buckets\toph_storage_bits"
+        << "\toph_empty_buckets_left\toph_empty_buckets_right"
+        << "\tclipped\thash_seed\n";
+    std::cout << std::setprecision(17);
+    for (size_t i = 0; i < pairs.size(); ++i) {
+        const PairEvaluation& result = results[i];
+        std::cout << pairs[i].left << '\t'
+                  << pairs[i].right << '\t'
+                  << result.jaccard_oddsketch << '\t'
+                  << result.jaccard_oph << '\t'
+                  << result.raw_oddsketch << '\t'
+                  << result.hamming_distance << '\t'
+                  << options.sketch_size << '\t'
+                  << result.num_buckets << '\t'
+                  << result.oph_mismatches << '\t'
+                  << result.empty_buckets_left << '\t'
+                  << result.empty_buckets_right << '\t'
+                  << result.oph_num_buckets << '\t'
+                  << (result.oph_num_buckets * 64ULL) << '\t'
+                  << result.oph_empty_buckets_left << '\t'
+                  << result.oph_empty_buckets_right << '\t'
+                  << (result.clipped ? 1 : 0) << '\t'
+                  << options.hash_seed << "\n";
+    }
+}
+
 void set_kmer(OddsketchOptions& options, const std::string& value) {
     if (value.empty()) {
         return;
@@ -1067,6 +1277,24 @@ void set_threads(OddsketchOptions& options, const std::string& value) {
     options.threads = threads;
 }
 
+void set_hash_seed(OddsketchOptions& options, const std::string& value) {
+    if (value.empty()) {
+        return;
+    }
+    options.hash_seed = static_cast<uint64_t>(std::stoull(value));
+}
+
+void set_oph_num_buckets(OddsketchOptions& options, const std::string& value) {
+    if (value.empty()) {
+        return;
+    }
+    const size_t buckets = static_cast<size_t>(std::stoull(value));
+    if (buckets == 0 || (buckets & (buckets - 1)) != 0) {
+        throw std::runtime_error("oph-buckets must be a positive power of two");
+    }
+    options.oph_num_buckets = buckets;
+}
+
 bool option_requires_value(const std::string& key) {
     return key == "input-paths" ||
            key == "qlist" ||
@@ -1082,7 +1310,10 @@ bool option_requires_value(const std::string& key) {
            key == "j-threshold" ||
            key == "pos-mode" ||
            key == "canonical" ||
-           key == "threads";
+           key == "threads" ||
+           key == "seed" ||
+           key == "hash-seed" ||
+           key == "oph-buckets";
 }
 
 void require_value(const std::string& key, const std::string& value) {
@@ -1159,6 +1390,10 @@ CliArgs parse_options(int argc, char** argv) {
             set_canonical(args.options, value);
         } else if (key == "threads") {
             set_threads(args.options, value);
+        } else if (key == "seed" || key == "hash-seed") {
+            set_hash_seed(args.options, value);
+        } else if (key == "oph-buckets") {
+            set_oph_num_buckets(args.options, value);
         } else {
             throw std::runtime_error("unknown option: --" + key);
         }
@@ -1176,6 +1411,7 @@ void print_usage() {
         << "  oddsketch dist --all-to-all [options] < sketches.list\n"
         << "  oddsketch dist --bipartite --qlist queries.list --dblist db.list [options]\n"
         << "  oddsketch dist --pairlist pairs.tsv [options]\n"
+        << "  oddsketch eval --pairlist fasta_pairs.tsv [options]\n"
         << "\n"
         << "Options:\n"
         << "  --input-paths=genomes.list\n"
@@ -1188,6 +1424,8 @@ void print_usage() {
         << "  --pos-mode=value|mix|stripe  bit-position mapping mode (default: value)\n"
         << "  --j0=F                       design/reference Jaccard value (default: 0.75)\n"
         << "  --threads=N                  worker threads (default: 1)\n"
+        << "  --hash-seed=N                eval-only independent hash seed (default: 0)\n"
+        << "  --oph-buckets=N              eval-only OPH bucket count override (power of two)\n"
         << "\n"
         << "Compatibility:\n"
         << "  oddsketch sketch < paths.list still accepts one FASTA or FASTA.gz path per line.\n"
@@ -1209,8 +1447,16 @@ int oddsketch_cli_main(int argc, char** argv) {
         return 0;
     }
 
-    if (args.mode != "sketch" && args.mode != "dist") {
+    if (args.mode != "sketch" && args.mode != "dist" && args.mode != "eval") {
         print_usage();
+        return 1;
+    }
+    if (args.mode != "eval" && args.options.hash_seed != 0) {
+        std::cerr << "Usage error: --hash-seed is currently supported only by eval\n";
+        return 1;
+    }
+    if (args.mode != "eval" && args.options.oph_num_buckets != 0) {
+        std::cerr << "Usage error: --oph-buckets is currently supported only by eval\n";
         return 1;
     }
     if ((args.qlist_path.empty() && !args.dblist_path.empty()) ||
@@ -1226,6 +1472,20 @@ int oddsketch_cli_main(int argc, char** argv) {
 
     if (args.mode == "dist" && dist_mode_count > 1) {
         std::cerr << "Usage error: choose only one dist mode: --all-to-all, --bipartite, or --pairlist\n";
+        return 1;
+    }
+    if (args.mode == "eval" && !pairlist_mode) {
+        std::cerr << "Usage error: eval requires --pairlist with FASTA path pairs\n";
+        return 1;
+    }
+    if (args.mode == "eval" && (bipartite_mode || all_to_all_mode)) {
+        std::cerr << "Usage error: eval supports only --pairlist\n";
+        return 1;
+    }
+    if (args.mode == "eval" &&
+        (!args.input_paths_path.empty() || !args.out_dir.empty() ||
+         !args.sketch_paths_out.empty() || args.skip_existing)) {
+        std::cerr << "Usage error: eval does not write sketch files\n";
         return 1;
     }
     if (args.mode == "dist" && !args.input_paths_path.empty()) {
@@ -1290,6 +1550,8 @@ int oddsketch_cli_main(int argc, char** argv) {
             for (const auto& output_path : output_paths) {
                 std::cout << output_path << "\n";
             }
+        } else if (args.mode == "eval") {
+            run_eval_pairlist(read_pairs_from_pairlist_file(args.pairlist_path), args.options);
         } else if (bipartite_mode) {
             run_dist_bipartite(
                 read_paths_from_list_file(args.qlist_path),
