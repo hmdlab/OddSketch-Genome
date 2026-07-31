@@ -1,6 +1,6 @@
 {
   "paths": {
-    "outdir": "outputs/sketchsize"
+    "outdir": "outputs/validation"
   },
   "make_genomes": {
     "genome_length": 1000000,
@@ -12,15 +12,9 @@
     "replicates": 20,
     "kmerlen": 64,
     "sketch_sizes": [
-      1024,
-      2048,
-      4096,
-      8192,
-      16384,
-      32768,
-      65536,
-      131072
+      262144
     ],
+    "summary_figure": "RMSE_by_true_jaccard.png",
     "j0": 0.9,
     "pos_mode": "mix",
     "canonical": true,
@@ -32,7 +26,7 @@
     "bindash_randseed_base": 41,
     "bindash_randseed_stride": 1,
     "bootstrap": 2000,
-    "bootstrap_seed": 3101,
+    "bootstrap_seed": 23101,
     "high_jaccard_threshold": 0.75,
     "jaccard_bins": [
       0.55,

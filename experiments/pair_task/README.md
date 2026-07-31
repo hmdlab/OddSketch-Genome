@@ -26,22 +26,41 @@ same 20 independent replicates, with 1,000 genome pairs per replicate, at all
 eight sketch sizes. From this directory, submit:
 
 ```bash
-qsub jobs/qsub_project_runner.sh
+qsub jobs/paired_sketchsize.sh
 ```
 
-This creates one run under `outputs/sketchsize_repeats/`. Each
-`replicate x sketch-size` checkpoint is committed only after both methods
-finish and pass validation. Resume an interrupted run with:
-
-```bash
-qsub -v PAIRED_SKETCHSIZE_RUN_DIR=/absolute/path/to/run \
-  jobs/qsub_project_runner.sh
-```
+This creates a fresh run under `outputs/sketchsize/run_<timestamp>_<pid>/`.
+Intermediate files are kept under `.work/` while the experiment is running and
+removed after successful aggregation and analysis.
 
 The final run contains `paired_observations.tsv.gz`,
 `summary/main_metrics.tsv`, `summary/bin_metrics.tsv`, and
 `summary/RMSE_by_true_jaccard_panels.png`. Confidence intervals are reported in
 the TSV tables and are intentionally not drawn in the figure.
+
+Run all supplemental experiments in a shared validation run with:
+
+```bash
+qsub jobs/supplementary.sh
+```
+
+With no experiment argument, the script runs all three supplemental experiments.
+This creates
+`outputs/validation/run_<timestamp>_<job-id>/bindash_recommended/`,
+`k_sensitivity/`, and `oph/`. The BinDash experiment evaluates
+`sketchsize64=256` with `b=16` and runs OddSketch at the matching payload size
+(262,144 bits).
+
+Each supplemental experiment can also be submitted independently:
+
+```bash
+qsub jobs/supplementary.sh bindash_recommended
+qsub jobs/supplementary.sh k_sensitivity
+qsub jobs/supplementary.sh oph
+```
+
+The supplemental workflows always create a new run. They do not modify or
+resume an existing run.
 
 For a small direct smoke test without Grid Engine:
 
@@ -160,10 +179,10 @@ uv run python analysis/per_run/report_sketch_memory.py \
   --run-dir outputs/sketchsize/<run>
 ```
 
-The previous config-batch behavior remains available explicitly:
+Run the previous config-batch workflow directly:
 
 ```bash
-qsub jobs/qsub_project_runner.sh --legacy-batch \
+uv run python scripts/batch_project_runner.py \
   --config-dir configs/sketchsize
 ```
 
@@ -180,7 +199,7 @@ Additional qsub workflows for independent-seed confidence intervals and clipping
 - `config.json`: task settings
 - `configs/`: configuration groups for the bundled experiments
 - `scripts/`: genome generation, Jaccard calculation, and task runner
-- `jobs/`: Grid Engine job script used for the paper experiments
+- `jobs/`: Grid Engine entry points for the main and supplemental experiments
 - `analysis/per_run/`: per-run plotting, RMSE, and sketch-memory utilities
 - `analysis/aggregate/`: summary plots across multiple runs
 - `outputs/`: generated data, result tables, and figures

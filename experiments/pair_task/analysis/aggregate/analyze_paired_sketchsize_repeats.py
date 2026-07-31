@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 from pathlib import Path
 
 import matplotlib
@@ -15,6 +16,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.ticker import FormatStrFormatter
+
+
+ODDSKETCH_FIGURE_LABEL = os.environ.get(
+    "ODDSKETCH_FIGURE_LABEL",
+    "OddSketch-Genome",
+)
 
 
 REQUIRED_COLUMNS = {
@@ -231,7 +238,13 @@ def build_bin_metrics(frame: pd.DataFrame, metadata: dict) -> pd.DataFrame:
     return result
 
 
-def plot_binned(bin_metrics: pd.DataFrame, output: Path, metadata: dict) -> None:
+def plot_binned(
+    bin_metrics: pd.DataFrame,
+    output: Path,
+    metadata: dict,
+    *,
+    error_bars: bool = False,
+) -> None:
     sizes = [int(value) for value in metadata["sketch_sizes"]]
     columns = min(4, len(sizes))
     rows = math.ceil(len(sizes) / columns)
@@ -245,23 +258,56 @@ def plot_binned(bin_metrics: pd.DataFrame, output: Path, metadata: dict) -> None
         squeeze=False,
     )
     methods = (
-        ("OddSketch", "odd_rmse", "#d62728", "o"),
-        ("BinDash", "bindash_rmse", "#1f77b4", "s"),
+        (
+            ODDSKETCH_FIGURE_LABEL,
+            "odd_rmse",
+            "odd_rmse_ci_low",
+            "odd_rmse_ci_high",
+            "#d62728",
+            "o",
+        ),
+        (
+            "BinDash",
+            "bindash_rmse",
+            "bindash_rmse_ci_low",
+            "bindash_rmse_ci_high",
+            "#1f77b4",
+            "s",
+        ),
     )
     for panel_index, (axis, sketch_size) in enumerate(zip(axes.flat, sizes)):
         selected = bin_metrics[bin_metrics["sketch_size"] == sketch_size].sort_values(
             "bin_center"
         )
-        for label, column, color, marker in methods:
-            axis.plot(
-                selected["bin_center"],
-                selected[column],
-                marker=marker,
-                linewidth=2.0,
-                markersize=4.8,
-                color=color,
-                label=label,
-            )
+        for label, column, ci_low, ci_high, color, marker in methods:
+            if error_bars:
+                values = selected[column].to_numpy(dtype=float)
+                axis.errorbar(
+                    selected["bin_center"],
+                    values,
+                    yerr=np.vstack(
+                        (
+                            values - selected[ci_low].to_numpy(dtype=float),
+                            selected[ci_high].to_numpy(dtype=float) - values,
+                        )
+                    ),
+                    marker=marker,
+                    linewidth=2.0,
+                    markersize=4.8,
+                    color=color,
+                    label=label,
+                    capsize=3,
+                )
+            else:
+                axis.plot(
+                    selected["bin_center"],
+                    selected[column],
+                    marker=marker,
+                    linewidth=2.0,
+                    markersize=4.8,
+                    color=color,
+                    label=label,
+                )
         if is_eight_panel_figure:
             if panel_index < columns:
                 axis.set_ylim(0.0, 0.25)
@@ -299,22 +345,243 @@ def plot_binned(bin_metrics: pd.DataFrame, output: Path, metadata: dict) -> None
         ncol=2,
         frameon=True,
     )
-    fig.suptitle("RMSE by true Jaccard bin for each sketch size", fontsize=15, y=0.985)
+    title = "RMSE by true Jaccard bin for each sketch size"
+    if error_bars:
+        title += " (error bars: 95% CI)"
+    fig.suptitle(title, fontsize=15, y=0.985)
     fig.tight_layout(rect=(0.02, 0.07, 1.0, 0.95))
     fig.savefig(output, dpi=300)
     plt.close(fig)
 
 
+def validate_recommended_observations(frame: pd.DataFrame, metadata: dict) -> None:
+    required = {
+        "replicate",
+        "pair_id",
+        "bindash_sketchsize64",
+        "bindash_bbits",
+        "bindash_payload_bits",
+        "odd_sketch_size",
+        "jaccard_true",
+        "jaccard_oddsketch",
+        "jaccard_bindash",
+        "clipped",
+    }
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise SystemExit(
+            f"recommended observations are missing columns: {', '.join(missing)}"
+        )
+    for column in sorted(required):
+        frame[column] = pd.to_numeric(frame[column], errors="raise")
+    if not np.isfinite(frame[sorted(required)].to_numpy(dtype=float)).all():
+        raise SystemExit("recommended observations contain non-finite values")
+
+    replicates = int(metadata["replicates"])
+    pairs = int(metadata["pairs_per_replicate"])
+    settings = [int(value) for value in metadata["sketchsize64"]]
+    expected = replicates * pairs * len(settings)
+    if len(frame) != expected:
+        raise SystemExit(f"expected {expected} recommended observations, found {len(frame)}")
+    if frame.duplicated(["replicate", "bindash_sketchsize64", "pair_id"]).any():
+        raise SystemExit("recommended observations contain duplicate keys")
+    expected_ids = set(range(1, pairs + 1))
+    for (replicate, sketchsize64), group in frame.groupby(
+        ["replicate", "bindash_sketchsize64"], sort=True
+    ):
+        if len(group) != pairs or set(group["pair_id"].astype(int)) != expected_ids:
+            raise SystemExit(
+                f"replicate={replicate}, sketchsize64={sketchsize64}: pair IDs differ"
+            )
+        expected_payload = int(sketchsize64) * 64 * int(metadata["bbits"])
+        if not (group["bindash_payload_bits"].astype(int) == expected_payload).all():
+            raise SystemExit(
+                f"sketchsize64={sketchsize64}: payload bits do not match bbits"
+            )
+        if not (group["odd_sketch_size"].astype(int) == expected_payload).all():
+            raise SystemExit(
+                f"sketchsize64={sketchsize64}: OddSketch bits do not match BinDash"
+            )
+    for column in ("jaccard_true", "jaccard_oddsketch", "jaccard_bindash"):
+        if not frame[column].between(0.0, 1.0, inclusive="both").all():
+            raise SystemExit(f"{column} values must be in [0, 1]")
+    if not frame["clipped"].isin([0, 1]).all():
+        raise SystemExit("clipped must contain only 0 or 1")
+
+
+def analyze_recommended(
+    input_path: Path,
+    metadata_path: Path,
+    outdir: Path,
+) -> None:
+    metadata = json.loads(metadata_path.read_text())
+    frame = pd.read_csv(input_path, sep="\t", compression="gzip")
+    validate_recommended_observations(frame, metadata)
+    replicate_ids = list(range(1, int(metadata["replicates"]) + 1))
+    bootstrap = int(metadata["bootstrap"])
+    base_seed = int(metadata["bootstrap_seed"])
+    threshold = float(metadata["high_jaccard_threshold"])
+
+    main_rows = []
+    for index, sketchsize64 in enumerate(metadata["sketchsize64"]):
+        selected = frame[frame["bindash_sketchsize64"] == int(sketchsize64)]
+        row: dict[str, float | int] = {
+            "bindash_sketchsize64": int(sketchsize64),
+            "bindash_bbits": int(metadata["bbits"]),
+            "bindash_payload_bits": int(sketchsize64) * 64 * int(metadata["bbits"]),
+        }
+        for suffix, scoped, seed_offset in (
+            ("all", selected, 0),
+            (
+                f"j_ge_{str(threshold).replace('.', '_')}",
+                selected[selected["jaccard_true"] >= threshold],
+                1,
+            ),
+        ):
+            metrics = paired_metrics(
+                scoped,
+                replicate_ids=replicate_ids,
+                bootstrap=bootstrap,
+                seed=base_seed + index * 2 + seed_offset,
+            )
+            for key, value in metrics.items():
+                row[f"{key}_{suffix}"] = value
+        main_rows.append(row)
+    main_metrics = pd.DataFrame(main_rows)
+
+    edges = effective_bin_edges(metadata["jaccard_bins"], frame)
+    values = frame["jaccard_true"].to_numpy(dtype=float)
+    bin_ids = np.searchsorted(edges, values, side="right") - 1
+    bin_ids[values == edges[-1]] = len(edges) - 2
+    if np.any((bin_ids < 0) | (bin_ids >= len(edges) - 1)):
+        raise SystemExit("recommended observations could not be assigned to Jaccard bins")
+    work = frame.copy()
+    work["bin_id"] = bin_ids
+    bin_rows = []
+    seed_offset = 0
+    for sketchsize64 in metadata["sketchsize64"]:
+        selected_setting = work[
+            work["bindash_sketchsize64"] == int(sketchsize64)
+        ]
+        for bin_id in sorted(selected_setting["bin_id"].unique()):
+            selected = selected_setting[selected_setting["bin_id"] == bin_id]
+            metrics = paired_metrics(
+                selected,
+                replicate_ids=replicate_ids,
+                bootstrap=bootstrap,
+                seed=base_seed + 10000 + seed_offset,
+            )
+            seed_offset += 1
+            bin_rows.append(
+                {
+                    "bindash_sketchsize64": int(sketchsize64),
+                    "bindash_bbits": int(metadata["bbits"]),
+                    "bindash_payload_bits": (
+                        int(sketchsize64) * 64 * int(metadata["bbits"])
+                    ),
+                    "bin_id": int(bin_id),
+                    "bin_lo": float(edges[bin_id]),
+                    "bin_hi": float(edges[bin_id + 1]),
+                    "bin_center": float((edges[bin_id] + edges[bin_id + 1]) / 2),
+                    **metrics,
+                }
+            )
+    bin_metrics = pd.DataFrame(bin_rows)
+    expected_per_setting = int(metadata["replicates"]) * int(
+        metadata["pairs_per_replicate"]
+    )
+    if not (
+        bin_metrics.groupby("bindash_sketchsize64")["n_total"].sum()
+        == expected_per_setting
+    ).all():
+        raise SystemExit("recommended Jaccard bins do not cover all observations")
+
+    outdir.mkdir(parents=True, exist_ok=True)
+    main_metrics.to_csv(outdir / "main_metrics.tsv", sep="\t", index=False)
+    bin_metrics.to_csv(outdir / "bin_metrics.tsv", sep="\t", index=False)
+
+    settings = [int(value) for value in metadata["sketchsize64"]]
+    fig, axes = plt.subplots(
+        1,
+        len(settings),
+        figsize=(6.0 * len(settings), 5.0),
+        sharex=True,
+        sharey=True,
+        squeeze=False,
+    )
+    methods = (
+        ("OddSketch-Genome", "odd_rmse", "#3274b9"),
+        ("BinDash", "bindash_rmse", "#e05d2b"),
+    )
+    for axis, sketchsize64 in zip(axes.flat, settings):
+        selected = bin_metrics[
+            bin_metrics["bindash_sketchsize64"] == int(sketchsize64)
+        ].sort_values("bin_center")
+        payload_bits = int(sketchsize64) * 64 * int(metadata["bbits"])
+        for label, column, color in methods:
+            axis.plot(
+                selected["bin_center"],
+                selected[column],
+                marker="o",
+                linewidth=2.0,
+                color=color,
+                label=label,
+            )
+        axis.set_xlabel("True Jaccard")
+        axis.set_title(f"sketchsize64={sketchsize64} ({payload_bits:,} bits)")
+        axis.grid(alpha=0.25)
+    axes[0, 0].set_ylabel("RMSE")
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.005),
+        ncol=2,
+        frameon=False,
+    )
+    fig.suptitle("Memory-matched comparison at BinDash-recommended sketch sizes")
+    fig.tight_layout(rect=(0, 0.10, 1, 0.94))
+    fig.savefig(outdir / "RMSE_by_true_jaccard.png", dpi=300)
+    plt.close(fig)
+    print(f"saved recommended paired summary: {outdir}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", required=True)
-    parser.add_argument("--metadata", required=True)
+    parser.add_argument("--input", default=None)
+    parser.add_argument("--metadata", default=None)
+    parser.add_argument("--recommended-input", default=None)
+    parser.add_argument("--recommended-metadata", default=None)
     parser.add_argument("--outdir", required=True)
+    parser.add_argument(
+        "--figure-name",
+        default=None,
+        help="Override the configured paired-analysis PNG filename.",
+    )
+    parser.add_argument(
+        "--error-bars",
+        action="store_true",
+        help="Draw 95% confidence-interval error bars in the paired RMSE panels.",
+    )
     args = parser.parse_args()
 
+    outdir = Path(args.outdir).resolve()
+    if args.recommended_input or args.recommended_metadata:
+        if not args.recommended_input or not args.recommended_metadata:
+            raise SystemExit(
+                "--recommended-input and --recommended-metadata must be supplied together"
+            )
+        analyze_recommended(
+            Path(args.recommended_input).resolve(),
+            Path(args.recommended_metadata).resolve(),
+            outdir,
+        )
+        return
+    if not args.input or not args.metadata:
+        raise SystemExit("--input and --metadata are required for the paired analysis")
     input_path = Path(args.input).resolve()
     metadata = json.loads(Path(args.metadata).read_text())
-    outdir = Path(args.outdir).resolve()
     outdir.mkdir(parents=True, exist_ok=True)
     frame = pd.read_csv(input_path, sep="\t", compression="gzip")
     validate_observations(frame, metadata)
@@ -323,7 +590,18 @@ def main() -> None:
     bin_metrics = build_bin_metrics(frame, metadata)
     main_metrics.to_csv(outdir / "main_metrics.tsv", sep="\t", index=False)
     bin_metrics.to_csv(outdir / "bin_metrics.tsv", sep="\t", index=False)
-    plot_binned(bin_metrics, outdir / "RMSE_by_true_jaccard_panels.png", metadata)
+    figure_name = str(
+        args.figure_name
+        or metadata.get("summary_figure", "RMSE_by_true_jaccard_panels.png")
+    )
+    if Path(figure_name).name != figure_name or not figure_name.endswith(".png"):
+        raise SystemExit("summary_figure must be a PNG filename without a directory")
+    plot_binned(
+        bin_metrics,
+        outdir / figure_name,
+        metadata,
+        error_bars=args.error_bars,
+    )
     print(f"saved paired sketch-size summary: {outdir}")
 
 

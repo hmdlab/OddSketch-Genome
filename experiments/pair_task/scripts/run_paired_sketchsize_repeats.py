@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run paired OddSketch/BinDash sketch-size repeats with validated checkpoints."""
+"""Run a fresh paired OddSketch/BinDash sketch-size experiment."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ import hashlib
 import json
 import math
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -128,19 +129,19 @@ def validate_exact_rows(
     if len(rows) != pairs_per_replicate:
         raise ValueError(f"expected {pairs_per_replicate} exact rows, found {len(rows)}")
     if not rows or set(rows[0]) != set(EXACT_FIELDS):
-        raise ValueError("exact checkpoint has an unexpected schema")
+        raise ValueError("exact intermediate file has an unexpected schema")
 
     keyed: dict[int, dict[str, str]] = {}
     for row in rows:
         if parse_int(row, "replicate") != replicate:
-            raise ValueError("exact checkpoint replicate differs")
+            raise ValueError("exact intermediate file replicate differs")
         if parse_int(row, "genome_seed") != genome_seed:
-            raise ValueError("exact checkpoint genome seed differs")
+            raise ValueError("exact intermediate file genome seed differs")
         if parse_int(row, "kmerlen") != kmerlen:
-            raise ValueError("exact checkpoint k-mer length differs")
+            raise ValueError("exact intermediate file k-mer length differs")
         pair_id = parse_int(row, "pair_id")
         if pair_id in keyed:
-            raise ValueError(f"duplicate pair ID in exact checkpoint: {pair_id}")
+            raise ValueError(f"duplicate pair ID in exact intermediate file: {pair_id}")
         true_value = parse_finite(row, "jaccard_true")
         if not 0.0 <= true_value <= 1.0:
             raise ValueError("true Jaccard is outside [0, 1]")
@@ -148,7 +149,7 @@ def validate_exact_rows(
         parse_int(row, "genome_length")
         keyed[pair_id] = row
     if set(keyed) != set(range(1, pairs_per_replicate + 1)):
-        raise ValueError("exact checkpoint pair IDs are incomplete")
+        raise ValueError("exact intermediate file pair IDs are incomplete")
     return keyed
 
 
@@ -168,7 +169,7 @@ def validate_paired_rows(
     if len(rows) != pairs_per_replicate:
         raise ValueError(f"expected {pairs_per_replicate} paired rows, found {len(rows)}")
     if not rows or set(rows[0]) != set(PAIRED_FIELDS):
-        raise ValueError("paired checkpoint has an unexpected schema")
+        raise ValueError("paired intermediate file has an unexpected schema")
     sketchsize64 = sketch_size // (64 * bbits)
     payload_bits = sketchsize64 * 64 * bbits
     if payload_bits != sketch_size:
@@ -208,10 +209,12 @@ def validate_paired_rows(
         if parse_int(row, "clipped") not in (0, 1):
             raise ValueError("clipped must be 0 or 1")
     if seen != set(exact_by_id):
-        raise ValueError("OddSketch and BinDash pair IDs do not match the exact checkpoint")
+        raise ValueError(
+            "OddSketch and BinDash pair IDs do not match the exact intermediate file"
+        )
 
 
-def validated_exact_checkpoint(
+def read_validated_exact_intermediate(
     path: Path,
     **validation: int,
 ) -> dict[int, dict[str, str]] | None:
@@ -221,11 +224,11 @@ def validated_exact_checkpoint(
         rows = read_gzip_tsv(path)
         return validate_exact_rows(rows, **validation)
     except Exception as error:
-        print(f"[checkpoint-invalid] {path}: {error}", flush=True)
+        print(f"[intermediate-invalid] {path}: {error}", flush=True)
         return None
 
 
-def validated_paired_checkpoint(
+def read_validated_paired_intermediate(
     path: Path,
     **validation,
 ) -> list[dict[str, str]] | None:
@@ -236,7 +239,7 @@ def validated_paired_checkpoint(
         validate_paired_rows(rows, **validation)
         return rows
     except Exception as error:
-        print(f"[checkpoint-invalid] {path}: {error}", flush=True)
+        print(f"[intermediate-invalid] {path}: {error}", flush=True)
         return None
 
 
@@ -308,13 +311,14 @@ def verify_regenerated_pairs(
 ) -> None:
     keyed = {int(row["pair_id"]): row for row in pairs}
     if set(keyed) != set(exact_by_id):
-        raise SystemExit("regenerated dataset pair IDs differ from the exact checkpoint")
+        raise SystemExit("regenerated dataset pair IDs differ from the exact intermediate file")
     for pair_id, exact in exact_by_id.items():
         pair = keyed[pair_id]
         for field in ("mutation_count", "genome_length"):
             if int(pair[field]) != int(exact[field]):
                 raise SystemExit(
-                    f"regenerated dataset differs from exact checkpoint: pair={pair_id}, field={field}"
+                    f"regenerated dataset differs from exact intermediate file: "
+                    f"pair={pair_id}, field={field}"
                 )
 
 
@@ -324,7 +328,11 @@ def main() -> None:
         "--config",
         default="experiments/pair_task/configs/sketchsize_repeats/config.json",
     )
-    parser.add_argument("--run-dir", default=None, help="Existing run directory to resume")
+    parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="Create this directory for a new run instead of using paths.outdir",
+    )
     parser.add_argument("--replicates", type=int, default=None)
     parser.add_argument("--num-pairs", type=int, default=None)
     parser.add_argument("--genome-length", type=int, default=None)
@@ -401,20 +409,21 @@ def main() -> None:
             raise SystemExit(
                 f"sketch size {sketch_size} is not exactly representable with b={bbits}"
             )
-
     output_raw = Path(config["paths"]["outdir"])
     output_root = (
         output_raw.resolve() if output_raw.is_absolute() else (task_root / output_raw).resolve()
     )
-    output_root.mkdir(parents=True, exist_ok=True)
-    if args.run_dir:
-        run_dir = resolve_path(args.run_dir, repo_root)
-        run_dir.mkdir(parents=True, exist_ok=True)
+    if args.output_dir:
+        run_dir = resolve_path(args.output_dir, repo_root)
+        if run_dir.exists():
+            raise SystemExit(f"output directory already exists: {run_dir}")
+        run_dir.mkdir(parents=True)
     else:
+        output_root.mkdir(parents=True, exist_ok=True)
         run_dir = allocate_run_dir(output_root)
-    checkpoints = run_dir / "checkpoints"
+    work_root = run_dir / ".work"
     summary = run_dir / "summary"
-    checkpoints.mkdir(parents=True, exist_ok=True)
+    work_root.mkdir(parents=True)
     summary.mkdir(parents=True, exist_ok=True)
 
     runtime = {
@@ -449,16 +458,22 @@ def main() -> None:
         "bindash_chunk_size": chunk_size,
         "bindash_minhashtype": minhashtype,
         "bindash_dens": dens,
+        "summary_figure": str(
+            experiment.get(
+                "summary_figure",
+                "RMSE_by_true_jaccard_panels.png",
+            )
+        ),
     }
+    if (
+        Path(runtime["summary_figure"]).name != runtime["summary_figure"]
+        or not runtime["summary_figure"].endswith(".png")
+    ):
+        raise SystemExit("summary_figure must be a PNG filename without a directory")
     resolved_config = json.loads(json.dumps(config))
     resolved_config["runtime"] = runtime
     used_config_path = run_dir / "used_config.json"
-    if used_config_path.exists():
-        previous = json.loads(used_config_path.read_text())
-        if previous.get("runtime") != runtime:
-            raise SystemExit("resume configuration differs from the existing used_config.json")
-    else:
-        used_config_path.write_text(json.dumps(resolved_config, indent=2) + "\n")
+    used_config_path.write_text(json.dumps(resolved_config, indent=2) + "\n")
 
     oddsketch = resolve_executable(None, "ODDSKETCH_BIN", repo_root / "src" / "oddsketch")
     true_jaccard = resolve_executable(
@@ -472,6 +487,13 @@ def main() -> None:
     bindash_candidate = resolve_path(bindash_raw, repo_root) if bindash_raw else None
     bindash = resolve_bindash(str(bindash_candidate) if bindash_candidate else None)
     make_genomes = task_root / "scripts" / "make_genomes.py"
+    metadata_path = run_dir / "run_metadata.json"
+    analyzer = (
+        task_root
+        / "analysis"
+        / "aggregate"
+        / "analyze_paired_sketchsize_repeats.py"
+    )
 
     now = datetime.now().astimezone().isoformat()
     metadata = {
@@ -491,22 +513,6 @@ def main() -> None:
         "rmse_definition": "sqrt(sum_r SSE_r / sum_r N_r)",
         "ci_definition": "paired bootstrap over replicate IDs",
     }
-    metadata_path = run_dir / "run_metadata.json"
-    if metadata_path.exists():
-        previous_metadata = json.loads(metadata_path.read_text())
-        for field in (
-            "oddsketch_sha256",
-            "true_jaccard_sha256",
-            "bindash_sha256",
-            "bindash_version",
-        ):
-            if previous_metadata.get(field) != metadata[field]:
-                raise SystemExit(
-                    f"resume executable provenance differs for {field}: "
-                    f"{previous_metadata.get(field)!r} != {metadata[field]!r}"
-                )
-        metadata["created_at"] = previous_metadata.get("created_at", now)
-        metadata["resumed_at"] = now
     metadata_path.write_text(json.dumps(metadata, indent=2) + "\n")
 
     print(f"[paired-sketchsize] run_dir={run_dir}", flush=True)
@@ -522,7 +528,7 @@ def main() -> None:
         bindash_randseed = (
             bindash_randseed_base + (replicate - 1) * bindash_randseed_stride
         )
-        replicate_dir = checkpoints / f"replicate_{replicate:03d}"
+        replicate_dir = work_root / f"replicate_{replicate:03d}"
         replicate_dir.mkdir(parents=True, exist_ok=True)
         exact_path = replicate_dir / "exact.tsv.gz"
         exact_validation = {
@@ -531,14 +537,14 @@ def main() -> None:
             "pairs_per_replicate": pairs_per_replicate,
             "kmerlen": kmerlen,
         }
-        exact_by_id = validated_exact_checkpoint(exact_path, **exact_validation)
+        exact_by_id = read_validated_exact_intermediate(exact_path, **exact_validation)
 
         completed: dict[int, list[dict[str, str]]] = {}
         if exact_by_id is not None:
             for sketch_size in sketch_sizes:
-                checkpoint = replicate_dir / f"n{sketch_size}.tsv.gz"
-                rows = validated_paired_checkpoint(
-                    checkpoint,
+                intermediate_path = replicate_dir / f"n{sketch_size}.tsv.gz"
+                rows = read_validated_paired_intermediate(
+                    intermediate_path,
                     exact_by_id=exact_by_id,
                     replicate=replicate,
                     genome_seed=genome_seed,
@@ -552,7 +558,7 @@ def main() -> None:
                 if rows is not None:
                     completed[sketch_size] = rows
                     print(
-                        f"[checkpoint-ok] replicate={replicate} n={sketch_size}",
+                        f"[intermediate-ok] replicate={replicate} n={sketch_size}",
                         flush=True,
                     )
         missing_sizes = [value for value in sketch_sizes if value not in completed]
@@ -605,7 +611,7 @@ def main() -> None:
                 )
                 exact_by_id = validate_exact_rows(exact_rows, **exact_validation)
                 write_gzip_tsv_atomic(exact_path, exact_rows, EXACT_FIELDS)
-                print(f"[checkpoint-write] {exact_path}", flush=True)
+                print(f"[intermediate-write] {exact_path}", flush=True)
             else:
                 verify_regenerated_pairs(pairs, exact_by_id)
 
@@ -704,17 +710,21 @@ def main() -> None:
                     "kmerlen": kmerlen,
                 }
                 validate_paired_rows(paired_rows, **validation)
-                checkpoint = replicate_dir / f"n{sketch_size}.tsv.gz"
-                write_gzip_tsv_atomic(checkpoint, paired_rows, PAIRED_FIELDS)
-                validated = validated_paired_checkpoint(checkpoint, **validation)
+                intermediate_path = replicate_dir / f"n{sketch_size}.tsv.gz"
+                write_gzip_tsv_atomic(intermediate_path, paired_rows, PAIRED_FIELDS)
+                validated = read_validated_paired_intermediate(
+                    intermediate_path, **validation
+                )
                 if validated is None:
-                    raise SystemExit(f"new checkpoint failed validation: {checkpoint}")
-                print(f"[checkpoint-write] {checkpoint}", flush=True)
+                    raise SystemExit(
+                        f"new intermediate file failed validation: {intermediate_path}"
+                    )
+                print(f"[intermediate-write] {intermediate_path}", flush=True)
 
     all_rows: list[dict[str, str]] = []
     for replicate in range(1, replicates + 1):
-        replicate_dir = checkpoints / f"replicate_{replicate:03d}"
-        exact_by_id = validated_exact_checkpoint(
+        replicate_dir = work_root / f"replicate_{replicate:03d}"
+        exact_by_id = read_validated_exact_intermediate(
             replicate_dir / "exact.tsv.gz",
             replicate=replicate,
             genome_seed=genome_seed_base + (replicate - 1) * genome_seed_stride,
@@ -722,11 +732,13 @@ def main() -> None:
             kmerlen=kmerlen,
         )
         if exact_by_id is None:
-            raise SystemExit(f"final exact checkpoint validation failed for replicate={replicate}")
+            raise SystemExit(
+                f"final exact intermediate validation failed for replicate={replicate}"
+            )
         for sketch_size in sketch_sizes:
-            checkpoint = replicate_dir / f"n{sketch_size}.tsv.gz"
-            rows = validated_paired_checkpoint(
-                checkpoint,
+            intermediate_path = replicate_dir / f"n{sketch_size}.tsv.gz"
+            rows = read_validated_paired_intermediate(
+                intermediate_path,
                 exact_by_id=exact_by_id,
                 replicate=replicate,
                 genome_seed=genome_seed_base + (replicate - 1) * genome_seed_stride,
@@ -744,7 +756,7 @@ def main() -> None:
             )
             if rows is None:
                 raise SystemExit(
-                    f"final paired checkpoint validation failed: replicate={replicate}, "
+                    f"final paired intermediate validation failed: replicate={replicate}, "
                     f"n={sketch_size}"
                 )
             all_rows.extend(rows)
@@ -758,16 +770,8 @@ def main() -> None:
     paired_output = run_dir / "paired_observations.tsv.gz"
     write_gzip_tsv_atomic(paired_output, all_rows, PAIRED_FIELDS)
 
-    metadata["status"] = "complete"
-    metadata["completed_at"] = datetime.now().astimezone().isoformat()
     metadata["paired_observation_count"] = len(all_rows)
     metadata_path.write_text(json.dumps(metadata, indent=2) + "\n")
-    analyzer = (
-        task_root
-        / "analysis"
-        / "aggregate"
-        / "analyze_paired_sketchsize_repeats.py"
-    )
     run(
         [
             sys.executable,
@@ -780,6 +784,10 @@ def main() -> None:
             str(summary),
         ]
     )
+    metadata["status"] = "complete"
+    metadata["completed_at"] = datetime.now().astimezone().isoformat()
+    metadata_path.write_text(json.dumps(metadata, indent=2) + "\n")
+    shutil.rmtree(work_root)
     print(f"[paired-sketchsize] complete: {run_dir}", flush=True)
 
 
