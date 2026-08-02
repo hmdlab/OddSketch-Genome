@@ -9,10 +9,10 @@ from pathlib import Path
 
 
 def main() -> None:
-    task_root = Path(__file__).resolve().parents[1]
+    task_root = Path(__file__).resolve().parents[2]
     command = [
         sys.executable,
-        str(task_root / "scripts" / "run_paired.py"),
+        str(task_root / "scripts" / "runners" / "run_paired.py"),
         "--config",
         str(task_root / "configs" / "smoke.json"),
         "--experiment",

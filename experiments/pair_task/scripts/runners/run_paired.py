@@ -493,10 +493,11 @@ def main() -> None:
     )
     bindash_candidate = resolve_path(bindash_raw, repo_root) if bindash_raw else None
     bindash = resolve_bindash(str(bindash_candidate) if bindash_candidate else None)
-    make_genomes = task_root / "scripts" / "make_genomes.py"
+    make_genomes = task_root / "scripts" / "runners" / "make_genomes.py"
     metadata_path = run_dir / "run_metadata.json"
     analyzer = (
         task_root
+        / "scripts"
         / "analysis"
         / "paired.py"
     )

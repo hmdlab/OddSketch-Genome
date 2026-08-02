@@ -18,14 +18,14 @@ the executable reports `version 2.2.0 commit ce2d168-clean`.
 Run the small paired comparison from this directory:
 
 ```bash
-uv run python scripts/run_smoke.py
+uv run python scripts/runners/run_smoke.py
 ```
 
 The defaults in `configs/smoke.json` use two replicates of 20 genome pairs.
 Runner options can be appended to override the config, for example:
 
 ```bash
-uv run python scripts/run_smoke.py \
+uv run python scripts/runners/run_smoke.py \
   --replicates 1 --num-pairs 4 --genome-length 20000 \
   --mutation-min 1 --mutation-max 2 --bootstrap 10
 ```
@@ -112,7 +112,7 @@ editing the JSON files.
 
 - `configs/`: experiment definitions
 - `jobs/`: Grid Engine and direct shell entry points
-- `scripts/`: experiment runners and shared command helpers
-- `analysis/paired.py`: paired OddSketch/BinDash summaries
-- `analysis/validation.py`: k-mer sensitivity and OPH summaries
+- `scripts/runners/`: experiment runners, data generation, and command helpers
+- `scripts/analysis/paired.py`: paired OddSketch/BinDash summaries
+- `scripts/analysis/validation.py`: k-mer sensitivity and OPH summaries
 - `outputs/`: ignored generated datasets, tables, and figures

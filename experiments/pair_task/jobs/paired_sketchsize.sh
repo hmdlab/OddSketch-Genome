@@ -73,7 +73,7 @@ echo "[job] oddsketch=${ODDSKETCH_BIN}"
 echo "[job] true_jaccard=${TRUE_JACCARD_BIN}"
 echo "[job] bindash=$("${BINDASH_BIN}" --version 2>&1 | head -n 1)"
 "${UV_BIN}" "${UV_RUN_ARGS[@]}" python \
-  "${TASK_DIR}/scripts/run_paired.py" \
+  "${TASK_DIR}/scripts/runners/run_paired.py" \
   --config "${TASK_DIR}/configs/paired.json" \
   --experiment paired \
   "$@"

@@ -99,7 +99,7 @@ echo "[job] run_dir=${RUN_DIR}"
 
 run_bindash_recommended() {
   "${UV_BIN}" "${UV_RUN_ARGS[@]}" python \
-    "${TASK_DIR}/scripts/run_paired.py" \
+    "${TASK_DIR}/scripts/runners/run_paired.py" \
     --config "${TASK_DIR}/configs/supplementary.json" \
     --experiment bindash_recommended \
     --output-dir "${RUN_DIR}/bindash_recommended" \
@@ -111,7 +111,7 @@ run_validation() {
   local output_name=$2
   shift 2
   "${UV_BIN}" "${UV_RUN_ARGS[@]}" python \
-    "${TASK_DIR}/scripts/run_validation.py" \
+    "${TASK_DIR}/scripts/runners/run_validation.py" \
     --experiment "${experiment_name}" \
     --config "${TASK_DIR}/configs/supplementary.json" \
     --output-dir "${RUN_DIR}/${output_name}" \

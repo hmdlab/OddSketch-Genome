@@ -230,7 +230,7 @@ def main() -> None:
     true_bin = resolve_binary(
         "TRUE_JACCARD_BIN", repo_root / "experiments" / "tools" / "bin" / "true_jaccard"
     )
-    make_genomes_script = task_root / "scripts" / "make_genomes.py"
+    make_genomes_script = task_root / "scripts" / "runners" / "make_genomes.py"
     observations_path = run_dir / "observations.tsv"
 
     print(f"[validation] run_dir={run_dir}")
@@ -350,7 +350,7 @@ def main() -> None:
                         })
                     observations_handle.flush()
 
-    analysis_script = task_root / "analysis" / "validation.py"
+    analysis_script = task_root / "scripts" / "analysis" / "validation.py"
     bins = ",".join(str(value) for value in analysis_cfg["bins"])
     run([
         sys.executable,

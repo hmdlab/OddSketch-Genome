@@ -40,7 +40,7 @@ Run the pairwise synthetic benchmark from its task directory:
 
 ```bash
 cd experiments/pair_task
-uv run python scripts/run_smoke.py
+uv run python scripts/runners/run_smoke.py
 ```
 
 Run the RefSeq sketch-build benchmark from the repository root:
