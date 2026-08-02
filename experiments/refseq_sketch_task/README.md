@@ -1,211 +1,28 @@
 # RefSeq Sketch Task
 
-This task reproduces the paper benchmark that sketches 496,080 RefSeq bacterial
-genomes with OddSketch and BinDash. It records database size, build time, and
-peak memory for each tool.
+This workflow measures sketch database size, build time, and peak memory for
+OddSketch and BinDash over 496,080 RefSeq bacterial genomes.
 
-This is the heaviest workflow in the repository. The downloaded compressed
-genomes occupy 637,090,865,486 bytes (approximately 637 GB), and additional
-space is required for manifests, logs, and sketch databases. Run it on a server
-or HPC system with sufficient storage and runtime. 
+The compressed input genomes occupy approximately 637 GB. Additional storage
+is required for manifests, logs, and sketch databases, so run the workflow on a
+machine with sufficient storage and runtime. Network access is required during
+the download.
 
-Complete the repository installation before starting. The OddSketch measurement
-requires a built `src/oddsketch` executable. The full paper benchmark also
-requires BinDash, installed with `bash scripts/bootstrap.sh`. Network access is
-required while downloading the genome files.
+## Requirements
 
-## Reproducing the Paper Benchmark
-
-Run the following commands from the repository root.
-
-The exact assembly-summary snapshot used in the paper is included at
-`experiments/refseq_sketch_task/provenance/assembly_summary_refseq_bacteria_20260513.txt.gz`.
-The downloader reads this file directly and verifies the SHA256 of its
-uncompressed contents. Download the 496,080 compressed genome FASTA files
-selected by that summary:
+Run the setup commands from the repository root:
 
 ```bash
-uv run python experiments/refseq_sketch_task/scripts/download_refseq_assemblies.py \
-  --config experiments/refseq_sketch_task/config.json
+make -C src CXX=g++ LDFLAGS=-lstdc++fs
+scripts/bootstrap.sh
 ```
 
-Validate every downloaded gzip file and redownload missing or corrupt files:
+The first command builds OddSketch and the experiment helper binaries. The
+second installs the BinDash baseline used by the benchmark.
 
-```bash
-uv run python experiments/refseq_sketch_task/scripts/validate_refseq_gzip.py \
-  --repair
-```
+## Running the Benchmark
 
-Measure the OddSketch sketch database build:
-
-```bash
-uv run python experiments/refseq_sketch_task/scripts/refseq_sketch_runner.py \
-  --config experiments/refseq_sketch_task/config.json
-```
-
-Measure the BinDash sketch database build on the same genome list:
-
-```bash
-uv run python experiments/refseq_sketch_task/scripts/refseq_bindash_sketch_runner.py \
-  --config experiments/refseq_sketch_task/config.json
-```
-
-To resume an interrupted OddSketch run, reuse its run ID:
-
-```bash
-uv run python experiments/refseq_sketch_task/scripts/refseq_sketch_runner.py \
-  --config experiments/refseq_sketch_task/config.json \
-  --run-id <run_id> --resume
-```
-
-Use a fresh run without `--resume` when measuring a new end-to-end build time.
-
-## RefSeq Dataset and Provenance
-
-This workflow uses the single RefSeq bacteria dataset collected for the paper.
-The assembly summary was acquired from:
-
-```text
-https://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt
-```
-
-Recorded assembly-summary provenance:
-
-- acquisition date: 2026-05-13
-- source last-modified timestamp: 2026-05-11 09:19:56 JST
-- uncompressed file size: 220,398,686 bytes
-- uncompressed SHA256: `6b4541d82355ad719ebfa855d86f91f046c23edf1b15bd84aeeb643e1d836875`
-- compressed file size: 33,860,120 bytes
-- compressed SHA256: `34af3e01f3fb79c166e59331e9f8bbb4c99f9bfe4abf373fbf3dc4095235b59c`
-
-The downloader verifies this SHA256 before starting. The summary contains
-496,081 rows with a usable `ftp_path`. Accession `GCF_039679095.1` returned
-HTTP 404 during data collection and is explicitly excluded in `config.json`,
-leaving the 496,080 genomes used in the paper.
-
-Genome FASTA files are downloaded from the `ftp_path` column. The downloader
-appends `<assembly_directory>_genomic.fna.gz` to each path and converts
-`ftp://` to `https://` when necessary. For example:
-
-```text
-ftp_path:
-https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/036/600/855/GCF_036600855.1_ASM3660085v1/
-
-downloaded FASTA:
-https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/036/600/855/GCF_036600855.1_ASM3660085v1/GCF_036600855.1_ASM3660085v1_genomic.fna.gz
-```
-
-Genome files were downloaded from 2026-05-13 15:42:11 JST to 2026-05-15
-10:11:13 JST. A gzip integrity check ran from 2026-05-28 15:51:52 JST to
-2026-05-28 16:18:24 JST; all 496,080 files were valid.
-
-Public provenance is stored separately from the genome data:
-
-- [`provenance/refseq_bacteria_dataset.json`](provenance/refseq_bacteria_dataset.json):
-  source URL, dates, counts, integrity results, and SHA256 values
-- [`provenance/assembly_summary_refseq_bacteria_20260513.txt.gz`](provenance/assembly_summary_refseq_bacteria_20260513.txt.gz):
-  exact compressed assembly-summary snapshot used to select the paper dataset
-- [`provenance/refseq_bacteria_genomes.tsv.gz`](provenance/refseq_bacteria_genomes.tsv.gz):
-  `assembly_accession`, `ftp_path`, `genomic_fna_url`, `local_filename`, and
-  `file_size` for all 496,080 genomes
-
-Regenerate these files from the local dataset and validation outputs with:
-
-```bash
-uv run python experiments/refseq_sketch_task/scripts/build_refseq_provenance.py
-```
-
-## Config
-
-[`config.json`](config.json) controls dataset selection and both sketch tools.
-Paths are resolved relative to `experiments/refseq_sketch_task/`.
-
-- `paths.data_root`: run output root
-- `paths.assembly_summary`: bundled paper-version assembly summary
-- `paths.local_genome_list`: downloaded gzip-file list
-- `download`: source provenance, exclusions, expected genome count, download
-  concurrency, retry behavior, and output location
-- `refseq_sketch.limit`: optional genome limit for a smaller test run; `null`
-  selects the complete paper dataset
-- `oddsketch`: threads, k-mer length, sketch size, threshold, positional mode,
-  and canonical k-mer setting
-- `bindash`: executable, source version, threads, k-mer length, sketch size,
-  and b-bit setting
-
-The downloader writes `.fna.gz` files to `data/assembly/gzip/` and does not
-retain decompressed FASTA files. OddSketch reads the gzip files directly.
-
-## Outputs
-
-Downloaded data and validation records are written under `data/assembly/`:
-
-- `gzip/`: compressed genome FASTA files
-- `manifests/gzip_paths.txt`: input list shared by both sketch runners
-- `manifests/assembly_download_manifest.tsv`: accession, URL, path, size, and
-  download status
-- `manifests/gzip_integrity_results.tsv`: per-file validation and repair status
-- `metadata/`: download metadata and a copy of the assembly summary
-
-Sketch runs are written under `data/sketch_runs/runs/<run_id>/`. The data
-directory may be a symlink to a large external filesystem.
-
-OddSketch runs include:
-
-- `results/oddsketch_sketch_metrics.tsv`
-- `oddsketch_sketches/`
-- `manifests/sketch_paths.txt`
-- `logs/oddsketch_sketch_time.txt`
-- `logs/oddsketch_sketch_stdout.txt`
-
-BinDash runs include:
-
-- `results/bindash_sketch_metrics.tsv`
-- `bindash_sketches/`
-- `manifests/bindash_sketch_files.tsv`
-- `logs/bindash_sketch_time.txt`
-- `logs/bindash_sketch_stdout.txt`
-
-Each run also saves the resolved config, selected assemblies, input manifests,
-and assembly summary. In the metrics files, `elapsed_sec` is the sketch-tool
-runtime; `workflow_elapsed_sec` additionally includes runner-side setup and
-manifest handling.
-
-## BinDash Baseline
-
-BinDash is an external dependency and is not vendored in this repository. The
-bootstrap script builds it from:
-
-```text
-https://github.com/zhaoxiaofei/bindash.git
-```
-
-The paper benchmark used tag `v2.6`, which resolves to commit:
-
-```text
-ce2d16816beade65db992b8cd6eced00b54ca9ef
-```
-
-For the recorded RefSeq run `run_20260613_172855`, the executable reported:
-
-```text
-version 2.2.0 commit ce2d168-clean
-```
-
-The recorded binary SHA256 was:
-
-```text
-74993c6dd59467693185795b4651bc04ec2bcf02d44b583eea2069db36c25a20
-```
-
-The run used `--nthreads=8`, `--kmerlen=64`, `--sketchsize64=16`, and
-`--bbits=16`, giving an effective sketch size of 16,384 bits per genome.
-`bindash.sketch_size` in `config.json` is expressed as target bits and converted
-to BinDash `--sketchsize64`.
-
-## Job Scripts
-
-The `jobs/` directory contains shell entry points that wrap the same Python
-runners documented above:
+Run all commands from the repository root:
 
 ```bash
 experiments/refseq_sketch_task/jobs/download_refseq_assemblies.sh
@@ -214,7 +31,11 @@ experiments/refseq_sketch_task/jobs/refseq_oddsketch_sketch.sh
 experiments/refseq_sketch_task/jobs/refseq_bindash_sketch.sh
 ```
 
-Resume an interrupted OddSketch job with:
+The validation step checks every downloaded gzip file and repairs missing or
+corrupt files. OddSketch and BinDash then build separate sketch databases from
+the same genome list.
+
+Resume an interrupted OddSketch run by reusing its run ID:
 
 ```bash
 experiments/refseq_sketch_task/jobs/refseq_oddsketch_sketch.sh \
@@ -222,11 +43,71 @@ experiments/refseq_sketch_task/jobs/refseq_oddsketch_sketch.sh \
   --run-id <run_id> --resume
 ```
 
-## Layout
+Use a fresh run without `--resume` when measuring a new end-to-end build.
 
-- `config.json`: dataset, OddSketch, and BinDash settings
-- `scripts/`: download, validation, provenance, and sketch runners
-- `jobs/`: shell entry points for the experiment workflows
-- `provenance/`: assembly-summary snapshot, dataset metadata, and compressed
-  genome manifest
-- `data/`: downloaded genomes, validation records, and generated sketch runs
+## Dataset and Provenance
+
+The exact RefSeq bacteria assembly-summary snapshot used for the paper was
+acquired on 2026-05-13 and is bundled with the repository. One unavailable
+accession, `GCF_039679095.1`, is excluded, leaving 496,080 genomes.
+
+Public provenance is stored separately from the downloaded genome data:
+
+- [`provenance/refseq_bacteria_dataset.json`](provenance/refseq_bacteria_dataset.json):
+  source, acquisition dates, counts, integrity results, and SHA256 values
+- [`provenance/assembly_summary_refseq_bacteria_20260513.txt.gz`](provenance/assembly_summary_refseq_bacteria_20260513.txt.gz):
+  exact assembly-summary snapshot used to select the dataset
+- [`provenance/refseq_bacteria_genomes.tsv.gz`](provenance/refseq_bacteria_genomes.tsv.gz):
+  accession, source URL, local filename, and file size for every genome
+
+## Outputs
+
+Downloaded data and sketch runs are written under `data/` by default:
+
+```text
+data/
+├── assembly/
+│   ├── gzip/
+│   ├── manifests/
+│   └── metadata/
+└── sketch_runs/runs/<run_id>/
+    ├── results/
+    ├── logs/
+    ├── manifests/
+    ├── metadata/
+    ├── genome_inputs/
+    └── oddsketch_sketches/ or bindash_sketches/
+```
+
+The principal result files are:
+
+- `results/oddsketch_sketch_metrics.tsv`
+- `results/bindash_sketch_metrics.tsv`
+
+They report the sketch-command runtime (`elapsed_sec`), sketch plus post-run
+manifest and size processing (`workflow_elapsed_sec`), maximum RSS, CPU time,
+input and sketch counts, exit status, and total sketch-file size.
+
+Detailed `/usr/bin/time -v` output and tool output are saved under `logs/`.
+Each run also records the resolved config, selected assemblies, input
+manifests, commands, executable paths and hashes, available version information,
+and the Git commit under `metadata/`.
+
+The `data/` directory may be a symlink to a larger filesystem.
+
+## Configuration
+
+[`config.json`](config.json) controls dataset selection, output paths, and both
+sketch tools. Relative paths are resolved from this task directory.
+
+- `paths.data_root`: sketch-run output root
+- `paths.assembly_summary`: bundled assembly-summary snapshot
+- `paths.local_genome_list`: downloaded gzip-file list
+- `download`: expected count, exclusions, retries, concurrency, and output path
+- `refseq_sketch.limit`: optional genome limit; `null` selects the full dataset
+- `oddsketch`: threads, k-mer length, sketch size, threshold, and k-mer settings
+- `bindash`: executable, source version, threads, k-mer length, sketch size, and
+  b-bit setting
+
+The downloader retains compressed `.fna.gz` inputs. OddSketch reads these files
+directly without storing decompressed copies.
