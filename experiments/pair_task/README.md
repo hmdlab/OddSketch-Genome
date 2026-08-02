@@ -1,7 +1,8 @@
 # Pair Task
 
 This task generates synthetic genome pairs and compares exact Jaccard,
-OddSketch-Genome, BinDash, and the supplemental OPH baseline.
+OddSketch-Genome, BinDash, and the supplemental One Permutation Hashing (OPH)
+baseline.
 
 BinDash is an external dependency and is not vendored in this repository. The
 bootstrap helper installs tag `v2.6` from:
