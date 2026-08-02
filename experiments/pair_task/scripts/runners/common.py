@@ -51,7 +51,7 @@ def resolve_output_root(task_root: Path, cfg: dict, cli_outdir: str | None = Non
     if isinstance(paths, dict) and paths.get("outdir"):
         return resolve_path(task_root, paths["outdir"])
 
-    return (task_root / "outputs" / "smoke").resolve()
+    raise SystemExit("config must define paths.outdir or --outdir must be specified")
 
 
 def allocate_run_dir(base_outdir: Path, prefix: str = "run") -> Path:

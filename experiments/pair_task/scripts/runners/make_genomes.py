@@ -50,7 +50,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument(
         "--config",
-        default="configs/smoke.json",
+        required=True,
         help="Path to task config JSON",
     )
     ap.add_argument("--genome-length", type=int, default=None, help="Length of each generated sequence in base pairs")

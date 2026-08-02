@@ -135,17 +135,6 @@ Paths are resolved relative to `experiments/refseq_sketch_task/`.
 The downloader writes `.fna.gz` files to `data/assembly/gzip/` and does not
 retain decompressed FASTA files. OddSketch reads the gzip files directly.
 
-## Recorded Execution Environment
-
-The OddSketch and BinDash measurements used the retained Grid Engine job
-scripts with the following application and scheduler settings:
-
-| Tool | Threads | Grid Engine request |
-| --- | --- | --- |
-| OddSketch | `--threads=8` | queue `h.q`; `OpenMP` 8 slots; `mem_req=16g`; `h_vmem=16g` |
-| BinDash | `--nthreads=8` | queue `h.q`; `OpenMP` 8 slots; `mem_req=16g`; `h_vmem=16g` |
-
-
 ## Outputs
 
 Downloaded data and validation records are written under `data/assembly/`:
@@ -213,34 +202,31 @@ The run used `--nthreads=8`, `--kmerlen=64`, `--sketchsize64=16`, and
 `bindash.sketch_size` in `config.json` is expressed as target bits and converted
 to BinDash `--sketchsize64`.
 
-## Grid Engine Execution
+## Job Scripts
 
-The `jobs/` directory retains the Grid Engine scripts used for the paper
-experiments. They wrap the same Python entry points documented above:
+The `jobs/` directory contains shell entry points that wrap the same Python
+runners documented above:
 
 ```bash
-qsub experiments/refseq_sketch_task/jobs/qsub_download_refseq_assemblies.sh
-qsub experiments/refseq_sketch_task/jobs/qsub_validate_refseq_gzip.sh
-qsub experiments/refseq_sketch_task/jobs/qsub_refseq_oddsketch_sketch.sh
-qsub experiments/refseq_sketch_task/jobs/qsub_refseq_bindash_sketch.sh
+experiments/refseq_sketch_task/jobs/download_refseq_assemblies.sh
+experiments/refseq_sketch_task/jobs/validate_refseq_gzip.sh
+experiments/refseq_sketch_task/jobs/refseq_oddsketch_sketch.sh
+experiments/refseq_sketch_task/jobs/refseq_bindash_sketch.sh
 ```
 
 Resume an interrupted OddSketch job with:
 
 ```bash
-qsub experiments/refseq_sketch_task/jobs/qsub_refseq_oddsketch_sketch.sh \
+experiments/refseq_sketch_task/jobs/refseq_oddsketch_sketch.sh \
   experiments/refseq_sketch_task/config.json \
   --run-id <run_id> --resume
 ```
-
-Review the queue, parallel environment, memory request, environment, and path
-settings in each job script before submitting it on another cluster.
 
 ## Layout
 
 - `config.json`: dataset, OddSketch, and BinDash settings
 - `scripts/`: download, validation, provenance, and sketch runners
-- `jobs/`: Grid Engine scripts used for the paper experiments
+- `jobs/`: shell entry points for the experiment workflows
 - `provenance/`: assembly-summary snapshot, dataset metadata, and compressed
   genome manifest
 - `data/`: downloaded genomes, validation records, and generated sketch runs

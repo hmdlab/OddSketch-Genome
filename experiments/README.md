@@ -9,62 +9,55 @@ This directory contains benchmark workflows built around the standalone OddSketc
 - `tools/`: C++ helper tools and external-tool setup scripts used only by experiment workflows
 
 Each task keeps its own code, configuration, and ignored output directories.
-`pair_task/` separates its smoke, paired, and supplemental settings under
+`pair_task/` separates its paired and supplemental settings under
 `pair_task/configs/`; `refseq_sketch_task/` uses a task-level `config.json`.
 
-## Task Size
+## Benchmark Workflows
 
-- `pair_task/` is the synthetic benchmark. Its bundled `configs/smoke.json`
-  provides a small local check; the paper-scale settings are in
+- `pair_task/` is the synthetic benchmark. Its paper-scale settings are in
   `configs/paired.json` and `configs/supplementary.json`.
-- `refseq_sketch_task/` is the heavy real-data benchmark. It downloads and sketches hundreds of thousands of RefSeq bacterial genomes, so it is intended for an HPC or server environment with substantial storage and runtime.
+- `refseq_sketch_task/` is the real-data benchmark. It downloads and sketches
+  hundreds of thousands of RefSeq bacterial genomes, so it requires substantial
+  storage and runtime and is intended for a server or HPC environment.
 
-The experiment workflows include BinDash baseline comparisons. Install BinDash before running the default `pair_task` configs or the RefSeq BinDash sketch benchmark.
+Both workflows include BinDash baseline comparisons.
 
-## Quick Run
+## Prerequisites
 
-Install Python dependencies and build helper binaries from the repository root:
+Run the setup commands from the repository root:
 
 ```bash
 uv sync
 make -C src CXX=g++ LDFLAGS=-lstdc++fs
+scripts/bootstrap.sh
 ```
 
-Install BinDash for the baseline comparison steps:
+BinDash is required by the paired and supplemental pair-task experiments and
+the RefSeq BinDash sketch benchmark.
+
+## Running the Benchmarks
+
+Run the paper-scale paired comparison from the repository root:
 
 ```bash
-bash scripts/bootstrap.sh
+experiments/pair_task/jobs/paired_sketchsize.sh
 ```
 
-Run the pairwise synthetic benchmark from its task directory:
+Run all supplemental pair-task experiments with:
 
 ```bash
-cd experiments/pair_task
-uv run python scripts/runners/run_smoke.py
+experiments/pair_task/jobs/supplementary.sh
 ```
 
-Run the RefSeq sketch-build benchmark from the repository root:
+Run the RefSeq OddSketch and BinDash sketch-build benchmarks with:
 
 ```bash
-uv run python experiments/refseq_sketch_task/scripts/refseq_sketch_runner.py \
-  --config experiments/refseq_sketch_task/config.json
+experiments/refseq_sketch_task/jobs/refseq_oddsketch_sketch.sh
+experiments/refseq_sketch_task/jobs/refseq_bindash_sketch.sh
 ```
 
-Or submit it to Grid Engine:
-
-```bash
-qsub experiments/refseq_sketch_task/jobs/qsub_refseq_sketch.sh
-```
-
-## Cluster Jobs
-
-The Grid Engine scripts under each task's `jobs/` directory were used for the
-paper experiments. They are provided to document the original execution setup
-and may also serve as examples for cluster execution.
-
-Queue names, parallel environments, resource directives, runtime limits, and
-software paths are specific to the original computing environment and may
-require modification before reuse.
+See each task's README for individual supplemental experiments, RefSeq dataset
+acquisition, and runner options.
 
 ## Notes
 

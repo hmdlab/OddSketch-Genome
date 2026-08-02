@@ -13,36 +13,13 @@ https://github.com/zhaoxiaofei/bindash.git
 The paper baseline used commit `ce2d16816beade65db992b8cd6eced00b54ca9ef`;
 the executable reports `version 2.2.0 commit ce2d168-clean`.
 
-## Local Smoke Test
-
-Run the small paired comparison from this directory:
-
-```bash
-uv run python scripts/runners/run_smoke.py
-```
-
-The defaults in `configs/smoke.json` use two replicates of 20 genome pairs.
-Runner options can be appended to override the config, for example:
-
-```bash
-uv run python scripts/runners/run_smoke.py \
-  --replicates 1 --num-pairs 4 --genome-length 20000 \
-  --mutation-min 1 --mutation-max 2 --bootstrap 10
-```
-
 ## Main Paired Experiment
 
 The main accuracy comparison evaluates OddSketch-Genome and BinDash on the
 same 20 independent replicates, with 1,000 genome pairs per replicate, at eight
 payload sizes.
 
-Submit through Grid Engine:
-
-```bash
-qsub jobs/paired_sketchsize.sh
-```
-
-Run directly without Grid Engine:
+Run the experiment from this directory:
 
 ```bash
 jobs/paired_sketchsize.sh
@@ -64,12 +41,6 @@ Run the BinDash README-recommended setting, k-mer sensitivity, and the
 memory-matched OPH baseline together:
 
 ```bash
-qsub jobs/supplementary.sh
-```
-
-Direct execution is also supported:
-
-```bash
 jobs/supplementary.sh
 ```
 
@@ -81,10 +52,10 @@ jobs/supplementary.sh k_sensitivity
 jobs/supplementary.sh oph
 ```
 
-Each submission creates:
+Each invocation creates:
 
 ```text
-outputs/validation/run_<timestamp>_<job-id>/
+outputs/validation/run_<timestamp>_<id>/
 ├── bindash_recommended/
 ├── k_sensitivity/
 └── oph/
@@ -99,9 +70,8 @@ OddSketch payload of 262,144 bits. The OPH experiment stores `n/64` full
 
 ## Configuration
 
-The public workflows use three flat config files:
+The public workflows use two config files:
 
-- `configs/smoke.json`: small local check
 - `configs/paired.json`: main paired sketch-size experiment
 - `configs/supplementary.json`: BinDash recommended, k-mer sensitivity, and OPH
 
@@ -111,7 +81,7 @@ editing the JSON files.
 ## Layout
 
 - `configs/`: experiment definitions
-- `jobs/`: Grid Engine and direct shell entry points
+- `jobs/`: shell entry points
 - `scripts/runners/`: experiment runners, data generation, and command helpers
 - `scripts/analysis/paired.py`: paired OddSketch/BinDash summaries
 - `scripts/analysis/validation.py`: k-mer sensitivity and OPH summaries

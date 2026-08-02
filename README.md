@@ -116,7 +116,9 @@ Benchmark workflows are under `experiments/`. See the experiment READMEs for rep
 - [`experiments/pair_task/README.md`](experiments/pair_task/README.md)
 - [`experiments/refseq_sketch_task/README.md`](experiments/refseq_sketch_task/README.md)
 
-The `pair_task` workflow is a synthetic benchmark and can be scaled down for a local smoke test by reducing genome length and pair count in its config. The RefSeq workflow is a large real-data benchmark over hundreds of thousands of genomes and is intended for an HPC or server environment with substantial storage.
+The `pair_task` workflow is a synthetic benchmark. The RefSeq workflow is a
+large real-data benchmark over hundreds of thousands of genomes and is intended
+for an HPC or server environment with substantial storage.
 
 ## Data and Baseline Provenance
 
