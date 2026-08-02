@@ -45,7 +45,11 @@ OBSERVATION_FIELDS = (
 
 def resolve_config(raw: str) -> Path:
     task_root = resolve_task_root()
-    candidates = (Path(raw), task_root / raw, task_root / "configs" / "validation" / "config.json")
+    candidates = (
+        Path(raw),
+        task_root / raw,
+        task_root / "configs" / "supplementary.json",
+    )
     for candidate in candidates:
         if candidate.exists():
             return candidate.resolve()
@@ -129,8 +133,8 @@ def eval_rows(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle, delimiter="\t"))
 
 
-def experiment_matrix(validation_cfg: dict, experiment: str) -> tuple[int, list[int], list[int], int]:
-    section = validation_cfg[experiment]
+def experiment_matrix(config: dict, experiment: str) -> tuple[int, list[int], list[int], int]:
+    section = config[experiment]
     replicates = int(section["replicates"])
     seed_base = int(section["hash_seed_base"])
     if experiment == "k_sensitivity":
@@ -145,7 +149,7 @@ def experiment_matrix(validation_cfg: dict, experiment: str) -> tuple[int, list[
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--experiment", required=True, choices=("k_sensitivity", "oph"))
-    parser.add_argument("--config", default="configs/validation/config.json")
+    parser.add_argument("--config", default="configs/supplementary.json")
     parser.add_argument(
         "--output-dir",
         default=None,
@@ -164,8 +168,9 @@ def main() -> None:
     config_path = resolve_config(args.config)
     cfg = json.loads(config_path.read_text())
     validation_cfg = cfg["validation"]
+    analysis_cfg = cfg["analysis"]
     replicates, k_values, sketch_sizes, hash_seed_base = experiment_matrix(
-        validation_cfg, args.experiment
+        cfg, args.experiment
     )
     if args.replicates is not None:
         replicates = args.replicates
@@ -186,9 +191,9 @@ def main() -> None:
     j0 = float(validation_cfg["j0"])
     pos_mode = str(validation_cfg.get("pos_mode", "mix"))
     canonical = bool(validation_cfg.get("canonical", True))
-    experiment_cfg = validation_cfg[args.experiment]
+    experiment_cfg = cfg[args.experiment]
     memory_matched_oph = bool(experiment_cfg.get("memory_matched", False))
-    bootstrap = args.bootstrap if args.bootstrap is not None else int(validation_cfg["bootstrap"])
+    bootstrap = args.bootstrap if args.bootstrap is not None else int(analysis_cfg["bootstrap"])
 
     output_base_raw = Path(cfg["paths"]["outdir"])
     output_base = output_base_raw if output_base_raw.is_absolute() else (task_root / output_base_raw)
@@ -345,8 +350,8 @@ def main() -> None:
                         })
                     observations_handle.flush()
 
-    analysis_script = task_root / "analysis" / "validation" / "analyze_validation.py"
-    bins = ",".join(str(value) for value in validation_cfg["bins"])
+    analysis_script = task_root / "analysis" / "validation.py"
+    bins = ",".join(str(value) for value in analysis_cfg["bins"])
     run([
         sys.executable,
         str(analysis_script),

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Aggregate seeded validation runs into TSV, Markdown, and PNG outputs."""
+"""Analyze seeded k-mer sensitivity and OPH validation experiments."""
 
 from __future__ import annotations
 
@@ -185,17 +185,6 @@ def markdown_table(frame: pd.DataFrame, columns: list[str], formats: dict[str, s
     return "\n".join(lines) + "\n"
 
 
-def error_band(ax: plt.Axes, data: pd.DataFrame, label: str, color: str) -> None:
-    data = data.sort_values("bin_center")
-    x = data["bin_center"].to_numpy()
-    y = data["rmse"].to_numpy()
-    low = data["rmse_ci_low"].to_numpy()
-    high = data["rmse_ci_high"].to_numpy()
-    ax.plot(x, y, marker="o", linewidth=2, label=label, color=color)
-    if np.isfinite(low).any() and np.isfinite(high).any():
-        ax.fill_between(x, low, high, color=color, alpha=0.18)
-
-
 def error_bars(
     ax: plt.Axes,
     data: pd.DataFrame,
@@ -221,129 +210,6 @@ def error_bars(
         label=label,
         color=color,
     )
-
-
-def save_repeats(frame: pd.DataFrame, outdir: Path, bootstrap: int) -> None:
-    binned = grouped_summary(
-        frame,
-        ["sketch_size", "bin_id", "bin_lo", "bin_hi", "bin_center"],
-        "jaccard_oddsketch",
-        "OddSketch",
-        bootstrap,
-        101,
-    )
-    overall = grouped_summary(
-        frame, ["sketch_size"], "jaccard_oddsketch", "OddSketch", bootstrap, 102
-    )
-    binned.to_csv(outdir / "binned_summary.tsv", sep="\t", index=False)
-    overall.to_csv(outdir / "overall_summary.tsv", sep="\t", index=False)
-
-    sizes = sorted(int(value) for value in binned["sketch_size"].unique())
-    columns = min(4, max(1, len(sizes)))
-    rows = math.ceil(len(sizes) / columns)
-    fig, axes = plt.subplots(rows, columns, figsize=(4.2 * columns, 3.6 * rows), squeeze=False, sharex=True)
-    for ax, sketch_size in zip(axes.flat, sizes):
-        subset = binned[binned["sketch_size"] == sketch_size]
-        error_band(ax, subset, ODDSKETCH_FIGURE_LABEL, "#2f6fbb")
-        ax.set_title(f"n = {sketch_size} bits")
-        ax.set_xlabel("True Jaccard")
-        ax.set_ylabel("RMSE")
-        ax.grid(alpha=0.25)
-    for ax in axes.flat[len(sizes):]:
-        ax.set_visible(False)
-    fig.suptitle("OddSketch RMSE by true-Jaccard bin (95% replicate-bootstrap CI)")
-    fig.tight_layout()
-    fig.savefig(outdir / "rmse_by_true_jaccard.png", dpi=300)
-    plt.close(fig)
-
-    fig, axes = plt.subplots(rows, columns, figsize=(4.2 * columns, 3.6 * rows), squeeze=False, sharex=True)
-    for ax, sketch_size in zip(axes.flat, sizes):
-        subset = binned[binned["sketch_size"] == sketch_size].sort_values("bin_center")
-        x = subset["bin_center"].to_numpy()
-        y = 100.0 * subset["clip_rate"].to_numpy()
-        low = 100.0 * subset["clip_ci_low"].to_numpy()
-        high = 100.0 * subset["clip_ci_high"].to_numpy()
-        ax.plot(x, y, marker="o", linewidth=2, color="#d65f32")
-        if np.isfinite(low).any():
-            ax.fill_between(x, low, high, color="#d65f32", alpha=0.18)
-        ax.axhline(1.0, color="#555555", linestyle="--", linewidth=1)
-        ax.axhline(5.0, color="#999999", linestyle=":", linewidth=1)
-        ax.set_title(f"n = {sketch_size} bits")
-        ax.set_xlabel("True Jaccard")
-        ax.set_ylabel("Clipped pairs (%)")
-        ax.grid(alpha=0.25)
-    for ax in axes.flat[len(sizes):]:
-        ax.set_visible(False)
-    fig.suptitle("OddSketch saturation rate, D >= n/2 (95% replicate-bootstrap CI)")
-    fig.tight_layout()
-    fig.savefig(outdir / "clip_rate_by_true_jaccard.png", dpi=300)
-    plt.close(fig)
-
-    overall = overall.sort_values("sketch_size")
-    fig, ax = plt.subplots(figsize=(8, 5))
-    yerr = np.vstack((
-        overall["rmse"] - overall["rmse_ci_low"],
-        overall["rmse_ci_high"] - overall["rmse"],
-    ))
-    ax.errorbar(overall["sketch_size"], overall["rmse"], yerr=yerr, marker="o", capsize=3)
-    ax.set_xscale("log", base=2)
-    ax.set_xticks(overall["sketch_size"], [str(int(value)) for value in overall["sketch_size"]], rotation=35)
-    ax.set_xlabel("Sketch size n (bits)")
-    ax.set_ylabel("Overall RMSE")
-    ax.set_title("RMSE versus sketch size (95% replicate-bootstrap CI)")
-    ax.grid(alpha=0.25)
-    fig.tight_layout()
-    fig.savefig(outdir / "rmse_vs_sketch_size.png", dpi=300)
-    plt.close(fig)
-
-    reliable_rows: list[dict] = []
-    for sketch_size, subset in binned.groupby("sketch_size"):
-        ordered = subset.sort_values("bin_lo").reset_index(drop=True)
-        for threshold in (0.01, 0.05):
-            reliable_j = float("nan")
-            for index in range(len(ordered)):
-                tail = ordered.iloc[index:]
-                if len(tail) and (tail["clip_ci_high"] <= threshold).all():
-                    reliable_j = float(ordered.iloc[index]["bin_lo"])
-                    break
-            reliable_rows.append({
-                "sketch_size": int(sketch_size),
-                "clip_threshold": threshold,
-                "minimum_reliable_j": reliable_j,
-            })
-    reliable = pd.DataFrame(reliable_rows)
-    reliable.to_csv(outdir / "reliable_range.tsv", sep="\t", index=False)
-
-    report = [
-        "# Independent-seed RMSE and saturation report",
-        "",
-        "Confidence intervals resample independent replicates. A pair is clipped when `D >= n/2`.",
-        "The empirical reliable boundary is the lowest bin edge for which the upper 95% CI of the clip rate",
-        "stays below the stated threshold in that bin and every observed higher-J bin.",
-        "",
-        "## Overall RMSE",
-        "",
-        markdown_table(
-            overall,
-            ["sketch_size", "replicates", "n_total", "rmse", "rmse_ci_low", "rmse_ci_high", "empty_rate"],
-            {"rmse": ".6f", "rmse_ci_low": ".6f", "rmse_ci_high": ".6f", "empty_rate": ".4%"},
-        ),
-        "## Empirical saturation-safe range",
-        "",
-        markdown_table(
-            reliable,
-            ["sketch_size", "clip_threshold", "minimum_reliable_j"],
-            {"clip_threshold": ".0%", "minimum_reliable_j": ".2f"},
-        ),
-        "## Per-bin values",
-        "",
-        markdown_table(
-            binned,
-            ["sketch_size", "bin_lo", "bin_hi", "n_total", "rmse", "rmse_ci_low", "rmse_ci_high", "clip_rate", "clip_ci_high", "empty_rate"],
-            {"bin_lo": ".2f", "bin_hi": ".2f", "rmse": ".6f", "rmse_ci_low": ".6f", "rmse_ci_high": ".6f", "clip_rate": ".2%", "clip_ci_high": ".2%", "empty_rate": ".4%"},
-        ),
-    ]
-    (outdir / "report.md").write_text("\n".join(report))
 
 
 def save_k_sensitivity(frame: pd.DataFrame, outdir: Path, bootstrap: int) -> None:
@@ -561,7 +427,7 @@ def save_oph(frame: pd.DataFrame, outdir: Path, bootstrap: int) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--experiment", required=True, choices=("repeats", "k_sensitivity", "oph"))
+    parser.add_argument("--experiment", required=True, choices=("k_sensitivity", "oph"))
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--outdir", type=Path, required=True)
     parser.add_argument("--bins", default="0.55,0.60,0.65,0.70,0.75,0.80,0.85,0.90,0.95,1.00")
@@ -571,9 +437,7 @@ def main() -> None:
     edges = parse_edges(args.bins)
     frame = load_observations(args.input, edges)
     args.outdir.mkdir(parents=True, exist_ok=True)
-    if args.experiment == "repeats":
-        save_repeats(frame, args.outdir, args.bootstrap)
-    elif args.experiment == "k_sensitivity":
+    if args.experiment == "k_sensitivity":
         save_k_sensitivity(frame, args.outdir, args.bootstrap)
     else:
         save_oph(frame, args.outdir, args.bootstrap)

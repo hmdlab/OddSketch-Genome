@@ -1,0 +1,38 @@
+{
+  "paths": {
+    "outdir": "outputs/smoke"
+  },
+  "make_genomes": {
+    "genome_length": 20000,
+    "num_pairs": 20,
+    "mutation_min": 1,
+    "mutation_max": 50
+  },
+  "paired": {
+    "replicates": 2,
+    "kmerlen": 64,
+    "sketch_sizes": [1024, 2048],
+    "summary_figure": "RMSE_by_true_jaccard.png",
+    "j0": 0.9,
+    "pos_mode": "mix",
+    "canonical": true,
+    "threads": 2,
+    "genome_seed_base": 102000,
+    "genome_seed_stride": 100000,
+    "odd_hash_seed_base": 700001,
+    "odd_hash_seed_stride": 1,
+    "bindash_randseed_base": 41,
+    "bindash_randseed_stride": 1,
+    "bootstrap": 100,
+    "bootstrap_seed": 3101,
+    "high_jaccard_threshold": 0.75,
+    "jaccard_bins": [0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00],
+    "bindash": {
+      "bindash_bin": "experiments/tools/bin/bindash",
+      "bbits": 16,
+      "chunk_size": 10,
+      "minhashtype": 2,
+      "dens": 2
+    }
+  }
+}

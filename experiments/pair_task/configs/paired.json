@@ -8,7 +8,7 @@
     "mutation_min": 10,
     "mutation_max": 5000
   },
-  "paired_sketchsize_repeats": {
+  "paired": {
     "replicates": 20,
     "kmerlen": 64,
     "sketch_sizes": [

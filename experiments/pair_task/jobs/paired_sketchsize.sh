@@ -11,9 +11,9 @@ set -euo pipefail
 export ODDSKETCH_FIGURE_LABEL=${ODDSKETCH_FIGURE_LABEL:-OddSketch-Genome}
 
 SUBMIT_DIR=${SGE_O_WORKDIR:-$(pwd)}
-if [[ -f "${SUBMIT_DIR}/experiments/pair_task/configs/sketchsize_repeats/config.json" ]]; then
+if [[ -f "${SUBMIT_DIR}/experiments/pair_task/configs/paired.json" ]]; then
   REPO_ROOT=${SUBMIT_DIR}
-elif [[ -f "${SUBMIT_DIR}/configs/sketchsize_repeats/config.json" ]]; then
+elif [[ -f "${SUBMIT_DIR}/configs/paired.json" ]]; then
   REPO_ROOT=$(cd "${SUBMIT_DIR}/../.." && pwd)
 else
   echo "Submit from the repository root or experiments/pair_task." >&2
@@ -73,8 +73,9 @@ echo "[job] oddsketch=${ODDSKETCH_BIN}"
 echo "[job] true_jaccard=${TRUE_JACCARD_BIN}"
 echo "[job] bindash=$("${BINDASH_BIN}" --version 2>&1 | head -n 1)"
 "${UV_BIN}" "${UV_RUN_ARGS[@]}" python \
-  "${TASK_DIR}/scripts/run_paired_sketchsize_repeats.py" \
-  --config "${TASK_DIR}/configs/sketchsize_repeats/config.json" \
+  "${TASK_DIR}/scripts/run_paired.py" \
+  --config "${TASK_DIR}/configs/paired.json" \
+  --experiment paired \
   "$@"
 
 echo "[job] end=$(date)"

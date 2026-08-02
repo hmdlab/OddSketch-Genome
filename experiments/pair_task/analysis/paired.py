@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Aggregate paired OddSketch/BinDash sketch-size repeats."""
+"""Analyze paired OddSketch/BinDash sketch-size experiments."""
 
 from __future__ import annotations
 
@@ -113,27 +113,33 @@ def paired_metrics(
         )
         .reindex(replicate_ids, fill_value=0)
     )
+    # A restricted scope (for example, one true-Jaccard bin) may contain no
+    # observations from some replicates. Bootstrap only the replicates that
+    # actually contribute to that scope; otherwise an all-empty resample is
+    # possible even though the scope itself is non-empty.
+    per_replicate = per_replicate.loc[per_replicate["n"] > 0]
+    if per_replicate.empty:
+        raise SystemExit("cannot compute RMSE for an empty group")
+
     n = per_replicate["n"].to_numpy(dtype=np.int64)
     odd_sse = per_replicate["odd_sse"].to_numpy(dtype=float)
     bindash_sse = per_replicate["bindash_sse"].to_numpy(dtype=float)
     n_total = int(n.sum())
-    if n_total == 0:
-        raise SystemExit("cannot compute RMSE for an empty group")
-
     odd_rmse = math.sqrt(float(odd_sse.sum()) / n_total)
     bindash_rmse = math.sqrt(float(bindash_sse.sum()) / n_total)
 
     rng = np.random.default_rng(seed)
-    indices = rng.integers(0, len(replicate_ids), size=(bootstrap, len(replicate_ids)))
+    replicate_count = len(per_replicate)
+    indices = rng.integers(
+        0, replicate_count, size=(bootstrap, replicate_count)
+    )
     sampled_n = n[indices].sum(axis=1)
-    if np.any(sampled_n == 0):
-        raise SystemExit("a replicate-bootstrap sample contained no observations")
     sampled_odd = np.sqrt(odd_sse[indices].sum(axis=1) / sampled_n)
     sampled_bindash = np.sqrt(bindash_sse[indices].sum(axis=1) / sampled_n)
     sampled_difference = sampled_odd - sampled_bindash
 
     return {
-        "replicates": len(replicate_ids),
+        "replicates": replicate_count,
         "n_total": n_total,
         "odd_rmse": odd_rmse,
         "odd_rmse_ci_low": float(np.quantile(sampled_odd, 0.025)),
@@ -354,205 +360,10 @@ def plot_binned(
     plt.close(fig)
 
 
-def validate_recommended_observations(frame: pd.DataFrame, metadata: dict) -> None:
-    required = {
-        "replicate",
-        "pair_id",
-        "bindash_sketchsize64",
-        "bindash_bbits",
-        "bindash_payload_bits",
-        "odd_sketch_size",
-        "jaccard_true",
-        "jaccard_oddsketch",
-        "jaccard_bindash",
-        "clipped",
-    }
-    missing = sorted(required - set(frame.columns))
-    if missing:
-        raise SystemExit(
-            f"recommended observations are missing columns: {', '.join(missing)}"
-        )
-    for column in sorted(required):
-        frame[column] = pd.to_numeric(frame[column], errors="raise")
-    if not np.isfinite(frame[sorted(required)].to_numpy(dtype=float)).all():
-        raise SystemExit("recommended observations contain non-finite values")
-
-    replicates = int(metadata["replicates"])
-    pairs = int(metadata["pairs_per_replicate"])
-    settings = [int(value) for value in metadata["sketchsize64"]]
-    expected = replicates * pairs * len(settings)
-    if len(frame) != expected:
-        raise SystemExit(f"expected {expected} recommended observations, found {len(frame)}")
-    if frame.duplicated(["replicate", "bindash_sketchsize64", "pair_id"]).any():
-        raise SystemExit("recommended observations contain duplicate keys")
-    expected_ids = set(range(1, pairs + 1))
-    for (replicate, sketchsize64), group in frame.groupby(
-        ["replicate", "bindash_sketchsize64"], sort=True
-    ):
-        if len(group) != pairs or set(group["pair_id"].astype(int)) != expected_ids:
-            raise SystemExit(
-                f"replicate={replicate}, sketchsize64={sketchsize64}: pair IDs differ"
-            )
-        expected_payload = int(sketchsize64) * 64 * int(metadata["bbits"])
-        if not (group["bindash_payload_bits"].astype(int) == expected_payload).all():
-            raise SystemExit(
-                f"sketchsize64={sketchsize64}: payload bits do not match bbits"
-            )
-        if not (group["odd_sketch_size"].astype(int) == expected_payload).all():
-            raise SystemExit(
-                f"sketchsize64={sketchsize64}: OddSketch bits do not match BinDash"
-            )
-    for column in ("jaccard_true", "jaccard_oddsketch", "jaccard_bindash"):
-        if not frame[column].between(0.0, 1.0, inclusive="both").all():
-            raise SystemExit(f"{column} values must be in [0, 1]")
-    if not frame["clipped"].isin([0, 1]).all():
-        raise SystemExit("clipped must contain only 0 or 1")
-
-
-def analyze_recommended(
-    input_path: Path,
-    metadata_path: Path,
-    outdir: Path,
-) -> None:
-    metadata = json.loads(metadata_path.read_text())
-    frame = pd.read_csv(input_path, sep="\t", compression="gzip")
-    validate_recommended_observations(frame, metadata)
-    replicate_ids = list(range(1, int(metadata["replicates"]) + 1))
-    bootstrap = int(metadata["bootstrap"])
-    base_seed = int(metadata["bootstrap_seed"])
-    threshold = float(metadata["high_jaccard_threshold"])
-
-    main_rows = []
-    for index, sketchsize64 in enumerate(metadata["sketchsize64"]):
-        selected = frame[frame["bindash_sketchsize64"] == int(sketchsize64)]
-        row: dict[str, float | int] = {
-            "bindash_sketchsize64": int(sketchsize64),
-            "bindash_bbits": int(metadata["bbits"]),
-            "bindash_payload_bits": int(sketchsize64) * 64 * int(metadata["bbits"]),
-        }
-        for suffix, scoped, seed_offset in (
-            ("all", selected, 0),
-            (
-                f"j_ge_{str(threshold).replace('.', '_')}",
-                selected[selected["jaccard_true"] >= threshold],
-                1,
-            ),
-        ):
-            metrics = paired_metrics(
-                scoped,
-                replicate_ids=replicate_ids,
-                bootstrap=bootstrap,
-                seed=base_seed + index * 2 + seed_offset,
-            )
-            for key, value in metrics.items():
-                row[f"{key}_{suffix}"] = value
-        main_rows.append(row)
-    main_metrics = pd.DataFrame(main_rows)
-
-    edges = effective_bin_edges(metadata["jaccard_bins"], frame)
-    values = frame["jaccard_true"].to_numpy(dtype=float)
-    bin_ids = np.searchsorted(edges, values, side="right") - 1
-    bin_ids[values == edges[-1]] = len(edges) - 2
-    if np.any((bin_ids < 0) | (bin_ids >= len(edges) - 1)):
-        raise SystemExit("recommended observations could not be assigned to Jaccard bins")
-    work = frame.copy()
-    work["bin_id"] = bin_ids
-    bin_rows = []
-    seed_offset = 0
-    for sketchsize64 in metadata["sketchsize64"]:
-        selected_setting = work[
-            work["bindash_sketchsize64"] == int(sketchsize64)
-        ]
-        for bin_id in sorted(selected_setting["bin_id"].unique()):
-            selected = selected_setting[selected_setting["bin_id"] == bin_id]
-            metrics = paired_metrics(
-                selected,
-                replicate_ids=replicate_ids,
-                bootstrap=bootstrap,
-                seed=base_seed + 10000 + seed_offset,
-            )
-            seed_offset += 1
-            bin_rows.append(
-                {
-                    "bindash_sketchsize64": int(sketchsize64),
-                    "bindash_bbits": int(metadata["bbits"]),
-                    "bindash_payload_bits": (
-                        int(sketchsize64) * 64 * int(metadata["bbits"])
-                    ),
-                    "bin_id": int(bin_id),
-                    "bin_lo": float(edges[bin_id]),
-                    "bin_hi": float(edges[bin_id + 1]),
-                    "bin_center": float((edges[bin_id] + edges[bin_id + 1]) / 2),
-                    **metrics,
-                }
-            )
-    bin_metrics = pd.DataFrame(bin_rows)
-    expected_per_setting = int(metadata["replicates"]) * int(
-        metadata["pairs_per_replicate"]
-    )
-    if not (
-        bin_metrics.groupby("bindash_sketchsize64")["n_total"].sum()
-        == expected_per_setting
-    ).all():
-        raise SystemExit("recommended Jaccard bins do not cover all observations")
-
-    outdir.mkdir(parents=True, exist_ok=True)
-    main_metrics.to_csv(outdir / "main_metrics.tsv", sep="\t", index=False)
-    bin_metrics.to_csv(outdir / "bin_metrics.tsv", sep="\t", index=False)
-
-    settings = [int(value) for value in metadata["sketchsize64"]]
-    fig, axes = plt.subplots(
-        1,
-        len(settings),
-        figsize=(6.0 * len(settings), 5.0),
-        sharex=True,
-        sharey=True,
-        squeeze=False,
-    )
-    methods = (
-        ("OddSketch-Genome", "odd_rmse", "#3274b9"),
-        ("BinDash", "bindash_rmse", "#e05d2b"),
-    )
-    for axis, sketchsize64 in zip(axes.flat, settings):
-        selected = bin_metrics[
-            bin_metrics["bindash_sketchsize64"] == int(sketchsize64)
-        ].sort_values("bin_center")
-        payload_bits = int(sketchsize64) * 64 * int(metadata["bbits"])
-        for label, column, color in methods:
-            axis.plot(
-                selected["bin_center"],
-                selected[column],
-                marker="o",
-                linewidth=2.0,
-                color=color,
-                label=label,
-            )
-        axis.set_xlabel("True Jaccard")
-        axis.set_title(f"sketchsize64={sketchsize64} ({payload_bits:,} bits)")
-        axis.grid(alpha=0.25)
-    axes[0, 0].set_ylabel("RMSE")
-    handles, labels = axes[0, 0].get_legend_handles_labels()
-    fig.legend(
-        handles,
-        labels,
-        loc="lower center",
-        bbox_to_anchor=(0.5, 0.005),
-        ncol=2,
-        frameon=False,
-    )
-    fig.suptitle("Memory-matched comparison at BinDash-recommended sketch sizes")
-    fig.tight_layout(rect=(0, 0.10, 1, 0.94))
-    fig.savefig(outdir / "RMSE_by_true_jaccard.png", dpi=300)
-    plt.close(fig)
-    print(f"saved recommended paired summary: {outdir}")
-
-
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", default=None)
-    parser.add_argument("--metadata", default=None)
-    parser.add_argument("--recommended-input", default=None)
-    parser.add_argument("--recommended-metadata", default=None)
+    parser.add_argument("--input", required=True)
+    parser.add_argument("--metadata", required=True)
     parser.add_argument("--outdir", required=True)
     parser.add_argument(
         "--figure-name",
@@ -567,19 +378,6 @@ def main() -> None:
     args = parser.parse_args()
 
     outdir = Path(args.outdir).resolve()
-    if args.recommended_input or args.recommended_metadata:
-        if not args.recommended_input or not args.recommended_metadata:
-            raise SystemExit(
-                "--recommended-input and --recommended-metadata must be supplied together"
-            )
-        analyze_recommended(
-            Path(args.recommended_input).resolve(),
-            Path(args.recommended_metadata).resolve(),
-            outdir,
-        )
-        return
-    if not args.input or not args.metadata:
-        raise SystemExit("--input and --metadata are required for the paired analysis")
     input_path = Path(args.input).resolve()
     metadata = json.loads(Path(args.metadata).read_text())
     outdir.mkdir(parents=True, exist_ok=True)

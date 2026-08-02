@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 
 from common import allocate_run_dir, resolve_repo_root, resolve_task_root
-from run_bindash_validation_repeats import (
+from bindash_common import (
     command_output,
     resolve_bindash,
     run_chunk,
@@ -326,7 +326,12 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config",
-        default="experiments/pair_task/configs/sketchsize_repeats/config.json",
+        default="experiments/pair_task/configs/paired.json",
+    )
+    parser.add_argument(
+        "--experiment",
+        default="paired",
+        help="Top-level config section containing the paired experiment",
     )
     parser.add_argument(
         "--output-dir",
@@ -347,7 +352,9 @@ def main() -> None:
     task_root = resolve_task_root()
     config_path = resolve_path(args.config, repo_root)
     config = json.loads(config_path.read_text())
-    experiment = config["paired_sketchsize_repeats"]
+    if args.experiment not in config:
+        raise SystemExit(f"experiment section not found in config: {args.experiment}")
+    experiment = config[args.experiment]
     make = config["make_genomes"]
     bindash_config = experiment["bindash"]
 
@@ -491,8 +498,7 @@ def main() -> None:
     analyzer = (
         task_root
         / "analysis"
-        / "aggregate"
-        / "analyze_paired_sketchsize_repeats.py"
+        / "paired.py"
     )
 
     now = datetime.now().astimezone().isoformat()
@@ -511,13 +517,15 @@ def main() -> None:
         "bindash_version": command_output([str(bindash), "--version"]),
         "bindash_sha256": sha256_file(bindash),
         "rmse_definition": "sqrt(sum_r SSE_r / sum_r N_r)",
-        "ci_definition": "paired bootstrap over replicate IDs",
+        "ci_definition": (
+            "paired bootstrap over replicate IDs with observations in each analysis scope"
+        ),
     }
     metadata_path.write_text(json.dumps(metadata, indent=2) + "\n")
 
-    print(f"[paired-sketchsize] run_dir={run_dir}", flush=True)
+    print(f"[paired] run_dir={run_dir}", flush=True)
     print(
-        f"[paired-sketchsize] replicates={replicates} pairs={pairs_per_replicate} "
+        f"[paired] replicates={replicates} pairs={pairs_per_replicate} "
         f"sketch_sizes={','.join(str(value) for value in sketch_sizes)}",
         flush=True,
     )
@@ -567,7 +575,7 @@ def main() -> None:
 
         temp_parent = Path(os.environ["TMPDIR"]) if os.environ.get("TMPDIR") else None
         with tempfile.TemporaryDirectory(
-            prefix=f"paired-sketchsize-r{replicate:03d}-",
+            prefix=f"paired-r{replicate:03d}-",
             dir=str(temp_parent) if temp_parent else None,
         ) as raw_work:
             work = Path(raw_work)
@@ -788,7 +796,7 @@ def main() -> None:
     metadata["completed_at"] = datetime.now().astimezone().isoformat()
     metadata_path.write_text(json.dumps(metadata, indent=2) + "\n")
     shutil.rmtree(work_root)
-    print(f"[paired-sketchsize] complete: {run_dir}", flush=True)
+    print(f"[paired] complete: {run_dir}", flush=True)
 
 
 if __name__ == "__main__":

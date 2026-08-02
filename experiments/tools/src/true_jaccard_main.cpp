@@ -139,9 +139,10 @@ int main(int argc, char** argv) {
     // try default config locations relative to working dir
     const vector<string> cands = {
       "config.json",
-      string("experiments")+"/pair_task/config.json",
-      string("..")+"/pair_task/config.json",
-      string("..")+"/config.json"
+      "configs/smoke.json",
+      string("experiments")+"/pair_task/configs/smoke.json",
+      string("..")+"/pair_task/configs/smoke.json",
+      string("..")+"/configs/smoke.json"
     };
     for (auto &c : cands) { apply_config(c); }
   }

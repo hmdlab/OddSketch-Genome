@@ -48,7 +48,11 @@ def generate_diverse_genome_pair(
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--config", default="config.json", help="Path to task config JSON")
+    ap.add_argument(
+        "--config",
+        default="configs/smoke.json",
+        help="Path to task config JSON",
+    )
     ap.add_argument("--genome-length", type=int, default=None, help="Length of each generated sequence in base pairs")
     ap.add_argument("--num-pairs", type=int, default=None, help="Number of genome pairs to generate")
     ap.add_argument("--mutation-min", type=int, default=None, help="Minimum number of mutations per pair")

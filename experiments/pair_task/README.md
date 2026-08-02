@@ -1,205 +1,118 @@
 # Pair Task
 
-This task generates synthetic genome pairs and compares exact Jaccard, OddSketch, and BinDash.
+This task generates synthetic genome pairs and compares exact Jaccard,
+OddSketch-Genome, BinDash, and the supplemental OPH baseline.
 
-This is the lighter benchmark workflow in this repository. The default
-`config.json` generates 10 pairs of 1 Mbp synthetic genomes. The paper's
-paired sketch-size experiment is substantially heavier: it evaluates eight
-sketch sizes over 20 independent replicates of 1,000 genome pairs each.
-
-BinDash is an external dependency and is not vendored in this repository. The default helper script installs it from:
+BinDash is an external dependency and is not vendored in this repository. The
+bootstrap helper installs tag `v2.6` from:
 
 ```text
 https://github.com/zhaoxiaofei/bindash.git
 ```
 
-with `BINDASH_TAG=v2.6`.
+The paper baseline used commit `ce2d16816beade65db992b8cd6eced00b54ca9ef`;
+the executable reports `version 2.2.0 commit ce2d168-clean`.
 
-BinDash is required only for `cal_jaccard_bindash.py` or task runs with `bindash.enabled=true`. Set `bindash.enabled=false` for OddSketch-only runs.
+## Local Smoke Test
 
-For the benchmark baseline reported here, tag `v2.6` corresponds to commit `ce2d16816beade65db992b8cd6eced00b54ca9ef`, and the executable reports `version 2.2.0 commit ce2d168-clean`.
+Run the small paired comparison from this directory:
 
-## Reproducing Paper Figures
-The default Grid Engine workflow is the paired sketch-size experiment used for
-the main accuracy comparison. It evaluates OddSketch-Genome and BinDash on the
-same 20 independent replicates, with 1,000 genome pairs per replicate, at all
-eight sketch sizes. From this directory, submit:
+```bash
+uv run python scripts/run_smoke.py
+```
+
+The defaults in `configs/smoke.json` use two replicates of 20 genome pairs.
+Runner options can be appended to override the config, for example:
+
+```bash
+uv run python scripts/run_smoke.py \
+  --replicates 1 --num-pairs 4 --genome-length 20000 \
+  --mutation-min 1 --mutation-max 2 --bootstrap 10
+```
+
+## Main Paired Experiment
+
+The main accuracy comparison evaluates OddSketch-Genome and BinDash on the
+same 20 independent replicates, with 1,000 genome pairs per replicate, at eight
+payload sizes.
+
+Submit through Grid Engine:
 
 ```bash
 qsub jobs/paired_sketchsize.sh
 ```
 
-This creates a fresh run under `outputs/sketchsize/run_<timestamp>_<pid>/`.
-Intermediate files are kept under `.work/` while the experiment is running and
-removed after successful aggregation and analysis.
+Run directly without Grid Engine:
 
-The final run contains `paired_observations.tsv.gz`,
-`summary/main_metrics.tsv`, `summary/bin_metrics.tsv`, and
-`summary/RMSE_by_true_jaccard_panels.png`. Confidence intervals are reported in
-the TSV tables and are intentionally not drawn in the figure.
+```bash
+jobs/paired_sketchsize.sh
+```
 
-Run all supplemental experiments in a shared validation run with:
+Each invocation creates a fresh run under:
+
+```text
+outputs/sketchsize/run_<timestamp>_<pid>/
+```
+
+The final run contains `used_config.json`, `run_metadata.json`,
+`paired_observations.tsv.gz`, and summary TSV/PNG files. Intermediate files are
+stored under `.work/` and removed after successful analysis.
+
+## Supplemental Experiments
+
+Run the BinDash README-recommended setting, k-mer sensitivity, and the
+memory-matched OPH baseline together:
 
 ```bash
 qsub jobs/supplementary.sh
 ```
 
-With no experiment argument, the script runs all three supplemental experiments.
-This creates
-`outputs/validation/run_<timestamp>_<job-id>/bindash_recommended/`,
-`k_sensitivity/`, and `oph/`. The BinDash experiment evaluates
-`sketchsize64=256` with `b=16` and runs OddSketch at the matching payload size
-(262,144 bits).
-
-Each supplemental experiment can also be submitted independently:
+Direct execution is also supported:
 
 ```bash
-qsub jobs/supplementary.sh bindash_recommended
-qsub jobs/supplementary.sh k_sensitivity
-qsub jobs/supplementary.sh oph
+jobs/supplementary.sh
 ```
 
-The supplemental workflows always create a new run. They do not modify or
-resume an existing run.
-
-For a small direct smoke test without Grid Engine:
+Run one supplemental experiment by naming it:
 
 ```bash
-uv run python scripts/run_paired_sketchsize_repeats.py \
-  --replicates 2 --num-pairs 20 --genome-length 20000 \
-  --mutation-min 1 --mutation-max 50 \
-  --sketch-sizes 1024,2048 --bootstrap 100 --chunk-size 10
+jobs/supplementary.sh bindash_recommended
+jobs/supplementary.sh k_sensitivity
+jobs/supplementary.sh oph
 ```
 
-## Quick Start
-Run the default 10-pair configuration as a local smoke test:
+Each submission creates:
 
-```bash
-cd experiments/pair_task
-uv run python scripts/batch_project_runner.py --config config.json
+```text
+outputs/validation/run_<timestamp>_<job-id>/
+├── bindash_recommended/
+├── k_sensitivity/
+└── oph/
 ```
 
-For a faster smoke test, reduce `make_genomes.genome_length` and
-`make_genomes.num_pairs` in `config.json`.
+An individual invocation contains only the selected experiment directory.
+Runs are never resumed or modified after creation.
 
-`batch_project_runner.py` creates a unique run directory under the configured output root for each config, saves the resolved config to `<run>/metadata/used_config.json`, and generates figures for that run.
-When you use the default config, it also updates `outputs/default/latest_used_config.json` so you can easily inspect the latest resolved config.
+The BinDash recommended experiment uses `sketchsize64=256`, `b=16`, and an
+OddSketch payload of 262,144 bits. The OPH experiment stores `n/64` full
+64-bit densified minima for an `n`-bit OddSketch payload.
 
-OddSketch in this task now runs in batch mode:
-- `sketch`: one `oddsketch sketch` invocation over all unique genomes in `pair_info.txt`
-- `dist`: one `oddsketch dist --pairlist=...` invocation over the generated sketch pairs
+## Configuration
 
-## Config
-`config.json` controls both the synthetic data generation and the estimation settings.
+The public workflows use three flat config files:
 
-- `paths.outdir`
-  - Root directory for all generated files.
-  - Default: `outputs/default`
-- `make_genomes.genome_length`
-  - Length of each synthetic genome in base pairs.
-- `make_genomes.num_pairs`
-  - Number of genome pairs to generate.
-- `make_genomes.mutation_min`, `make_genomes.mutation_max`
-  - Minimum and maximum mutation counts applied to each pair.
-  - Each pair is sampled within this range.
-- `make_genomes.seed_base`
-  - Base random seed for reproducible genome generation.
-- `true_jaccard.kmerlen`
-  - `k` used for exact Jaccard calculation.
-- `oddsketch.kmerlen`
-  - `k` used by OddSketch.
-- `oddsketch.threads`
-  - Number of threads used by OddSketch for both `sketch` and `dist`.
-- `oddsketch.sketch_size`
-  - Sketch size for OddSketch estimation.
-- `oddsketch.j0`
-  - OddSketch similarity threshold parameter.
-- `oddsketch.pos_mode`
-  - Positional sampling mode passed to OddSketch.
-- `oddsketch.canonical`
-  - Whether canonical k-mers are used.
-  - The pair-task OddSketch script sketches each unique genome once and then evaluates only the requested pairs via `dist --pairlist`.
-- `bindash.bindash_bin`
-  - BinDash executable name or path.
-- `bindash.enabled`
-  - Whether BinDash steps are executed in this task.
-  - Set `false` to run OddSketch-only experiments.
-- `bindash.threads`
-  - Number of threads used by BinDash.
-- `bindash.mode`
-  - BinDash execution mode. The current default is `sketch_dist`.
-- `bindash.kmerlen`, `bindash.sketch_size`, `bindash.bbits`
-  - Main BinDash sketch parameters.
-  - `sketch_size` is interpreted as the target total sketch size in bits.
-  - Internally the script converts this to BinDash's `--sketchsize64` by dividing by `64 * bbits`, so the effective memory is rounded up to the nearest `64 * bbits` bits.
-- `bindash.pair_cmd`
-  - Command template used when evaluating one genome pair with BinDash.
+- `configs/smoke.json`: small local check
+- `configs/paired.json`: main paired sketch-size experiment
+- `configs/supplementary.json`: BinDash recommended, k-mer sensitivity, and OPH
 
-Common edits:
-
-- Change output location:
-  - set `paths.outdir`
-- Make a smaller smoke test:
-  - reduce `make_genomes.genome_length` and `make_genomes.num_pairs`
-- Compare different sketch settings:
-  - change `oddsketch.sketch_size`, `oddsketch.j0`, or `bindash.sketch_size`
-
-## Outputs
-Default root: `outputs/default/<run>/`
-
-- `genomes/`
-- `pair_info.txt`, `genome_paths.txt`
-- `results/jaccard_true_results.txt`
-- `results/jaccard_oddsketch_results.txt`
-- `results/jaccard_bindash_results.txt`
-- `results/comparison_results_oddsketch.csv`
-- `results/comparison_results_bindash.csv`
-- `figures/`
-
-## Manual Execution
-Run the other bundled configuration groups with:
-
-```bash
-uv run python scripts/batch_project_runner.py --config-dir configs/default
-uv run python scripts/batch_project_runner.py --config-dir configs/bbits
-```
-
-Recompute RMSE summaries from the result CSV files of a completed run:
-
-```bash
-uv run python analysis/per_run/compute_rmse.py \
-  --csv outputs/default/<run>/results/comparison_results_oddsketch.csv \
-  --csv outputs/default/<run>/results/comparison_results_bindash.csv
-```
-
-Inspect sketch storage for one completed sketch-size run:
-
-```bash
-uv run python analysis/per_run/report_sketch_memory.py \
-  --run-dir outputs/sketchsize/<run>
-```
-
-Run the previous config-batch workflow directly:
-
-```bash
-uv run python scripts/batch_project_runner.py \
-  --config-dir configs/sketchsize
-```
-
-Review the queue, resource, environment, and path settings in the job script
-before using it on another cluster.
-
-## Seeded Validation and Supplement Workflows
-
-Additional qsub workflows for independent-seed confidence intervals and clipping rates, k-mer sensitivity (`k=21,31,64`), and the internal OPH + densification baseline are documented in:
-
-- [`analysis/validation/README.md`](analysis/validation/README.md)
+Command-line runner options override the corresponding config values without
+editing the JSON files.
 
 ## Layout
-- `config.json`: task settings
-- `configs/`: configuration groups for the bundled experiments
-- `scripts/`: genome generation, Jaccard calculation, and task runner
-- `jobs/`: Grid Engine entry points for the main and supplemental experiments
-- `analysis/per_run/`: per-run plotting, RMSE, and sketch-memory utilities
-- `analysis/aggregate/`: summary plots across multiple runs
-- `outputs/`: generated data, result tables, and figures
+
+- `configs/`: experiment definitions
+- `jobs/`: Grid Engine and direct shell entry points
+- `scripts/`: experiment runners and shared command helpers
+- `analysis/paired.py`: paired OddSketch/BinDash summaries
+- `analysis/validation.py`: k-mer sensitivity and OPH summaries
+- `outputs/`: ignored generated datasets, tables, and figures

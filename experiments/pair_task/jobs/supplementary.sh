@@ -9,13 +9,13 @@
 set -euo pipefail
 
 usage() {
-  echo "usage: supplementary.sh [all|bindash_recommended|k_sensitivity|oph] [runner options...]" >&2
+  echo "usage: supplementary.sh [bindash_recommended|k_sensitivity|oph] [runner options...]" >&2
 }
 
 EXPERIMENT=all
 if [[ $# -gt 0 ]]; then
   case "$1" in
-    all|bindash_recommended|k_sensitivity|oph)
+    bindash_recommended|k_sensitivity|oph)
       EXPERIMENT=$1
       shift
       ;;
@@ -29,9 +29,9 @@ if [[ $# -gt 0 ]]; then
 fi
 
 SUBMIT_DIR=${SGE_O_WORKDIR:-$(pwd)}
-if [[ -f "${SUBMIT_DIR}/experiments/pair_task/configs/validation/config.json" ]]; then
+if [[ -f "${SUBMIT_DIR}/experiments/pair_task/configs/supplementary.json" ]]; then
   REPO_ROOT=${SUBMIT_DIR}
-elif [[ -f "${SUBMIT_DIR}/configs/validation/config.json" ]]; then
+elif [[ -f "${SUBMIT_DIR}/configs/supplementary.json" ]]; then
   REPO_ROOT=$(cd "${SUBMIT_DIR}/../.." && pwd)
 else
   echo "Submit from the repository root or experiments/pair_task." >&2
@@ -99,8 +99,9 @@ echo "[job] run_dir=${RUN_DIR}"
 
 run_bindash_recommended() {
   "${UV_BIN}" "${UV_RUN_ARGS[@]}" python \
-    "${TASK_DIR}/scripts/run_paired_sketchsize_repeats.py" \
-    --config "${TASK_DIR}/configs/bindash_recommended/config.json" \
+    "${TASK_DIR}/scripts/run_paired.py" \
+    --config "${TASK_DIR}/configs/supplementary.json" \
+    --experiment bindash_recommended \
     --output-dir "${RUN_DIR}/bindash_recommended" \
     "$@"
 }
@@ -110,9 +111,9 @@ run_validation() {
   local output_name=$2
   shift 2
   "${UV_BIN}" "${UV_RUN_ARGS[@]}" python \
-    "${TASK_DIR}/scripts/run_validation_experiment.py" \
+    "${TASK_DIR}/scripts/run_validation.py" \
     --experiment "${experiment_name}" \
-    --config "${TASK_DIR}/configs/validation/config.json" \
+    --config "${TASK_DIR}/configs/supplementary.json" \
     --output-dir "${RUN_DIR}/${output_name}" \
     "$@"
 }
