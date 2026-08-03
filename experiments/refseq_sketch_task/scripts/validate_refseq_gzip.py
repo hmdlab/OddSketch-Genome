@@ -18,7 +18,19 @@ def task_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
-def resolve_path(raw: str) -> Path:
+def resolve_config(path_arg: str) -> Path:
+    candidates = [
+        Path(path_arg).expanduser(),
+        task_root() / path_arg,
+        task_root() / "config.json",
+    ]
+    for path in candidates:
+        if path.exists():
+            return path.resolve()
+    raise SystemExit(f"config not found: {path_arg}")
+
+
+def resolve_path(raw: str | Path) -> Path:
     path = Path(raw).expanduser()
     return path if path.is_absolute() else (task_root() / path).resolve()
 
@@ -137,21 +149,43 @@ def write_tsv(path: Path, rows: list[dict[str, str]], fieldnames: list[str]) -> 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--gzip-list", default="data/assembly/manifests/gzip_paths.txt")
-    ap.add_argument("--download-manifest", default="data/assembly/manifests/assembly_download_manifest.tsv")
-    ap.add_argument("--outdir", default="data/assembly/manifests")
-    ap.add_argument("--threads", type=int, default=4)
-    ap.add_argument("--retries", type=int, default=3)
-    ap.add_argument("--timeout-sec", type=int, default=120)
+    ap.add_argument("--config", default="config.json")
+    ap.add_argument("--gzip-list", default=None)
+    ap.add_argument("--download-manifest", default=None)
+    ap.add_argument("--outdir", default=None)
+    ap.add_argument("--threads", type=int, default=None)
+    ap.add_argument("--retries", type=int, default=None)
+    ap.add_argument("--timeout-sec", type=int, default=None)
     ap.add_argument("--repair", action="store_true")
     args = ap.parse_args()
 
-    gzip_list = resolve_path(args.gzip_list)
-    download_manifest = resolve_path(args.download_manifest)
-    outdir = resolve_path(args.outdir)
+    config_path = resolve_config(args.config)
+    config = json.loads(config_path.read_text())
+    download_config = config.get("download", {})
+    download_outdir = resolve_path(download_config.get("outdir") or "data/assembly")
+    manifests_dir = download_outdir / "manifests"
+
+    gzip_list = (
+        resolve_path(args.gzip_list)
+        if args.gzip_list
+        else manifests_dir / "gzip_paths.txt"
+    )
+    download_manifest = (
+        resolve_path(args.download_manifest)
+        if args.download_manifest
+        else manifests_dir / "assembly_download_manifest.tsv"
+    )
+    outdir = resolve_path(args.outdir) if args.outdir else manifests_dir
+    if not gzip_list.is_file():
+        raise SystemExit(f"gzip list not found: {gzip_list}")
+    if not download_manifest.is_file():
+        raise SystemExit(f"download manifest not found: {download_manifest}")
+
     paths = read_gzip_paths(gzip_list)
     manifest_rows = read_download_manifest(download_manifest)
-    threads = max(1, args.threads)
+    threads = max(1, int(args.threads or download_config.get("threads", 4)))
+    retries = max(1, int(args.retries or download_config.get("retries", 3)))
+    timeout = max(1, int(args.timeout_sec or download_config.get("timeout_sec", 120)))
     fieldnames = [
         "assembly_accession",
         "gzip_path",
@@ -177,7 +211,16 @@ def main() -> None:
                 path = next(pending_paths)
             except StopIteration:
                 break
-            pending.add(executor.submit(validate_one, path, manifest_rows, args.repair, args.retries, args.timeout_sec))
+            pending.add(
+                executor.submit(
+                    validate_one,
+                    path,
+                    manifest_rows,
+                    args.repair,
+                    retries,
+                    timeout,
+                )
+            )
 
         done_count = 0
         while pending:
@@ -193,7 +236,16 @@ def main() -> None:
                     path = next(pending_paths)
                 except StopIteration:
                     continue
-                pending.add(executor.submit(validate_one, path, manifest_rows, args.repair, args.retries, args.timeout_sec))
+                pending.add(
+                    executor.submit(
+                        validate_one,
+                        path,
+                        manifest_rows,
+                        args.repair,
+                        retries,
+                        timeout,
+                    )
+                )
 
     rows.sort(key=lambda row: row["gzip_path"])
     report_path = outdir / "gzip_integrity_manifest.tsv"
@@ -207,6 +259,8 @@ def main() -> None:
     metadata = {
         "started_at_utc": started_at,
         "finished_at_utc": utc_now(),
+        "config": str(config_path),
+        "download_outdir": str(download_outdir),
         "gzip_list": str(gzip_list),
         "download_manifest": str(download_manifest),
         "checked": len(rows),
@@ -216,6 +270,8 @@ def main() -> None:
         "remaining_invalid": sum(row["status"] not in ("ok", "repaired") for row in rows),
         "repair": args.repair,
         "threads": threads,
+        "retries": retries,
+        "timeout_sec": timeout,
         "report": str(report_path),
         "invalid_report": str(invalid_path),
     }

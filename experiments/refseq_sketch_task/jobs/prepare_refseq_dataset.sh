@@ -71,6 +71,7 @@ echo "[job] downloading RefSeq assemblies"
 
 echo "[job] validating downloaded gzip files"
 "${UV_BIN}" "${UV_RUN_ARGS[@]}" python "${TASK_DIR}/scripts/validate_refseq_gzip.py" \
+  --config "${CONFIG_PATH}" \
   --threads "${CHECK_THREADS}" \
   --repair
 

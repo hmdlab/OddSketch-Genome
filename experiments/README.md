@@ -64,7 +64,9 @@ acquisition, and runner options.
 ## Notes
 
 - To use a specific OddSketch binary, set `ODDSKETCH_BIN`.
-- BinDash is external and is not vendored in this repository. The default helper script builds it from `https://github.com/zhaoxiaofei/bindash.git` at tag `v2.6`.
+- BinDash is external and is not vendored in this repository. The bootstrap
+  helper builds and verifies paper commit
+  `ce2d16816beade65db992b8cd6eced00b54ca9ef` from tag `v2.6`.
 - Pair-task configs define their output roots via `paths.outdir`. Each run
   creates a fresh timestamped directory and records the resolved settings
   alongside the observations and summaries.

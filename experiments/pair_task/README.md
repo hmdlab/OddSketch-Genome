@@ -5,14 +5,14 @@ OddSketch-Genome, BinDash, and the supplemental One Permutation Hashing (OPH)
 baseline.
 
 BinDash is an external dependency and is not vendored in this repository. The
-bootstrap helper installs tag `v2.6` from:
+bootstrap helper builds and verifies paper commit
+`ce2d16816beade65db992b8cd6eced00b54ca9ef` from tag `v2.6` at:
 
 ```text
 https://github.com/zhaoxiaofei/bindash.git
 ```
 
-The paper baseline used commit `ce2d16816beade65db992b8cd6eced00b54ca9ef`;
-the executable reports `version 2.2.0 commit ce2d168-clean`.
+The executable reports `version 2.2.0 commit ce2d168-clean`.
 
 ## Main Paired Experiment
 
