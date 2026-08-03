@@ -8,32 +8,27 @@ is required for manifests, logs, and sketch databases, so run the workflow on a
 machine with sufficient storage and runtime. Network access is required during
 the download.
 
-## Requirements
+## Running the Benchmark
 
-Run the setup commands from the repository root:
+Run all commands from the repository root. First, build OddSketch and the
+experiment helper binaries, then install BinDash:
 
 ```bash
 make -C src CXX=g++ LDFLAGS=-lstdc++fs
 scripts/bootstrap.sh
 ```
 
-The first command builds OddSketch and the experiment helper binaries. The
-second installs the BinDash baseline used by the benchmark.
-
-## Running the Benchmark
-
-Run all commands from the repository root:
+Download and validate the dataset, then run both sketch benchmarks:
 
 ```bash
-experiments/refseq_sketch_task/jobs/download_refseq_assemblies.sh
-experiments/refseq_sketch_task/jobs/validate_refseq_gzip.sh
+experiments/refseq_sketch_task/jobs/prepare_refseq_dataset.sh
 experiments/refseq_sketch_task/jobs/refseq_oddsketch_sketch.sh
 experiments/refseq_sketch_task/jobs/refseq_bindash_sketch.sh
 ```
 
-The validation step checks every downloaded gzip file and repairs missing or
-corrupt files. OddSketch and BinDash then build separate sketch databases from
-the same genome list.
+The dataset preparation job downloads the assemblies, checks every gzip file,
+and repairs missing or corrupt files. OddSketch and BinDash then build separate
+sketch databases from the same genome list.
 
 Resume an interrupted OddSketch run by reusing its run ID:
 
@@ -44,21 +39,6 @@ experiments/refseq_sketch_task/jobs/refseq_oddsketch_sketch.sh \
 ```
 
 Use a fresh run without `--resume` when measuring a new end-to-end build.
-
-## Dataset and Provenance
-
-The exact RefSeq bacteria assembly-summary snapshot used for the paper was
-acquired on 2026-05-13 and is bundled with the repository. One unavailable
-accession, `GCF_039679095.1`, is excluded, leaving 496,080 genomes.
-
-Public provenance is stored separately from the downloaded genome data:
-
-- [`provenance/refseq_bacteria_dataset.json`](provenance/refseq_bacteria_dataset.json):
-  source, acquisition dates, counts, integrity results, and SHA256 values
-- [`provenance/assembly_summary_refseq_bacteria_20260513.txt.gz`](provenance/assembly_summary_refseq_bacteria_20260513.txt.gz):
-  exact assembly-summary snapshot used to select the dataset
-- [`provenance/refseq_bacteria_genomes.tsv.gz`](provenance/refseq_bacteria_genomes.tsv.gz):
-  accession, source URL, local filename, and file size for every genome
 
 ## Outputs
 
@@ -94,6 +74,21 @@ manifests, commands, executable paths and hashes, available version information,
 and the Git commit under `metadata/`.
 
 The `data/` directory may be a symlink to a larger filesystem.
+
+## Dataset and Provenance
+
+The exact RefSeq bacteria assembly-summary snapshot used for the paper was
+acquired on 2026-05-13 and is bundled with the repository. One unavailable
+accession, `GCF_039679095.1`, is excluded, leaving 496,080 genomes.
+
+Public provenance is stored separately from the downloaded genome data:
+
+- [`provenance/refseq_bacteria_dataset.json`](provenance/refseq_bacteria_dataset.json):
+  source, acquisition dates, counts, integrity results, and SHA256 values
+- [`provenance/assembly_summary_refseq_bacteria_20260513.txt.gz`](provenance/assembly_summary_refseq_bacteria_20260513.txt.gz):
+  exact assembly-summary snapshot used to select the dataset
+- [`provenance/refseq_bacteria_genomes.tsv.gz`](provenance/refseq_bacteria_genomes.tsv.gz):
+  accession, source URL, local filename, and file size for every genome
 
 ## Configuration
 

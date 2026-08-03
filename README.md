@@ -120,17 +120,22 @@ The `pair_task` workflow is a synthetic benchmark. The RefSeq workflow is a
 large real-data benchmark over hundreds of thousands of genomes and is intended
 for an HPC or server environment with substantial storage.
 
-## Data and Baseline Provenance
+## Benchmark Data and Baseline Provenance
 
-The RefSeq benchmark uses the NCBI RefSeq bacteria assembly summary:
+The RefSeq benchmark dataset is defined by the following bundled provenance
+files:
 
-```text
-https://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt
-```
+- [`refseq_bacteria_dataset.json`](experiments/refseq_sketch_task/provenance/refseq_bacteria_dataset.json):
+  source and acquisition dates, dataset counts, integrity results, and SHA256
+  values
+- [`assembly_summary_refseq_bacteria_20260513.txt.gz`](experiments/refseq_sketch_task/provenance/assembly_summary_refseq_bacteria_20260513.txt.gz):
+  exact RefSeq bacteria assembly-summary snapshot used to select the dataset
+- [`refseq_bacteria_genomes.tsv.gz`](experiments/refseq_sketch_task/provenance/refseq_bacteria_genomes.tsv.gz):
+  selected accessions, source URLs, local filenames, and file sizes
 
-The exact gzip-compressed snapshot acquired for the paper experiments is
-included under `experiments/refseq_sketch_task/provenance/`, together with its
-SHA256 and the selected-genome manifest.
+The genome FASTA files are not included because of their size. The RefSeq
+dataset preparation job downloads the files listed by this snapshot and checks
+their gzip integrity before the sketch benchmarks run.
 
 BinDash baseline:
 
@@ -141,7 +146,8 @@ commit: ce2d16816beade65db992b8cd6eced00b54ca9ef
 executable: version 2.2.0 commit ce2d168-clean
 ```
 
-Detailed provenance is recorded in [`experiments/refseq_sketch_task/README.md`](experiments/refseq_sketch_task/README.md).
+See the [RefSeq benchmark README](experiments/refseq_sketch_task/README.md) for
+the preparation command, output layout, and configuration.
 
 ## Citation
 

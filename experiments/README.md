@@ -27,13 +27,13 @@ Both workflows include BinDash baseline comparisons.
 Run the setup commands from the repository root:
 
 ```bash
-uv sync
 make -C src CXX=g++ LDFLAGS=-lstdc++fs
 scripts/bootstrap.sh
 ```
 
 BinDash is required by the paired and supplemental pair-task experiments and
-the RefSeq BinDash sketch benchmark.
+the RefSeq BinDash sketch benchmark. The job scripts run `uv sync`
+automatically; run it manually only when invoking the Python scripts directly.
 
 ## Running the Benchmarks
 
@@ -49,9 +49,11 @@ Run all supplemental pair-task experiments with:
 experiments/pair_task/jobs/supplementary.sh
 ```
 
-Run the RefSeq OddSketch and BinDash sketch-build benchmarks with:
+Prepare and validate the RefSeq dataset, then run the OddSketch and BinDash
+sketch-build benchmarks with:
 
 ```bash
+experiments/refseq_sketch_task/jobs/prepare_refseq_dataset.sh
 experiments/refseq_sketch_task/jobs/refseq_oddsketch_sketch.sh
 experiments/refseq_sketch_task/jobs/refseq_bindash_sketch.sh
 ```
@@ -63,7 +65,9 @@ acquisition, and runner options.
 
 - To use a specific OddSketch binary, set `ODDSKETCH_BIN`.
 - BinDash is external and is not vendored in this repository. The default helper script builds it from `https://github.com/zhaoxiaofei/bindash.git` at tag `v2.6`.
-- Task configs define their default output roots via `paths.outdir`.
-- Pair-task runs create a fresh timestamped directory and record the resolved
-  settings alongside the observations and summaries.
+- Pair-task configs define their output roots via `paths.outdir`. Each run
+  creates a fresh timestamped directory and records the resolved settings
+  alongside the observations and summaries.
+- The RefSeq config uses `download.outdir` for downloaded assemblies and
+  `paths.data_root` for sketch-run outputs.
 - Exact-Jaccard helper binaries are built from `experiments/tools/src/` into `experiments/tools/bin/` by `make -C src`.

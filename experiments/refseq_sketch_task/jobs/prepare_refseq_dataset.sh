@@ -1,17 +1,18 @@
 #!/bin/bash
 #$ -cwd
 #$ -V
-#$ -N refseq_download
+#$ -N refseq_prepare
 #$ -q tsmall
-#$ -l mem_req=8g
-#$ -l h_vmem=8g
+#$ -pe OpenMP 16
+#$ -l mem_req=4g
+#$ -l h_vmem=4g
 
 set -euo pipefail
 
 REPO_ROOT=$(pwd)
 if [[ ! -f "${REPO_ROOT}/README.md" || ! -d "${REPO_ROOT}/experiments/refseq_sketch_task" ]]; then
   echo "Run this job from the repository root:" >&2
-  echo "  cd /path/to/genome-oddsketch && experiments/refseq_sketch_task/jobs/download_refseq_assemblies.sh" >&2
+  echo "  cd /path/to/genome-oddsketch && experiments/refseq_sketch_task/jobs/prepare_refseq_dataset.sh" >&2
   exit 1
 fi
 
@@ -49,6 +50,8 @@ if [[ -n "${PYTHON_BIN}" ]]; then
   UV_RUN_ARGS+=(--python "${PYTHON_BIN}")
 fi
 
+CHECK_THREADS=${CHECK_THREADS:-${NSLOTS:-4}}
+
 echo "[job] host=$(hostname)"
 echo "[job] start=$(date)"
 echo "[job] repo_root=${REPO_ROOT}"
@@ -58,8 +61,17 @@ if [[ -n "${PYTHON_BIN}" ]]; then
   echo "[job] python=${PYTHON_BIN}"
 fi
 echo "[job] uv_cache_dir=${UV_CACHE_DIR}"
+echo "[job] check_threads=${CHECK_THREADS}"
 
 "${UV_BIN}" sync
-"${UV_BIN}" "${UV_RUN_ARGS[@]}" python "${TASK_DIR}/scripts/download_refseq_assemblies.py" --config "${CONFIG_PATH}"
+
+echo "[job] downloading RefSeq assemblies"
+"${UV_BIN}" "${UV_RUN_ARGS[@]}" python "${TASK_DIR}/scripts/download_refseq_assemblies.py" \
+  --config "${CONFIG_PATH}"
+
+echo "[job] validating downloaded gzip files"
+"${UV_BIN}" "${UV_RUN_ARGS[@]}" python "${TASK_DIR}/scripts/validate_refseq_gzip.py" \
+  --threads "${CHECK_THREADS}" \
+  --repair
 
 echo "[job] end=$(date)"
