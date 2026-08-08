@@ -16,7 +16,7 @@
       "GCF_039679095.1"
     ],
     "expected_genome_count": 496080,
-    "threads": 4,
+    "threads": 16,
     "retries": 3,
     "timeout_sec": 120,
     "decompress": false,
