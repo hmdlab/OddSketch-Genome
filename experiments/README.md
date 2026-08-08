@@ -49,11 +49,16 @@ Run all supplemental pair-task experiments with:
 experiments/pair_task/jobs/supplementary.sh
 ```
 
-Prepare and validate the RefSeq dataset, then run the OddSketch and BinDash
-sketch-build benchmarks with:
+Prepare and validate the RefSeq dataset. This command downloads the assemblies
+before checking their gzip integrity:
 
 ```bash
 experiments/refseq_sketch_task/jobs/prepare_refseq_dataset.sh
+```
+
+Then run the OddSketch and BinDash sketch-build benchmarks:
+
+```bash
 experiments/refseq_sketch_task/jobs/refseq_oddsketch_sketch.sh
 experiments/refseq_sketch_task/jobs/refseq_bindash_sketch.sh
 ```
