@@ -33,8 +33,11 @@ outputs/sketchsize/run_<timestamp>_<pid>/
 ```
 
 The final run contains `used_config.json`, `run_metadata.json`,
-`paired_observations.tsv.gz`, and summary TSV/PNG files. Intermediate files are
-stored under `.work/` and removed after successful analysis.
+`paired_observations.tsv.gz`, summary TSV files, and both
+`RMSE_by_true_jaccard_panels.png` and
+`RMSE_by_true_jaccard_panels_95CI.png`. The latter shows paired-bootstrap 95%
+confidence intervals. Intermediate files are stored under `.work/` and removed
+after successful analysis.
 
 ## Supplemental Experiments
 

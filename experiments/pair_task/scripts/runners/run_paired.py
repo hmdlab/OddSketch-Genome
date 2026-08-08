@@ -471,12 +471,21 @@ def main() -> None:
                 "RMSE_by_true_jaccard_panels.png",
             )
         ),
+        "summary_figure_95ci": str(
+            experiment.get(
+                "summary_figure_95ci",
+                "RMSE_by_true_jaccard_panels_95CI.png",
+            )
+        ),
     }
-    if (
-        Path(runtime["summary_figure"]).name != runtime["summary_figure"]
-        or not runtime["summary_figure"].endswith(".png")
-    ):
-        raise SystemExit("summary_figure must be a PNG filename without a directory")
+    for figure_key in ("summary_figure", "summary_figure_95ci"):
+        figure_name = runtime[figure_key]
+        if Path(figure_name).name != figure_name or not figure_name.endswith(".png"):
+            raise SystemExit(
+                f"{figure_key} must be a PNG filename without a directory"
+            )
+    if runtime["summary_figure"] == runtime["summary_figure_95ci"]:
+        raise SystemExit("summary_figure and summary_figure_95ci must differ")
     resolved_config = json.loads(json.dumps(config))
     resolved_config["runtime"] = runtime
     used_config_path = run_dir / "used_config.json"

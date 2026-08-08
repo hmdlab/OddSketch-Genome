@@ -400,6 +400,24 @@ def main() -> None:
         metadata,
         error_bars=args.error_bars,
     )
+    ci_figure_name = metadata.get("summary_figure_95ci")
+    if ci_figure_name is not None:
+        ci_figure_name = str(ci_figure_name)
+        if (
+            Path(ci_figure_name).name != ci_figure_name
+            or not ci_figure_name.endswith(".png")
+        ):
+            raise SystemExit(
+                "summary_figure_95ci must be a PNG filename without a directory"
+            )
+        if ci_figure_name == figure_name:
+            raise SystemExit("summary_figure and summary_figure_95ci must differ")
+        plot_binned(
+            bin_metrics,
+            outdir / ci_figure_name,
+            metadata,
+            error_bars=True,
+        )
     print(f"saved paired sketch-size summary: {outdir}")
 
 
