@@ -223,7 +223,10 @@ def main() -> None:
             f"expected={expected_summary_sha256}, actual={summary_sha256}"
         )
 
-    outdir = resolve_path(task_root(), args.outdir or download_cfg.get("outdir") or "data/assembly")
+    outdir = resolve_path(
+        task_root(),
+        args.outdir or download_cfg.get("outdir") or "outputs/assembly",
+    )
     if outdir is None:
         raise SystemExit("download output directory could not be resolved")
 

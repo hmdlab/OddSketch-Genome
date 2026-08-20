@@ -182,19 +182,19 @@ def main() -> None:
     ap.add_argument("--config", default="config.json")
     ap.add_argument(
         "--integrity-manifest",
-        default="data/assembly/manifests/gzip_integrity_manifest.tsv",
+        default="outputs/assembly/manifests/gzip_integrity_manifest.tsv",
     )
     ap.add_argument(
         "--integrity-metadata",
-        default="data/assembly/manifests/gzip_integrity_metadata.json",
+        default="outputs/assembly/manifests/gzip_integrity_metadata.json",
     )
     ap.add_argument(
         "--download-metadata",
-        default="data/assembly/metadata/download_metadata.json",
+        default="outputs/assembly/metadata/download_metadata.json",
     )
     ap.add_argument(
         "--failed-manifest",
-        default="data/assembly/manifests/failed_assemblies.tsv",
+        default="outputs/assembly/manifests/failed_assemblies.tsv",
     )
     ap.add_argument(
         "--manifest-out",

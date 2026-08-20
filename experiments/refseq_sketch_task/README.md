@@ -42,15 +42,15 @@ Use a fresh run without `--resume` when measuring a new end-to-end build.
 
 ## Outputs
 
-Downloaded data and sketch runs are written under `data/` by default:
+Downloaded data and sketch runs are written under `outputs/` by default:
 
 ```text
-data/
+outputs/
 ├── assembly/
 │   ├── gzip/
 │   ├── manifests/
 │   └── metadata/
-└── sketch_runs/runs/<run_id>/
+└── runs/<run_id>/
     ├── results/
     ├── logs/
     ├── manifests/
@@ -73,7 +73,7 @@ Each run also records the resolved config, selected assemblies, input
 manifests, commands, executable paths and hashes, available version information,
 and the Git commit under `metadata/`.
 
-The `data/` directory may be a symlink to a larger filesystem.
+The `outputs/` directory may be a symlink to a larger filesystem.
 
 ## Dataset and Provenance
 

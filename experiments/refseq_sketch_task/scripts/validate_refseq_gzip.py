@@ -162,7 +162,9 @@ def main() -> None:
     config_path = resolve_config(args.config)
     config = json.loads(config_path.read_text())
     download_config = config.get("download", {})
-    download_outdir = resolve_path(download_config.get("outdir") or "data/assembly")
+    download_outdir = resolve_path(
+        download_config.get("outdir") or "outputs/assembly"
+    )
     manifests_dir = download_outdir / "manifests"
 
     gzip_list = (
